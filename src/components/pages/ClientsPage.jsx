@@ -15,7 +15,7 @@ export default function ClientsPage() {
     setTimeout(() => openPanel(id), 100);
   }
 
-  const tabs = [{ key: 'all', label: 'All' }, { key: 'LP1', label: 'LP1' }, { key: 'LP2', label: 'LP2' }];
+  const tabs = [{ key: 'all', label: 'All' }, { key: 'LP1', label: 'Crystal Pro' }, { key: 'LP2', label: 'Pearl View' }];
 
   return (
     <div className="page">
@@ -70,7 +70,7 @@ export default function ClientsPage() {
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{formatDate(l.date)}</div>
                 <span className={`tag tag-form${l.lp === 'LP2' ? '2' : '1'}`} style={{ marginTop: '4px', display: 'inline-block' }}>
-                  Form · {l.lp}
+                  Form · {l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro'}
                 </span>
               </div>
             </div>

@@ -5,10 +5,10 @@ export default function LeadCard({ lead }) {
 
   const srcTag =
     lead.source === 'call1' || lead.source === 'call2'
-      ? <span className="tag tag-call">Call · {lead.lp}</span>
+      ? <span className="tag tag-call">Call · {lead.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro'}</span>
       : lead.source === 'form1'
-      ? <span className="tag tag-form1">Form · LP1</span>
-      : <span className="tag tag-form2">Form · LP2</span>;
+      ? <span className="tag tag-form1">Form · Crystal Pro</span>
+      : <span className="tag tag-form2">Form · Pearl View</span>;
 
   const shortSubject =
     (lead.subject || '').length > 90
