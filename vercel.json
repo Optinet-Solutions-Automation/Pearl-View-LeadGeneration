@@ -1,4 +1,5 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/dashboard/$1" }],
+  "buildCommand": "node build.js",
+  "outputDirectory": "dashboard",
   "cleanUrls": true
 }
