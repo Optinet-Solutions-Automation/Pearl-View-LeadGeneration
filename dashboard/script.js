@@ -3,11 +3,12 @@
    DATA
 ═══════════════════════════════════════════ */
 const COLS = [
-  { id:'new',       label:'New Inquiries', dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
+  { id:'new',       label:'New Lead', dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
   { id:'contacted', label:'Contacted',     dot:'#d97706', cnt:'#fef3c7/#92400e' },
-  { id:'quoted',    label:'Quotes Issued', dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
-  { id:'scheduled', label:'Scheduled',     dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
-  { id:'completed', label:'Completed',     dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'quoted',    label:'In Progress', dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
+  { id:'scheduled', label:'Invoice Pending',     dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
+  { id:'completed', label:'Payment',     dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'completed', label:'Job Done', dot:'#ca8a04', cnt:'#fef9c3/#713f12'},
 ];
 
 /* ═══════════════════════════════════════════

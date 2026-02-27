@@ -1,13 +1,5 @@
-# Secrets & credentials
+node_modules
+dist
 .env
+.tmp
 dashboard/config.js
-
-# Screenshots (always deleted after use)
-.tmp/screenshots/
-
-# Nested git repo (separate repository)
-Pearl-View-LeadGeneration/
-
-# OS
-.DS_Store
-Thumbs.db

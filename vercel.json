@@ -1,4 +1,5 @@
 {
-  "outputDirectory": "dashboard",
-  "cleanUrls": true
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite"
 }
