@@ -1,27 +1,50 @@
+import { useState } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { formatDate } from '../../utils/dateUtils';
 
 export default function ClientsPage() {
   const { leads, openPanel, setCurrentPage } = useLeadsContext();
+  const [lpFilter, setLpFilter] = useState('all');
 
   const formLeads = leads.filter(l => !l.hasCall && l.name !== 'Unknown');
+  const counts = { all: formLeads.length, LP1: formLeads.filter(l => l.lp === 'LP1').length, LP2: formLeads.filter(l => l.lp === 'LP2').length };
+  const filtered = lpFilter === 'all' ? formLeads : formLeads.filter(l => l.lp === lpFilter);
 
   function goToLead(id) {
     setCurrentPage('leads');
     setTimeout(() => openPanel(id), 100);
   }
 
+  const tabs = [{ key: 'all', label: 'All' }, { key: 'LP1', label: 'LP1' }, { key: 'LP2', label: 'LP2' }];
+
   return (
     <div className="page">
       <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '4px' }}>Clients</div>
-      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>All unique clients from form submissions</div>
+      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>All unique clients from form submissions</div>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        {tabs.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setLpFilter(t.key)}
+            style={{
+              padding: '5px 14px', borderRadius: '20px', border: '1px solid',
+              fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+              borderColor: lpFilter === t.key ? 'var(--primary)' : 'var(--gray-200)',
+              background: lpFilter === t.key ? 'var(--primary)' : '#fff',
+              color: lpFilter === t.key ? '#fff' : 'var(--gray-600)',
+            }}
+          >
+            {t.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({counts[t.key]})</span>
+          </button>
+        ))}
+      </div>
       <div>
-        {formLeads.length === 0 ? (
+        {filtered.length === 0 ? (
           <div style={{ color: 'var(--gray-400)', fontSize: '13px', textAlign: 'center', padding: '32px' }}>
-            No form clients found
+            No clients found
           </div>
         ) : (
-          formLeads.map(l => (
+          filtered.map(l => (
             <div
               key={l.id}
               onClick={() => goToLead(l.id)}
