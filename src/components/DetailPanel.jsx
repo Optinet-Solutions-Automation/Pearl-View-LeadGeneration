@@ -85,10 +85,10 @@ export default function DetailPanel() {
   const isCallLead = l.source === 'call1' || l.source === 'call2';
 
   const srcTag = isCallLead
-    ? <span className="tag tag-call" style={{ fontSize: '11px' }}>Call · {l.lp}</span>
+    ? <span className="tag tag-call" style={{ fontSize: '11px' }}>Call · {l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro'}</span>
     : l.source === 'form1'
-    ? <span className="tag tag-form1" style={{ fontSize: '11px' }}>Form · LP1</span>
-    : <span className="tag tag-form2" style={{ fontSize: '11px' }}>Form · LP2</span>;
+    ? <span className="tag tag-form1" style={{ fontSize: '11px' }}>Form · Crystal Pro</span>
+    : <span className="tag tag-form2" style={{ fontSize: '11px' }}>Form · Pearl View</span>;
 
   function handleSaveNote() {
     saveNote(l.id, noteText || l.notes);

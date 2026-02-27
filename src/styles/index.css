@@ -187,8 +187,9 @@ body {
 /* ── KANBAN BOARD ────────────────────────── */
 .board {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
   gap: 10px;
+  overflow-x: auto;
 }
 .col {
   background: var(--gray-100); border-radius: 12px;
@@ -436,31 +437,20 @@ body {
 .shell { display: flex; width: 100%; height: 100vh; overflow: hidden; }
 
 /* ── COLUMN POPUP MODAL ──────────────────── */
-.col-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .45);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-.col-modal {
+/* Inline table section — replaces old fixed overlay */
+.col-table-section {
   background: #fff;
-  border-radius: 16px;
-  width: 92vw;
-  max-width: 900px;
-  max-height: 80vh;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0,0,0,.2);
-  animation: modalIn .18s ease;
+  animation: tableIn .18s ease;
+  min-height: 420px;
 }
-@keyframes modalIn {
-  from { opacity: 0; transform: scale(.96) translateY(8px); }
-  to   { opacity: 1; transform: scale(1)  translateY(0); }
+@keyframes tableIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .col-modal-hdr {
   display: flex;
@@ -477,6 +467,72 @@ body {
   font-weight: 700;
   color: var(--gray-900);
 }
+
+/* Column picker */
+.col-picker-wrap {
+  position: relative;
+}
+.col-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #fff;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  padding: 8px;
+  min-width: 190px;
+  z-index: 50;
+}
+.col-picker-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--gray-400);
+  padding: 4px 8px 8px;
+}
+.col-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  gap: 12px;
+  transition: background .1s;
+}
+.col-picker-row:hover { background: var(--gray-50); }
+.col-picker-label {
+  font-size: 13px;
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  width: 34px;
+  height: 18px;
+  border-radius: 20px;
+  background: var(--gray-300);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .18s;
+}
+.toggle-switch.on { background: var(--primary); }
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: left .18s;
+}
+.toggle-switch.on .toggle-knob { left: 18px; }
 .col-table-count {
   font-size: 11.5px;
   font-weight: 600;

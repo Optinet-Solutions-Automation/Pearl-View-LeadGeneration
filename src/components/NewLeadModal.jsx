@@ -50,8 +50,8 @@ export default function NewLeadModal() {
           <select className="fselect" name="source" value={form.source} onChange={handleChange}>
             <option value="form1">Form — LP Site 1</option>
             <option value="form2">Form — LP Site 2</option>
-            <option value="call1">Direct Call — LP1</option>
-            <option value="call2">Direct Call — LP2</option>
+            <option value="call1">Direct Call — Crystal Pro</option>
+            <option value="call2">Direct Call — Pearl View</option>
           </select>
         </div>
         <div className="fgroup">
