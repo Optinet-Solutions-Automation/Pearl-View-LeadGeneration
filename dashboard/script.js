@@ -7,8 +7,8 @@ const COLS = [
   { id:'contacted', label:'Contacted',     dot:'#d97706', cnt:'#fef3c7/#92400e' },
   { id:'quoted',    label:'In Progress', dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
   { id:'scheduled', label:'Invoice Pending',     dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
-  { id:'completed', label:'Payment',     dot:'#16a34a', cnt:'#dcfce7/#14532d' },
-  { id:'completed', label:'Payment',     dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'completed', label:'Payment', dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'completed', label:'Job Payment', dot:'#16a34a', cnt:'#dcfce7/#14532d' },
 ];
 
 /* ═══════════════════════════════════════════
