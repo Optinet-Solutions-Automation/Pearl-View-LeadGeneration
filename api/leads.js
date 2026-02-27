@@ -24,9 +24,9 @@ export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
 
-  const TOKEN = process.env.AIRTABLE_TOKEN;
-  const BASE  = process.env.AIRTABLE_BASE_ID;
-  const TABLE = process.env.AIRTABLE_TABLE_ID;
+  const TOKEN = (process.env.AIRTABLE_TOKEN || '').trim();
+  const BASE  = (process.env.AIRTABLE_BASE_ID || '').trim();
+  const TABLE = (process.env.AIRTABLE_TABLE_ID || '').trim();
 
   if (!TOKEN || !BASE || !TABLE) {
     const missing = ['AIRTABLE_TOKEN','AIRTABLE_BASE_ID','AIRTABLE_TABLE_ID'].filter(k => !process.env[k]);

@@ -38,9 +38,9 @@ export default async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
 
-  const TOKEN = process.env.AIRTABLE_TOKEN;
-  const BASE  = process.env.AIRTABLE_BASE_ID;
-  const TABLE = process.env.AIRTABLE_TABLE_ID;
+  const TOKEN = (process.env.AIRTABLE_TOKEN || '').trim();
+  const BASE  = (process.env.AIRTABLE_BASE_ID || '').trim();
+  const TABLE = (process.env.AIRTABLE_TABLE_ID || '').trim();
 
   if (!TOKEN || !BASE || !TABLE) {
     return res.status(500).json({ error: 'Missing Airtable env vars' });
