@@ -826,9 +826,8 @@ async function fetchAllFromAirtable() {
     } else {
       // Vercel: use server-side API route (token stays secure)
       const res = await fetch('/api/leads');
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
       allRecords = data.records;
     }
 
