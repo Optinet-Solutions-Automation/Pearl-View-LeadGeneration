@@ -1,5 +1,4 @@
 {
-  "buildCommand": "node build.js",
   "outputDirectory": "dashboard",
   "cleanUrls": true
 }
