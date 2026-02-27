@@ -2,7 +2,7 @@
  * GET /api/leads
  * Fetches all records from Airtable server-side using env vars.
  */
-const https = require('https');
+import https from 'https';
 
 function airtableGet(url, token) {
   return new Promise((resolve, reject) => {
@@ -20,7 +20,7 @@ function airtableGet(url, token) {
   });
 }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
 
