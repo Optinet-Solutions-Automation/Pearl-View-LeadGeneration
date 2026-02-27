@@ -131,11 +131,12 @@ export default function DetailPanel() {
             value={l.status}
             onChange={e => changeStatus(l.id, e.target.value)}
           >
-            <option value="new">🔵 New Inquiry</option>
+            <option value="new">🔵 New Lead</option>
             <option value="contacted">🟡 Contacted</option>
-            <option value="quoted">🟣 Quote Issued</option>
-            <option value="scheduled">🟢 Scheduled</option>
-            <option value="completed">✅ Completed</option>
+            <option value="quoted">🟣 In Progress</option>
+            <option value="scheduled">🟢 Invoice Pending</option>
+            <option value="completed">💚 Payment</option>
+            <option value="jobpayment">✅ Job Payment</option>
             <option value="lost">❌ Lost</option>
           </select>
         </div>

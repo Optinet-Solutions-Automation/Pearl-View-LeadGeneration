@@ -1,12 +1,12 @@
 import LeadCard from './LeadCard';
 
-export default function KanbanColumn({ col, leads }) {
+export default function KanbanColumn({ col, leads, isSelected, onSelect }) {
   const [bgC, textC] = col.cnt.split('/');
   const count = leads.length;
 
   return (
-    <div className="col">
-      <div className="col-hdr">
+    <div className={`col${isSelected ? ' col-selected' : ''}`}>
+      <div className="col-hdr" onClick={onSelect} title="Click to view lead list">
         <div className="col-dot" style={{ background: col.dot }}></div>
         <span className="col-lbl">{col.label}</span>
         <span className="col-cnt" style={{ background: bgC, color: textC }}>{count}</span>
