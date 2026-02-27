@@ -104,19 +104,31 @@ function normaliseRecord(rec, idx) {
   };
 }
 
+const IS_LOCAL = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 async function fetchAllFromAirtable() {
   showLoading(true);
   try {
     let allRecords = [];
-    let offset = '';
-    do {
-      const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
-      if (!res.ok) throw new Error(`Airtable error: ${res.status}`);
+
+    if (IS_LOCAL) {
+      // Local: call Airtable directly using config.js token
+      let offset = '';
+      do {
+        const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+        if (!res.ok) throw new Error(`Airtable error: ${res.status}`);
+        const data = await res.json();
+        allRecords.push(...(data.records || []));
+        offset = data.offset || '';
+      } while (offset);
+    } else {
+      // Vercel: call server-side API route using env vars
+      const res = await fetch('/api/leads');
       const data = await res.json();
-      allRecords.push(...(data.records || []));
-      offset = data.offset || '';
-    } while (offset);
+      if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
+      allRecords = data.records;
+    }
 
     leads = allRecords
       .map((r, i) => normaliseRecord(r, i))
@@ -421,12 +433,21 @@ function changeStatus(id, status) {
     const atStatusMap = { new:'New', contacted:'Contacted', quoted:'Quoted',
                           scheduled:'Scheduled', completed:'Completed', lost:'Lost' };
     const atFields = { 'Lead Status': atStatusMap[status] };
-    fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: atFields })
-    }).then(() => showToast('Status saved to Airtable ✓'))
-      .catch(() => showToast('Status updated locally (Airtable sync failed)'));
+    if (IS_LOCAL) {
+      fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: atFields })
+      }).then(() => showToast('Status saved to Airtable ✓'))
+        .catch(() => showToast('Status updated locally (Airtable sync failed)'));
+    } else {
+      fetch('/api/update-lead', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ airtableId: l.airtableId, fields: atFields })
+      }).then(() => showToast('Status saved to Airtable ✓'))
+        .catch(() => showToast('Status updated locally (Airtable sync failed)'));
+    }
   }
 }
 
