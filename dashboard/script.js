@@ -676,3 +676,37 @@ function showToast(msg) {
    INIT
 ═══════════════════════════════════════════ */
 fetchAllFromAirtable();
+
+
+
+
+
+
+
+/* ═══════════════════════════════════════════
+   PROFILE MENU
+═══════════════════════════════════════════ */
+function toggleProfileMenu(event) {
+  event.stopPropagation();
+  const menu = document.getElementById('profile-menu');
+  menu.classList.toggle('hidden');
+}
+
+// Close the menu automatically when clicking outside of it
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('profile-menu');
+  const wrapper = document.querySelector('.user-chip-wrapper');
+  
+  if (menu && !menu.classList.contains('hidden')) {
+    if (!wrapper.contains(event.target)) {
+      menu.classList.add('hidden');
+    }
+  }
+});
+
+// Logic for signing out
+function signOut() {
+  // Replace this with your actual sign-out logic (e.g., clearing auth tokens)
+  alert('Signing out of Pearl View...');
+  // window.location.href = '/login.html'; 
+}

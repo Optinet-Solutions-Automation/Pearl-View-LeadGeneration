@@ -77,9 +77,23 @@
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
         <span class="notif-dot"></span>
       </button>
-      <div class="user-chip">
-        <div class="avatar">AC</div>
-        <span class="user-name">Asaf C.</span>
+<div class="user-chip-wrapper" style="position: relative;">
+        <div class="user-chip" onclick="toggleProfileMenu(event)" style="cursor: pointer;">
+          <div class="avatar">AC</div>
+          <span class="user-name">Asaf C.</span>
+        </div>
+        
+        <div id="profile-menu" class="profile-menu hidden">
+          <div class="menu-header">
+            <span class="menu-name">Asaf C.</span>
+            <span class="menu-email">asaf@pearlview.com.au</span>
+          </div>
+          <div class="menu-divider"></div>
+          <button class="menu-item text-red" onclick="signOut()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            Sign out
+          </button>
+        </div>
       </div>
     </div>
   </header>
