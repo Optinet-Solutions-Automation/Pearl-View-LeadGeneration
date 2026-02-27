@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pearl View — Lead Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar:       #0c2340;
+      --sidebar-hover: #162f4d;
+      --sidebar-active:#1d4ed8;
+      --primary:       #2563eb;
+      --primary-dk:    #1d4ed8;
+      --primary-lt:    #3b82f6;
+      --blue-50:       #eff6ff;
+      --blue-100:      #dbeafe;
+      --blue-200:      #bfdbfe;
+      --white:         #ffffff;
+      --gray-50:       #f8fafc;
+      --gray-100:      #f1f5f9;
+      --gray-200:      #e2e8f0;
+      --gray-300:      #cbd5e1;
+      --gray-400:      #94a3b8;
+      --gray-500:      #64748b;
+      --gray-600:      #475569;
+      --gray-700:      #334155;
+      --gray-800:      #1e293b;
+      --gray-900:      #0f172a;
+      --green:         #16a34a;
+      --amber:         #d97706;
+      --red:           #dc2626;
+      --purple:        #7c3aed;
+      --teal:          #0d9488;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--blue-50);
+      color: var(--gray-800);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13.5px;
+    }
+
+    /* ── SIDEBAR ─────────────────────────────── */
+    .sidebar {
+      width: 216px;
+      min-width: 216px;
+      background: var(--sidebar);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 13px; color: #fff; flex-shrink: 0;
+      letter-spacing: -.5px;
+    }
+    .logo-name  { font-weight: 700; font-size: 14px; color: #fff; display: block; line-height: 1.2; }
+    .logo-sub   { font-size: 10px; color: rgba(255,255,255,.45); display: block; }
+    .nav        { flex: 1; padding: 10px 0; }
+    .nav-lbl    {
+      font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .09em; color: rgba(255,255,255,.3);
+      padding: 10px 16px 4px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px;
+      color: rgba(255,255,255,.6);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; position: relative;
+      transition: background .15s, color .15s;
+      user-select: none;
+    }
+    .nav-item:hover  { background: var(--sidebar-hover); color: #fff; }
+    .nav-item.active { background: var(--sidebar-active); color: #fff; }
+    .nav-item.active::before {
+      content: ''; position: absolute;
+      left: 0; top: 0; bottom: 0; width: 3px;
+      background: #60a5fa; border-radius: 0 2px 2px 0;
+    }
+    .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; opacity: .75; }
+    .nav-item.active svg, .nav-item:hover svg { opacity: 1; }
+    .nav-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,.18);
+      color: #fff; font-size: 10.5px; font-weight: 700;
+      padding: 1px 7px; border-radius: 20px; min-width: 20px; text-align: center;
+    }
+    .nav-item.active .nav-badge { background: rgba(255,255,255,.25); }
+    .sidebar-footer { padding: 10px 0; border-top: 1px solid rgba(255,255,255,.08); }
+
+    /* ── MAIN ────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+    /* ── TOP BAR ─────────────────────────────── */
+    .topbar {
+      background: #fff;
+      height: 54px; padding: 0 22px;
+      display: flex; align-items: center; gap: 14px;
+      border-bottom: 1px solid var(--gray-200);
+      flex-shrink: 0;
+    }
+    .topbar-title { font-size: 17px; font-weight: 700; color: var(--gray-900); flex-shrink: 0; }
+    .search-wrap { flex: 1; max-width: 340px; position: relative; }
+    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--gray-400); width: 14px; height: 14px; }
+    .search-wrap input {
+      width: 100%; padding: 7px 12px 7px 32px;
+      border: 1.5px solid var(--gray-200); border-radius: 8px;
+      font-size: 13px; background: var(--gray-50); color: var(--gray-700);
+      outline: none; font-family: inherit;
+    }
+    .search-wrap input:focus { border-color: var(--primary); background: #fff; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+    .btn-new {
+      background: var(--primary); color: #fff;
+      border: none; padding: 7px 15px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; font-family: inherit;
+      transition: background .15s;
+    }
+    .btn-new:hover { background: var(--primary-dk); }
+    .notif-btn {
+      width: 32px; height: 32px;
+      background: var(--gray-100); border: none; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--gray-500); position: relative;
+    }
+    .notif-dot {
+      position: absolute; top: 6px; right: 6px;
+      width: 7px; height: 7px; background: var(--red);
+      border-radius: 50%; border: 1.5px solid #fff;
+    }
+    .user-chip { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+    .avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .user-name { font-size: 13px; font-weight: 500; color: var(--gray-700); }
+
+    /* ── PAGE BODY ───────────────────────────── */
+    .page { flex: 1; overflow-y: auto; padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
+
+    /* ── STATS ROW ───────────────────────────── */
+    .stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; }
+    .stat-card {
+      background: #fff; border-radius: 12px; padding: 14px 16px;
+      border: 1px solid var(--gray-200);
+    }
+    .stat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .stat-lbl { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); }
+    .stat-ico { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .stat-ico svg { width: 16px; height: 16px; }
+    .stat-val { font-size: 22px; font-weight: 700; color: var(--gray-900); line-height: 1; }
+    .stat-sub { font-size: 11px; color: var(--gray-400); margin-top: 3px; }
+
+    /* ── KANBAN HEADER ───────────────────────── */
+    .board-hdr { display: flex; align-items: center; justify-content: space-between; }
+    .board-title { font-size: 14.5px; font-weight: 700; color: var(--gray-900); }
+    .board-ctrls { display: flex; align-items: center; gap: 8px; }
+    .ctrl-btn {
+      padding: 6px 13px; border: 1.5px solid var(--gray-200);
+      border-radius: 8px; background: #fff;
+      font-size: 12.5px; font-weight: 500; color: var(--gray-600);
+      cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: inherit;
+      transition: border-color .15s, color .15s;
+    }
+    .ctrl-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .ctrl-btn svg { width: 13px; height: 13px; }
+
+    /* ── KANBAN BOARD ────────────────────────── */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5,1fr);
+      gap: 10px;
+      flex: 1; min-height: 0; overflow: hidden;
+    }
+    .col {
+      background: var(--gray-100); border-radius: 12px;
+      border: 1px solid var(--gray-200);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .col-hdr {
+      padding: 11px 13px;
+      background: #fff; border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: center; gap: 7px;
+      flex-shrink: 0;
+    }
+    .col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .col-lbl { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-700); flex: 1; }
+    .col-cnt {
+      font-size: 10.5px; font-weight: 700;
+      padding: 1px 7px; border-radius: 20px;
+    }
+    .col-icon { width: 16px; height: 16px; color: var(--gray-400); cursor: pointer; flex-shrink: 0; }
+    .col-icon:hover { color: var(--gray-600); }
+    .col-cards {
+      flex: 1; overflow-y: auto;
+      padding: 9px; display: flex; flex-direction: column; gap: 7px;
+    }
+
+    /* ── LEAD CARD ───────────────────────────── */
+    .card {
+      background: #fff; border-radius: 10px; padding: 11px 12px;
+      border: 1.5px solid transparent;
+      cursor: pointer; transition: border-color .15s, box-shadow .15s;
+    }
+    .card:hover { border-color: var(--blue-200); box-shadow: 0 2px 8px rgba(37,99,235,.09); }
+    .card.active { border-color: var(--primary); box-shadow: 0 2px 12px rgba(37,99,235,.13); }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 5px; }
+    .card-name { font-size: 12.5px; font-weight: 700; color: var(--gray-900); line-height: 1.3; }
+    .star { font-size: 13px; cursor: pointer; color: var(--gray-300); flex-shrink: 0; line-height: 1; margin-left: 3px; }
+    .star.on { color: #f59e0b; }
+    .tags { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 5px; }
+    .tag {
+      font-size: 10px; font-weight: 700; padding: 2px 6px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .tag-form1 { background: #dbeafe; color: #1d4ed8; }
+    .tag-form2 { background: #ede9fe; color: #6d28d9; }
+    .tag-call  { background: #d1fae5; color: #065f46; }
+    .tag-sent  { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .tag-tomorrow { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .tag-gray  { background: var(--gray-100); color: var(--gray-600); }
+    .card-sub {
+      font-size: 11px; color: var(--gray-500); line-height: 1.45;
+      margin-bottom: 7px;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; }
+    .card-val { font-size: 11.5px; font-weight: 600; color: var(--gray-700); }
+    .card-dur { font-size: 10.5px; color: var(--gray-400); display: flex; align-items: center; gap: 3px; }
+    .card-dur svg { width: 11px; height: 11px; }
+    .prog { height: 3px; background: var(--gray-200); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 2px; background: var(--primary); }
+    .view-btn {
+      width: 100%; margin-top: 7px; padding: 5px 0;
+      background: var(--blue-50); color: var(--primary);
+      border: 1.5px solid var(--blue-200); border-radius: 6px;
+      font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: background .15s;
+    }
+    .view-btn:hover { background: var(--blue-100); }
+
+    /* ── DETAIL PANEL ────────────────────────── */
+    .panel {
+      width: 0; background: #fff;
+      border-left: 1px solid var(--gray-200);
+      display: flex; flex-direction: column; overflow: hidden;
+      transition: width .22s ease; flex-shrink: 0;
+    }
+    .panel.open { width: 310px; }
+    .panel-hdr {
+      padding: 16px 18px; border-bottom: 1px solid var(--gray-200);
+      display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0;
+    }
+    .panel-title { flex: 1; }
+    .panel-title h2 { font-size: 15px; font-weight: 700; color: var(--gray-900); line-height: 1.3; }
+    .panel-meta { font-size: 11.5px; color: var(--gray-500); margin-top: 2px; }
+    .close-btn {
+      width: 26px; height: 26px; border: none;
+      background: var(--gray-100); border-radius: 6px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--gray-500); font-size: 15px; flex-shrink: 0;
+      transition: background .15s;
+    }
+    .close-btn:hover { background: var(--gray-200); color: var(--gray-800); }
+    .panel-body { flex: 1; overflow-y: auto; }
+    .psec { padding: 13px 18px; border-bottom: 1px solid var(--gray-100); }
+    .psec-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--gray-400); margin-bottom: 9px;
+    }
+    .prow { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
+    .prow svg { width: 15px; height: 15px; color: var(--gray-400); flex-shrink: 0; }
+    .prow-text { font-size: 12.5px; color: var(--gray-700); }
+    .prow-text a { color: var(--primary); text-decoration: none; }
+    .status-sel {
+      width: 100%; padding: 7px 11px;
+      border: 1.5px solid var(--gray-200); border-radius: 8px;
+      font-size: 13px; font-family: inherit; color: var(--gray-700);
+      background: #fff; cursor: pointer; outline: none;
+    }
+    .status-sel:focus { border-color: var(--primary); }
+    .jrow { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12.5px; }
+    .jlbl { color: var(--gray-500); }
+    .jval { font-weight: 600; color: var(--gray-800); }
+
+    /* Audio player */
+    .audio-box {
+      background: var(--gray-50); border: 1px solid var(--gray-200);
+      border-radius: 10px; padding: 11px;
+    }
+    .audio-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .play-btn {
+      width: 28px; height: 28px; background: var(--primary);
+      border: none; border-radius: 50%; color: #fff;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .15s;
+    }
+    .play-btn:hover { background: var(--primary-dk); }
+    .play-btn svg { width: 12px; height: 12px; }
+    .wave { flex: 1; height: 26px; display: flex; align-items: center; gap: 1.5px; }
+    .wbar { width: 2px; border-radius: 1px; background: var(--blue-200); flex-shrink: 0; transition: background .1s; }
+    .wbar.played { background: var(--primary); }
+    .audio-footer { display: flex; justify-content: space-between; align-items: center; }
+    .audio-time { font-size: 10.5px; color: var(--gray-400); }
+    .audio-dl { color: var(--gray-400); cursor: pointer; }
+    .audio-dl:hover { color: var(--primary); }
+    .audio-dl svg { width: 14px; height: 14px; }
+
+    /* Notes */
+    .notes-ta {
+      width: 100%; min-height: 75px; padding: 9px 11px;
+      border: 1.5px solid var(--gray-200); border-radius: 8px;
+      font-size: 12.5px; font-family: inherit; color: var(--gray-700);
+      resize: vertical; outline: none; line-height: 1.5;
+    }
+    .notes-ta:focus { border-color: var(--primary); }
+    .notes-ta::placeholder { color: var(--gray-400); }
+    .save-note-btn {
+      margin-top: 6px; padding: 6px 14px;
+      background: var(--blue-50); color: var(--primary);
+      border: 1.5px solid var(--blue-200); border-radius: 7px;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .save-note-btn:hover { background: var(--blue-100); }
+
+    /* Action buttons */
+    .action-btn {
+      width: 100%; padding: 9px 14px; border: none; border-radius: 8px;
+      font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      transition: opacity .15s;
+    }
+    .action-btn:hover { opacity: .88; }
+    .action-btn svg { width: 14px; height: 14px; }
+    .btn-blue   { background: var(--primary); color: #fff; }
+    .btn-green  { background: var(--green);   color: #fff; }
+    .btn-red    { background: var(--red);     color: #fff; }
+    .btn-dark   { background: var(--gray-700);color: #fff; }
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+    /* ── MODAL ───────────────────────────────── */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 16px; padding: 26px;
+      width: 460px; max-height: 80vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 17px; font-weight: 700; color: var(--gray-900); margin-bottom: 18px; }
+    .fgroup { margin-bottom: 13px; }
+    .flabel { display: block; font-size: 12.5px; font-weight: 600; color: var(--gray-700); margin-bottom: 4px; }
+    .finput, .fselect, .ftextarea {
+      width: 100%; padding: 8px 11px;
+      border: 1.5px solid var(--gray-200); border-radius: 8px;
+      font-size: 13px; font-family: inherit; color: var(--gray-800);
+      outline: none; background: #fff;
+    }
+    .ftextarea { min-height: 70px; resize: vertical; }
+    .finput:focus, .fselect:focus, .ftextarea:focus { border-color: var(--primary); }
+    .modal-footer { display: flex; gap: 9px; justify-content: flex-end; margin-top: 18px; }
+    .btn-cancel {
+      padding: 8px 16px; border: 1.5px solid var(--gray-200);
+      border-radius: 8px; background: #fff; font-size: 13px;
+      font-weight: 500; color: var(--gray-600); cursor: pointer; font-family: inherit;
+    }
+    .btn-save-modal {
+      padding: 8px 18px; border: none; border-radius: 8px;
+      background: var(--primary); font-size: 13px;
+      font-weight: 600; color: #fff; cursor: pointer; font-family: inherit;
+    }
+
+    /* ── SCROLLBAR ───────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">PV</div>
+    <div>
+      <span class="logo-name">Pearl View</span>
+      <span class="logo-sub">Lead Management</span>
+    </div>
+  </div>
+  <nav class="nav">
+    <div class="nav-lbl">Main</div>
+    <div class="nav-item" data-page="overview" onclick="showPage('overview',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </div>
+    <div class="nav-item active" data-page="leads" onclick="showPage('leads',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Leads
+      <span class="nav-badge" id="nav-count">—</span>
+    </div>
+    <div class="nav-item" data-page="calendar" onclick="showPage('calendar',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Calendar
+    </div>
+    <div class="nav-item" data-page="clients" onclick="showPage('clients',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5M12 12a4 4 0 100-8 4 4 0 000 8z"/></svg>
+      Clients
+    </div>
+    <div class="nav-lbl" style="margin-top:6px">Business</div>
+    <div class="nav-item" data-page="reports" onclick="showPage('reports',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Reports
+    </div>
+    <div class="nav-item" data-page="crew" onclick="showPage('crew',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5"/><circle cx="12" cy="7" r="4"/></svg>
+      Crew & Jobs
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="nav-item" data-page="settings" onclick="showPage('settings',this)">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Settings
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main class="main">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <span class="topbar-title">Leads Dashboard</span>
+    <div class="search-wrap">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search leads…" oninput="searchLeads(this.value)" />
+    </div>
+    <div class="topbar-right">
+      <button class="notif-btn" title="Refresh from Airtable" onclick="fetchAllFromAirtable()" style="background:var(--blue-50);border:1.5px solid var(--blue-200);">
+        <svg fill="none" viewBox="0 0 24 24" stroke="var(--primary)" stroke-width="2" style="width:15px;height:15px"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      </button>
+      <button class="btn-new" onclick="openModal()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+        New Lead
+      </button>
+      <button class="notif-btn">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="notif-dot"></span>
+      </button>
+      <div class="user-chip">
+        <div class="avatar">AC</div>
+        <span class="user-name">Asaf C.</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page content -->
+  <div class="page" id="page-leads">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-lbl">New Leads</span>
+          <div class="stat-ico" style="background:#eff6ff">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#2563eb" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+        </div>
+        <div class="stat-val" id="stat-new">—</div>
+        <div class="stat-sub" id="stat-new-sub">Loading…</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-lbl">Calls Received</span>
+          <div class="stat-ico" style="background:#f0fdf4">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#16a34a" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/></svg>
+          </div>
+        </div>
+        <div class="stat-val" id="stat-calls">—</div>
+        <div class="stat-sub" id="stat-calls-sub">Loading…</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-lbl">Pending Quotes</span>
+          <div class="stat-ico" style="background:#fffbeb">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#d97706" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+          </div>
+        </div>
+        <div class="stat-val" id="stat-quotes">—</div>
+        <div class="stat-sub" id="stat-quotes-sub">Loading…</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-lbl">Scheduled Jobs</span>
+          <div class="stat-ico" style="background:#f0fdfa">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+        </div>
+        <div class="stat-val" id="stat-scheduled">—</div>
+        <div class="stat-sub" id="stat-scheduled-sub">Loading…</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top">
+          <span class="stat-lbl">Total Revenue</span>
+          <div class="stat-ico" style="background:#f0fdf4">
+            <svg fill="none" viewBox="0 0 24 24" stroke="#16a34a" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          </div>
+        </div>
+        <div class="stat-val" id="stat-revenue">—</div>
+        <div class="stat-sub" id="stat-revenue-sub">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Kanban header -->
+    <div class="board-hdr">
+      <span class="board-title">Lead Pipeline (Kanban Board)</span>
+      <div class="board-ctrls">
+        <button class="ctrl-btn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+          Filter
+        </button>
+        <button class="ctrl-btn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+          Add Column
+        </button>
+      </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="board" id="board"></div>
+
+  </div><!-- /page-leads -->
+
+  <!-- ── OVERVIEW PAGE ── -->
+  <div class="page" id="page-overview" style="display:none">
+    <div style="margin-bottom:4px">
+      <div style="font-size:17px;font-weight:700;color:var(--gray-900)">Overview</div>
+      <div style="font-size:13px;color:var(--gray-500);margin-top:2px">Summary of your Pearl View lead activity</div>
+    </div>
+    <div class="stats" id="overview-stats"></div>
+    <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:20px">
+      <div style="font-size:14px;font-weight:700;color:var(--gray-900);margin-bottom:14px">Lead Sources</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--blue-50);border:1.5px solid var(--blue-200);border-radius:10px;padding:14px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--primary);margin-bottom:6px">LP Site 1 · CrystalPro</div>
+          <a href="https://crystalpro.com.au/" target="_blank" style="font-size:12.5px;color:var(--primary);text-decoration:none;display:flex;align-items:center;gap:5px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+            crystalpro.com.au
+          </a>
+          <div style="margin-top:8px;font-size:12px;color:var(--gray-600)">Form leads + Call leads via this LP</div>
+          <div id="ov-lp1-count" style="font-size:22px;font-weight:700;color:var(--gray-900);margin-top:6px">—</div>
+        </div>
+        <div style="background:#f5f3ff;border:1.5px solid #ddd6fe;border-radius:10px;padding:14px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--purple);margin-bottom:6px">LP Site 2 · Pearl View</div>
+          <a href="https://pearlview.com.au/" target="_blank" style="font-size:12.5px;color:var(--purple);text-decoration:none;display:flex;align-items:center;gap:5px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+            pearlview.com.au
+          </a>
+          <div style="margin-top:8px;font-size:12px;color:var(--gray-600)">Form leads + Call leads via this LP</div>
+          <div id="ov-lp2-count" style="font-size:22px;font-weight:700;color:var(--gray-900);margin-top:6px">—</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:20px">
+      <div style="font-size:14px;font-weight:700;color:var(--gray-900);margin-bottom:14px">Recent Leads (Last 10)</div>
+      <div id="overview-recent"></div>
+    </div>
+  </div>
+
+  <!-- ── CLIENTS PAGE ── -->
+  <div class="page" id="page-clients" style="display:none">
+    <div style="font-size:17px;font-weight:700;color:var(--gray-900);margin-bottom:4px">Clients</div>
+    <div style="font-size:13px;color:var(--gray-500);margin-bottom:16px">All unique clients from form submissions</div>
+    <div id="clients-list"></div>
+  </div>
+
+  <!-- ── STUB PAGES ── -->
+  <div class="page" id="page-calendar" style="display:none">
+    <div style="font-size:17px;font-weight:700;color:var(--gray-900);margin-bottom:4px">Calendar</div>
+    <div style="font-size:13px;color:var(--gray-500);margin-bottom:20px">Scheduled jobs and follow-up dates</div>
+    <div id="calendar-list"></div>
+  </div>
+  <div class="page" id="page-reports" style="display:none">
+    <div style="font-size:17px;font-weight:700;color:var(--gray-900);margin-bottom:4px">Reports</div>
+    <div style="font-size:13px;color:var(--gray-500);margin-bottom:20px">Analytics coming in Phase 4</div>
+    <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:32px;text-align:center">
+      <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-300)" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      <div style="font-size:14px;font-weight:600;color:var(--gray-500)">Reports — Coming in Phase 4</div>
+      <div style="font-size:12.5px;color:var(--gray-400);margin-top:6px">Conversion rates, lead volume, revenue tracking</div>
+    </div>
+  </div>
+  <div class="page" id="page-crew" style="display:none">
+    <div style="font-size:17px;font-weight:700;color:var(--gray-900);margin-bottom:4px">Crew & Jobs</div>
+    <div style="font-size:13px;color:var(--gray-500);margin-bottom:20px">Crew assignment coming in Phase 3</div>
+    <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:32px;text-align:center">
+      <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-300)" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px"><path d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5"/><circle cx="12" cy="7" r="4"/></svg>
+      <div style="font-size:14px;font-weight:600;color:var(--gray-500)">Crew & Jobs — Coming in Phase 3</div>
+      <div style="font-size:12.5px;color:var(--gray-400);margin-top:6px">Assign crews, track job status, schedule appointments</div>
+    </div>
+  </div>
+  <div class="page" id="page-settings" style="display:none">
+    <div style="font-size:17px;font-weight:700;color:var(--gray-900);margin-bottom:4px">Settings</div>
+    <div style="font-size:13px;color:var(--gray-500);margin-bottom:16px">Dashboard configuration</div>
+    <div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:13px;font-weight:600;color:var(--gray-700)">Airtable Connection</div>
+      <div style="font-size:12.5px;color:var(--gray-500)">Base: <code style="background:var(--gray-100);padding:2px 6px;border-radius:4px">appNc7dQkFIq0dFFM</code></div>
+      <div style="font-size:12.5px;color:var(--gray-500)">Table: <code style="background:var(--gray-100);padding:2px 6px;border-radius:4px">Leads (tblS1keAU26CH08KJ)</code></div>
+      <div style="font-size:12.5px;color:var(--gray-500)">LP1: <a href="https://crystalpro.com.au/" target="_blank" style="color:var(--primary)">crystalpro.com.au</a></div>
+      <div style="font-size:12.5px;color:var(--gray-500)">LP2: <a href="https://pearlview.com.au/" target="_blank" style="color:var(--primary)">pearlview.com.au</a></div>
+      <button class="action-btn btn-blue" style="width:auto;align-self:flex-start;padding:8px 18px" onclick="fetchAllFromAirtable();showPage('leads',document.querySelector('[data-page=leads]'))">
+        Refresh Data from Airtable
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══════════════ DETAIL PANEL ══════════════ -->
+<aside class="panel" id="panel">
+  <div class="panel-hdr">
+    <div class="panel-title">
+      <h2 id="p-name">—</h2>
+      <div class="panel-meta" id="p-meta">—</div>
+    </div>
+    <button class="close-btn" onclick="closePanel()">✕</button>
+  </div>
+  <div class="panel-body" id="panel-body"></div>
+</aside>
+
+<!-- ══════════════ LOADING OVERLAY ══════════════ -->
+<div id="loading-overlay" style="
+  display:flex; position:fixed; inset:0; background:rgba(255,255,255,.9);
+  z-index:300; align-items:center; justify-content:center; flex-direction:column; gap:14px;">
+  <div style="width:36px;height:36px;border:3px solid var(--blue-100);border-top-color:var(--primary);
+    border-radius:50%;animation:spin .7s linear infinite;"></div>
+  <span style="font-size:13.5px;font-weight:500;color:var(--gray-500)">Loading leads from Airtable…</span>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<!-- ══════════════ NEW LEAD MODAL ══════════════ -->
+<div class="overlay" id="modal-overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-title">+ Add New Lead</div>
+    <div class="fgroup">
+      <label class="flabel">Source</label>
+      <select class="fselect" id="m-source">
+        <option value="form1">Form — LP Site 1</option>
+        <option value="form2">Form — LP Site 2</option>
+        <option value="call">Direct Call</option>
+      </select>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Full Name</label>
+      <input class="finput" id="m-name" placeholder="e.g. John Smith" />
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Phone</label>
+      <input class="finput" id="m-phone" placeholder="(555) 000-0000" />
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Email</label>
+      <input class="finput" id="m-email" placeholder="email@example.com" />
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Subject / Reason</label>
+      <textarea class="ftextarea" id="m-subject" placeholder="e.g. Quotation for 3-story commercial building, 20 windows…"></textarea>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Estimated Value ($)</label>
+      <input class="finput" id="m-value" type="number" placeholder="0" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save-modal" onclick="saveLead()">Save Lead</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+/* ═══════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════ */
+const COLS = [
+  { id:'new',       label:'New Inquiries', dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
+  { id:'contacted', label:'Contacted',     dot:'#d97706', cnt:'#fef3c7/#92400e' },
+  { id:'quoted',    label:'Quotes Issued', dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
+  { id:'scheduled', label:'Scheduled',     dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
+  { id:'completed', label:'Completed',     dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+];
+
+/* ═══════════════════════════════════════════
+   AIRTABLE CONFIG
+═══════════════════════════════════════════ */
+const AT_TOKEN    = window.AIRTABLE_TOKEN || '';
+const AT_BASE     = window.AIRTABLE_BASE  || '';
+const AT_TABLE    = window.AIRTABLE_TABLE || '';
+
+let nextId = 100;
+let leads = [
+  // ── Placeholder — replaced on load ──
+  { id:1, name:'Loading…', source:'form1', lp:'LP1',
+    phone:'(415) 555-0123', email:'sarah.j@gmail.com',
+    subject:'Quotation: 12 windows, 2 stories, Residential — $180',
+    value:180, status:'new', date:'Aug 16, 2024 1:30 PM',
+    address:'123 Oak Ave, Residential', jobType:'Residential',
+    windows:12, starred:false, notes:'', hasCall:false, progress:15 },
+
+  { id:2, name:'Mark Lee', source:'call', lp:null,
+    phone:'(415) 555-0199', email:'marklee@email.com',
+    subject:'Window cleaning inquiry — residential property',
+    value:0, status:'new', date:'Aug 16, 2024 1:30 PM',
+    address:'456 Oak Rd, Residential', jobType:'Residential',
+    windows:3, duration:'2:15', starred:false, notes:'', hasCall:true, progress:10 },
+
+  { id:3, name:'Maria Garcia', source:'form2', lp:'LP2',
+    phone:'(415) 555-0456', email:'m.garcia@mail.com',
+    subject:'Inquire: Glass panel cleaning, commercial space, $220',
+    value:220, status:'new', date:'Aug 16, 2024 2:00 PM',
+    address:'789 Market St, Commercial', jobType:'Commercial',
+    windows:8, starred:true, notes:'', hasCall:false, progress:15 },
+
+  { id:4, name:'James Davies', source:'call', lp:null,
+    phone:'(415) 555-0789', email:'james.d@email.com',
+    subject:'Residential quote — 2-story house, 10 windows',
+    value:0, status:'new', date:'Aug 16, 2024 3:00 PM',
+    address:'321 Maple Ave', jobType:'Residential',
+    windows:10, duration:'1:05', starred:false, notes:'', hasCall:true, progress:10 },
+
+  { id:5, name:'Local Office', source:'call', lp:null,
+    phone:'(415) 555-1010', email:'info@localoffice.com',
+    subject:'Commercial building, all 4 floors, regular monthly service',
+    value:0, status:'new', date:'Aug 16, 2024 4:00 PM',
+    address:'100 Business Blvd, Commercial', jobType:'Commercial',
+    windows:40, duration:'4:50', starred:false, notes:'', hasCall:true, progress:10 },
+
+  // ── Contacted ──
+  { id:6, name:'Alex Brown', source:'form1', lp:'LP1',
+    phone:'(415) 555-2020', email:'alex.b@email.com',
+    subject:'Quotation for single-story home, 6 windows',
+    value:250, status:'contacted', date:'Aug 15, 2024 9:00 AM',
+    address:'50 Pine St', jobType:'Residential',
+    windows:6, starred:false, notes:'Sent quote via email.', hasCall:false,
+    tag:'Sent Quote', progress:35 },
+
+  { id:7, name:'Emily Chen', source:'call', lp:null,
+    phone:'(415) 555-3030', email:'emily.c@email.com',
+    subject:'Called for residential window cleaning estimate',
+    value:0, status:'contacted', date:'Aug 15, 2024 11:00 AM',
+    address:'22 Birch Ln', jobType:'Residential',
+    windows:5, duration:'0:58', starred:false, notes:'Call back tomorrow morning.', hasCall:true,
+    tag:'Call back tomorrow', progress:30 },
+
+  { id:8, name:'Robert Hall', source:'form2', lp:'LP2',
+    phone:'(415) 555-4040', email:'r.hall@email.com',
+    subject:'Scheduled site visit for commercial property assessment',
+    value:0, status:'contacted', date:'Aug 15, 2024 2:30 PM',
+    address:'500 Commerce Way, Commercial', jobType:'Commercial',
+    windows:20, starred:false, notes:'Site visit booked for Aug 18.', hasCall:false,
+    tag:'Site visit booked', progress:30 },
+
+  // ── Quoted ──
+  { id:9, name:'Linda White', source:'form1', lp:'LP1',
+    phone:'(415) 555-5050', email:'linda.w@email.com',
+    subject:'2-story residential, inside & outside, 14 windows',
+    value:150, status:'quoted', date:'Aug 14, 2024 10:00 AM',
+    address:'77 Cedar Ct, Residential', jobType:'Residential',
+    windows:14, starred:false, notes:'Quote sent Aug 15. Awaiting reply.', hasCall:false,
+    tag:'Sent 8/15', progress:55 },
+
+  { id:10, name:'Daniel Smith', source:'call', lp:null,
+    phone:'(415) 555-6060', email:'d.smith@email.com',
+    subject:'2-story residential — exterior only, gutters included',
+    value:310, status:'quoted', date:'Aug 14, 2024 11:30 AM',
+    address:'33 Willow Dr', jobType:'Residential',
+    windows:12, duration:'3:20', starred:false, notes:'Quote sent Aug 14. Following up Aug 18.', hasCall:true,
+    tag:'Sent 8/14', progress:55 },
+
+  // ── Scheduled ──
+  { id:11, name:'Karen Evans', source:'form1', lp:'LP1',
+    phone:'(415) 555-7070', email:'k.evans@email.com',
+    subject:'Standard residential window cleaning, single-story',
+    value:280, status:'scheduled', date:'Aug 13, 2024 8:00 AM',
+    address:'12 Lakeview Dr, Residential', jobType:'Residential',
+    windows:8, starred:true, notes:'Confirmed. Job on Aug 18 10 AM.', hasCall:false,
+    jobDate:'Aug 18, 10:00 AM', progress:75 },
+
+  { id:12, name:'John Reed', source:'call', lp:null,
+    phone:'(415) 555-8080', email:'john.r@email.com',
+    subject:'Residential exterior window cleaning + screen wash',
+    value:195, status:'scheduled', date:'Aug 13, 2024 1:00 PM',
+    address:'88 Sunset Blvd', jobType:'Residential',
+    windows:6, duration:'2:40', starred:false, notes:'Booked for Aug 19 2 PM.', hasCall:true,
+    jobDate:'Aug 19, 2:00 PM', progress:75 },
+
+  { id:13, name:'Green Valley HOA', source:'form2', lp:'LP2',
+    phone:'(415) 555-9090', email:'hoa@greenvalley.com',
+    subject:'Commercial — full complex, 8 buildings, monthly contract',
+    value:1450, status:'scheduled', date:'Aug 12, 2024 9:00 AM',
+    address:'Green Valley Complex, Commercial', jobType:'Commercial',
+    windows:120, starred:true, notes:'Large contract. Aug 21 9AM start.', hasCall:false,
+    jobDate:'Aug 21, 9:00 AM', progress:75 },
+
+  // ── Completed ──
+  { id:14, name:'Sarah Morton', source:'form1', lp:'LP1',
+    phone:'(415) 555-1111', email:'s.morton@email.com',
+    subject:'Single-story residential, exterior only',
+    value:180, status:'completed', date:'Aug 10, 2024 9:00 AM',
+    address:'60 Oak St, Residential', jobType:'Residential',
+    windows:7, starred:false, notes:'Job done. Invoice paid.', hasCall:false, progress:100 },
+
+  { id:15, name:'Tom Wu', source:'call', lp:null,
+    phone:'(415) 555-2222', email:'tom.w@email.com',
+    subject:'Residential — inside & outside, 2-story',
+    value:350, status:'completed', date:'Aug 9, 2024 11:00 AM',
+    address:'44 Elm Ave', jobType:'Residential',
+    windows:16, duration:'1:50', starred:false, notes:'Completed. Left 5-star review.', hasCall:true, progress:100 },
+
+];
+
+let activeId  = null;
+let searchTerm = '';
+let isLoading  = true;
+
+/* ═══════════════════════════════════════════
+   AIRTABLE FETCH + NORMALISE
+═══════════════════════════════════════════ */
+function parseDate(raw) {
+  if (!raw) return new Date(0);
+  // Format A: "Mon, 27 Oct 2025, 10:17 am"  → parse directly
+  // Format B: "2025-08-28 09:50:08"          → ISO-ish
+  const s = raw.replace(',', ''); // remove first comma to help Date parsing
+  const d = new Date(s);
+  return isNaN(d) ? new Date(0) : d;
+}
+
+function formatDate(raw) {
+  const d = parseDate(raw);
+  if (d.getTime() === 0) return raw || '—';
+  return d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit' });
+}
+
+function normaliseRecord(rec, idx) {
+  const f = rec.fields;
+  const isCall = !!(f['Caller ID'] || f['Call Time']);
+
+  // Source → which LP site
+  const rawSrc = isCall ? (f['Call - Lead Source'] || '') : (f['Lead Source'] || '');
+  let source;
+  if (isCall) {
+    source = rawSrc.includes('pearlview') ? 'call2' : 'call1';
+  } else {
+    source = rawSrc.includes('pearlview') ? 'form2' : 'form1';
+  }
+
+  // Status
+  const statusMap = { 'New':'new', 'Contacted':'contacted', 'Quoted':'quoted',
+                      'Scheduled':'scheduled', 'Completed':'completed', 'Lost':'lost' };
+  const rawStatus = f['Lead Status'] || 'New';
+  const status = statusMap[rawStatus] || 'new';
+  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100 };
+
+  // Name — show proper name, not phone number for unknown callers
+  const name = f['Client Name'] || (isCall ? 'Unknown Caller' : 'Unknown');
+
+  // Subject — truncate very long transcripts for display
+  const fullSubject = (isCall
+    ? (f['Call Recording Transcript'] || '')
+    : (f['Inquiry Subject/Reason'] || ''));
+
+  const rawDate = isCall ? f['Call Time'] : f['Inquiry Date'];
+
+  return {
+    id:         rec.id,
+    name,
+    source,
+    lp:         source.includes('2') ? 'LP2' : 'LP1',
+    phone:      f['Phone Number'] || f['Caller ID'] || '',
+    email:      f['Email'] || '',
+    subject:    fullSubject,
+    date:       rawDate || '',
+    dateObj:    parseDate(rawDate),
+    address:    f['Adress'] || f['Service Address'] || '',
+    jobType:    f['Property Type'] || '',
+    windows:    f['Estimated Window Count'] || 0,
+    stories:    f['Stories'] || 0,
+    value:      f['Quote Amount'] || 0,
+    invoice:    f['Final Invoice Amount'] || 0,
+    duration:   f['Call Duration'] || '',
+    followUp:   f['Next Follow-up Date'] || '',
+    jobDate:    f['Scheduled Cleaning Date'] || '',
+    details:    f['Property Details'] || '',
+    status,
+    progress:   progMap[status] || 10,
+    starred:    false,
+    notes:      '',
+    hasCall:    isCall,
+    tag:        '',
+    airtableId: rec.id,
+  };
+}
+
+async function fetchAllFromAirtable() {
+  showLoading(true);
+  const allRecords = [];
+  let offset = '';
+  try {
+    do {
+      const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+      if (!res.ok) throw new Error(`Airtable error: ${res.status}`);
+      const data = await res.json();
+      allRecords.push(...(data.records || []));
+      offset = data.offset || '';
+    } while (offset);
+
+    // Normalise and sort newest first
+    leads = allRecords
+      .map((r, i) => normaliseRecord(r, i))
+      .sort((a, b) => b.dateObj - a.dateObj);
+
+  } catch (err) {
+    console.error('Failed to load from Airtable:', err);
+    showToast('Failed to load data — check console');
+  } finally {
+    showLoading(false);
+    renderBoard();
+  }
+}
+
+function showLoading(on) {
+  isLoading = on;
+  document.getElementById('loading-overlay').style.display = on ? 'flex' : 'none';
+}
+
+/* ═══════════════════════════════════════════
+   RENDER BOARD
+═══════════════════════════════════════════ */
+function renderBoard() {
+  const board = document.getElementById('board');
+  const filtered = searchTerm
+    ? leads.filter(l =>
+        l.name.toLowerCase().includes(searchTerm) ||
+        l.subject.toLowerCase().includes(searchTerm) ||
+        (l.phone || '').toLowerCase().includes(searchTerm)
+      )
+    : leads;
+
+  board.innerHTML = COLS.map(col => {
+    const colLeads = filtered.filter(l => l.status === col.id);
+    const [bgC, textC] = col.cnt.split('/');
+    return `
+      <div class="col">
+        <div class="col-hdr">
+          <div class="col-dot" style="background:${col.dot}"></div>
+          <span class="col-lbl">${col.label}</span>
+          <span class="col-cnt" style="background:${bgC};color:${textC}">${colLeads.length}</span>
+          <svg class="col-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+          </svg>
+        </div>
+        <div class="col-cards">
+          ${colLeads.map(l => cardHTML(l)).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  // update stats from real data
+  const newCount       = leads.filter(l => l.status === 'new').length;
+  const callCount      = leads.filter(l => l.hasCall).length;
+  const quotedCount    = leads.filter(l => l.status === 'quoted').length;
+  const scheduledCount = leads.filter(l => l.status === 'scheduled').length;
+  const completedLeads = leads.filter(l => l.status === 'completed');
+  const totalRevenue   = completedLeads.reduce((sum, l) => sum + (parseFloat(l.invoice) || parseFloat(l.value) || 0), 0);
+
+  document.getElementById('stat-new').textContent       = newCount;
+  document.getElementById('stat-new-sub').textContent   = `${leads.length} total leads`;
+  document.getElementById('stat-calls').textContent     = callCount;
+  document.getElementById('stat-calls-sub').textContent = `${leads.filter(l=>!l.hasCall).length} form submissions`;
+  document.getElementById('stat-quotes').textContent    = quotedCount;
+  document.getElementById('stat-quotes-sub').textContent= quotedCount === 1 ? 'Awaiting client response' : 'Awaiting client response';
+  document.getElementById('stat-scheduled').textContent = scheduledCount;
+  document.getElementById('stat-scheduled-sub').textContent = scheduledCount === 1 ? '1 job booked' : `${scheduledCount} jobs booked`;
+  document.getElementById('stat-revenue').textContent   = totalRevenue > 0 ? '$' + totalRevenue.toFixed(2) : '$0';
+  document.getElementById('stat-revenue-sub').textContent = `${completedLeads.length} job${completedLeads.length !== 1 ? 's' : ''} completed`;
+  document.getElementById('nav-count').textContent = leads.length;
+}
+
+function cardHTML(l) {
+  const srcTag = (l.source === 'call1' || l.source === 'call2')
+    ? `<span class="tag tag-call">Call · ${l.lp}</span>`
+    : l.source === 'form1'
+    ? `<span class="tag tag-form1">Form · LP1</span>`
+    : `<span class="tag tag-form2">Form · LP2</span>`;
+
+  // Truncate long transcripts/subjects for card display
+  const shortSubject = (l.subject || '').length > 90
+    ? l.subject.substring(0, 90) + '…'
+    : (l.subject || '—');
+
+  const tagChip = l.tag
+    ? `<span class="tag ${l.tag.toLowerCase().includes('sent') ? 'tag-sent' : l.tag.toLowerCase().includes('tomorrow') ? 'tag-tomorrow' : 'tag-gray'}">${l.tag}</span>`
+    : '';
+
+  const valText = l.value > 0 ? `Est. $${l.value.toLocaleString()}` : 'Est. $—';
+  const durText = l.duration
+    ? `<span class="card-dur"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${l.duration}</span>`
+    : '';
+
+  const showView = l.status === 'new' || l.status === 'contacted';
+
+  return `
+    <div class="card${activeId===l.id?' active':''}" id="card-${l.id}" onclick="openPanel('${l.id}')">
+      <div class="card-top">
+        <span class="card-name">${l.name}</span>
+        <span class="star${l.starred?' on':''}" onclick="toggleStar(event,'${l.id}')">${l.starred?'★':'☆'}</span>
+      </div>
+      <div class="tags">${srcTag}${tagChip}</div>
+      <div class="card-sub">${shortSubject}</div>
+      <div class="card-footer">
+        <span class="card-val">${valText}</span>
+        ${durText}
+      </div>
+      <div class="prog"><div class="prog-fill" style="width:${l.progress}%"></div></div>
+      ${showView ? `<button class="view-btn" onclick="openPanel('${l.id}')">View Details</button>` : ''}
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   PANEL
+═══════════════════════════════════════════ */
+function openPanel(id) {
+  activeId = id;
+  const l = leads.find(x => x.id === id);
+  if (!l) return;
+
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('p-name').textContent = l.name;
+  const isCallLead = l.source === 'call1' || l.source === 'call2';
+  document.getElementById('p-meta').textContent = `${isCallLead ? 'Direct Call · ' + l.lp : 'Form · ' + l.lp} · ${formatDate(l.date)}`;
+
+  const srcTag = isCallLead
+    ? `<span class="tag tag-call" style="font-size:11px">Call · ${l.lp}</span>`
+    : l.source === 'form1'
+    ? `<span class="tag tag-form1" style="font-size:11px">Form · LP1</span>`
+    : `<span class="tag tag-form2" style="font-size:11px">Form · LP2</span>`;
+
+  // call section
+  const transcript = l.subject || '';
+  const waveHTML = l.hasCall ? `
+    <div class="audio-box">
+      <div class="audio-row">
+        <button class="play-btn" id="play-btn-${l.id}" onclick="togglePlay(${JSON.stringify(l.id)})">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="wave" id="wave-${l.id}">
+          ${generateWave()}
+        </div>
+      </div>
+      <div class="audio-footer">
+        <span class="audio-time">Duration: ${l.duration || '—'}</span>
+      </div>
+    </div>
+    ${transcript ? `
+    <div style="margin-top:10px">
+      <div class="psec-title" style="margin-bottom:5px">Transcript</div>
+      <div style="font-size:11.5px;color:var(--gray-600);line-height:1.6;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px;max-height:140px;overflow-y:auto;">
+        ${transcript.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+      </div>
+    </div>` : ''}
+    ` : `<p style="font-size:12px;color:var(--gray-400)">No call recording for this lead.</p>`;
+
+  document.getElementById('panel-body').innerHTML = `
+    <div class="psec">
+      <div class="psec-title">Status</div>
+      <select class="status-sel" onchange="changeStatus('${l.id}', this.value)">
+        <option value="new"       ${l.status==='new'       ?'selected':''}>🔵 New Inquiry</option>
+        <option value="contacted" ${l.status==='contacted' ?'selected':''}>🟡 Contacted</option>
+        <option value="quoted"    ${l.status==='quoted'    ?'selected':''}>🟣 Quote Issued</option>
+        <option value="scheduled" ${l.status==='scheduled' ?'selected':''}>🟢 Scheduled</option>
+        <option value="completed" ${l.status==='completed' ?'selected':''}>✅ Completed</option>
+        <option value="lost"      ${l.status==='lost'      ?'selected':''}>❌ Lost</option>
+      </select>
+    </div>
+
+    <div class="psec">
+      <div class="psec-title">Client Contact</div>
+      <div class="prow">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/></svg>
+        <span class="prow-text">${l.phone}</span>
+      </div>
+      <div class="prow">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span class="prow-text"><a href="mailto:${l.email}">${l.email}</a></span>
+      </div>
+      <div class="prow">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span class="prow-text">${l.address || '—'}</span>
+      </div>
+    </div>
+
+    <div class="psec">
+      <div class="psec-title">Job Details</div>
+      <div class="jrow"><span class="jlbl">Job Type</span><span class="jval">${l.jobType || '—'}</span></div>
+      <div class="jrow"><span class="jlbl">Windows</span><span class="jval">${l.windows || '—'}</span></div>
+      <div style="padding:4px 0">
+        <div class="jlbl" style="margin-bottom:4px">Subject</div>
+        <div style="font-size:12px;color:var(--gray-800);line-height:1.55;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:8px 10px;max-height:120px;overflow-y:auto;text-align:left;white-space:pre-wrap;word-break:break-word">${l.subject || '—'}</div>
+      </div>
+      ${l.jobDate ? `<div class="jrow"><span class="jlbl">Job Date</span><span class="jval">${l.jobDate}</span></div>` : ''}
+      <div class="jrow"><span class="jlbl">Est. Value</span><span class="jval" style="color:var(--primary)">${l.value > 0 ? '$' + l.value.toLocaleString() : '—'}</span></div>
+      <div class="jrow"><span class="jlbl">Lead Source</span>${srcTag}</div>
+    </div>
+
+    <div class="psec">
+      <div class="psec-title">Call History</div>
+      ${waveHTML}
+    </div>
+
+    <div class="psec">
+      <div class="psec-title">Notes</div>
+      <textarea class="notes-ta" id="notes-${l.id}" placeholder="Add notes about this lead…">${l.notes}</textarea>
+      <button class="save-note-btn" onclick="saveNote('${l.id}')">Save Note</button>
+    </div>
+
+    <div class="psec" style="border-bottom:none">
+      <div class="psec-title">Actions</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div class="action-grid">
+          <button class="action-btn btn-blue">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5"/><circle cx="12" cy="7" r="4"/></svg>
+            Assign Crew
+          </button>
+          <button class="action-btn btn-dark" onclick="sendQuote('${l.id}')">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            Send Quote
+          </button>
+        </div>
+        <button class="action-btn btn-green" onclick="changeStatus('${l.id}','completed');closePanel()">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Complete Job
+        </button>
+        <button class="action-btn btn-red" onclick="archiveLead('${l.id}')">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Archive Lead
+        </button>
+      </div>
+    </div>
+  `;
+
+  renderBoard();
+}
+
+function closePanel() {
+  activeId = null;
+  document.getElementById('panel').classList.remove('open');
+  renderBoard();
+}
+
+/* ═══════════════════════════════════════════
+   WAVE GENERATOR
+═══════════════════════════════════════════ */
+function generateWave() {
+  const bars = 42;
+  let html = '';
+  for (let i = 0; i < bars; i++) {
+    const h = 4 + Math.floor(Math.random() * 20);
+    html += `<div class="wbar" style="height:${h}px"></div>`;
+  }
+  return html;
+}
+
+let playStates = {};
+function togglePlay(id) {
+  const btn = document.getElementById(`play-btn-${id}`);
+  if (!btn) return;
+  playStates[id] = !playStates[id];
+  const playing = playStates[id];
+  btn.innerHTML = playing
+    ? `<svg fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+    : `<svg fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+
+  if (playing) {
+    const wave = document.getElementById(`wave-${id}`);
+    if (wave) {
+      const bars = wave.querySelectorAll('.wbar');
+      let idx = 0;
+      const iv = setInterval(() => {
+        if (!playStates[id]) { clearInterval(iv); return; }
+        if (idx < bars.length) { bars[idx].classList.add('played'); idx++; }
+        else { clearInterval(iv); playStates[id] = false;
+          btn.innerHTML = `<svg fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`; }
+      }, 80);
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════ */
+function toggleStar(e, id) {
+  e.stopPropagation();
+  const l = leads.find(x => x.id === id);
+  if (l) { l.starred = !l.starred; renderBoard(); if (activeId === id) openPanel(id); }
+}
+
+function changeStatus(id, status) {
+  const l = leads.find(x => x.id === id);
+  if (!l) return;
+  l.status = status;
+  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100 };
+  l.progress = progMap[status] || 10;
+  renderBoard();
+  if (activeId === id) openPanel(id);
+
+  // Write back to Airtable if record has an airtable ID
+  if (l.airtableId) {
+    const atStatusMap = { new:'New', contacted:'Contacted', quoted:'Quoted',
+                          scheduled:'Scheduled', completed:'Completed', lost:'Lost' };
+    fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { 'Lead Status': atStatusMap[status] } })
+    }).then(() => showToast('Status saved to Airtable ✓'))
+      .catch(() => showToast('Status updated locally (Airtable sync failed)'));
+  }
+}
+
+function saveNote(id) {
+  const l = leads.find(x => x.id === id);
+  const ta = document.getElementById(`notes-${id}`);
+  if (l && ta) {
+    l.notes = ta.value;
+    showToast('Note saved ✓');
+  }
+}
+
+function sendQuote(id) {
+  changeStatus(id, 'quoted');
+  showToast('Status updated to Quoted');
+}
+
+function archiveLead(id) {
+  if (confirm('Archive this lead? It will be removed from the board.')) {
+    leads = leads.filter(l => l.id !== id);
+    closePanel();
+  }
+}
+
+function searchLeads(val) {
+  searchTerm = val.toLowerCase().trim();
+  renderBoard();
+}
+
+function showPage(page, el) {
+  // Update nav active state
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  // Hide all pages
+  ['leads','overview','clients','calendar','reports','crew','settings'].forEach(p => {
+    const el = document.getElementById('page-' + p);
+    if (el) el.style.display = 'none';
+  });
+
+  // Show target page
+  const target = document.getElementById('page-' + page);
+  if (target) target.style.display = 'flex';
+
+  // Update topbar title
+  const titles = { leads:'Leads Dashboard', overview:'Overview', clients:'Clients',
+                   calendar:'Calendar', reports:'Reports', crew:'Crew & Jobs', settings:'Settings' };
+  document.querySelector('.topbar-title').textContent = titles[page] || page;
+
+  // Close detail panel when switching pages
+  closePanel();
+
+  // Populate dynamic pages
+  if (page === 'overview') renderOverview();
+  if (page === 'clients')  renderClients();
+  if (page === 'calendar') renderCalendar();
+}
+
+function renderOverview() {
+  // Stats
+  const calls = leads.filter(l => l.hasCall).length;
+  const forms = leads.filter(l => !l.hasCall).length;
+  const lp1   = leads.filter(l => l.lp === 'LP1').length;
+  const lp2   = leads.filter(l => l.lp === 'LP2').length;
+  document.getElementById('ov-lp1-count').textContent = lp1 + ' total leads';
+  document.getElementById('ov-lp2-count').textContent = lp2 + ' total leads';
+
+  const statEl = document.getElementById('overview-stats');
+  statEl.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-lbl">Total Leads</span>
+        <div class="stat-ico" style="background:var(--blue-50)"><svg fill="none" viewBox="0 0 24 24" stroke="var(--primary)" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div>
+      </div>
+      <div class="stat-val">${leads.length}</div><div class="stat-sub">All time</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-lbl">Form Leads</span>
+        <div class="stat-ico" style="background:#ede9fe"><svg fill="none" viewBox="0 0 24 24" stroke="var(--purple)" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg></div>
+      </div>
+      <div class="stat-val">${forms}</div><div class="stat-sub">Web form submissions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-lbl">Call Leads</span>
+        <div class="stat-ico" style="background:#f0fdf4"><svg fill="none" viewBox="0 0 24 24" stroke="var(--green)" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/></svg></div>
+      </div>
+      <div class="stat-val">${calls}</div><div class="stat-sub">Direct calls received</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-lbl">Quoted</span>
+        <div class="stat-ico" style="background:#fffbeb"><svg fill="none" viewBox="0 0 24 24" stroke="#d97706" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+      </div>
+      <div class="stat-val">${leads.filter(l=>l.status==='quoted').length}</div><div class="stat-sub">Quotes issued</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-top"><span class="stat-lbl">Completed</span>
+        <div class="stat-ico" style="background:#f0fdf4"><svg fill="none" viewBox="0 0 24 24" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+      </div>
+      <div class="stat-val">${leads.filter(l=>l.status==='completed').length}</div><div class="stat-sub">Jobs done</div>
+    </div>`;
+
+  // Recent leads
+  const recent = leads.slice(0, 10);
+  document.getElementById('overview-recent').innerHTML = recent.map(l => `
+    <div onclick="showPage('leads',document.querySelector('[data-page=leads]'));setTimeout(()=>openPanel('${l.id}'),300)"
+      style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-100);cursor:pointer">
+      <div style="width:34px;height:34px;border-radius:8px;background:${l.hasCall?'#d1fae5':'var(--blue-100)'};
+        display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;
+        color:${l.hasCall?'#065f46':'var(--primary)'}">
+        ${l.hasCall?'📞':'📋'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--gray-900)">${l.name}</div>
+        <div style="font-size:11.5px;color:var(--gray-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(l.subject||'').substring(0,60)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);flex-shrink:0">${formatDate(l.date)}</div>
+    </div>`).join('');
+}
+
+function renderClients() {
+  // Only show form leads with a real name (not unknown)
+  const formLeads = leads.filter(l => !l.hasCall && l.name !== 'Unknown');
+  document.getElementById('clients-list').innerHTML = formLeads.map(l => `
+    <div onclick="showPage('leads',document.querySelector('[data-page=leads]'));setTimeout(()=>openPanel('${l.id}'),300)"
+      style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;
+        margin-bottom:8px;display:flex;align-items:center;gap:14px;cursor:pointer;
+        transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue-200)'" onmouseout="this.style.borderColor='var(--gray-200)'">
+      <div style="width:38px;height:38px;border-radius:50%;background:var(--blue-100);
+        display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;
+        color:var(--primary);flex-shrink:0">${l.name.charAt(0).toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:600;color:var(--gray-900)">${l.name}</div>
+        <div style="font-size:12px;color:var(--gray-500)">${l.email || l.phone || '—'}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;color:var(--gray-400)">${formatDate(l.date)}</div>
+        <span class="tag tag-form${l.lp==='LP2'?'2':'1'}" style="margin-top:4px;display:inline-block">Form · ${l.lp}</span>
+      </div>
+    </div>`).join('') || '<div style="color:var(--gray-400);font-size:13px;text-align:center;padding:32px">No form clients found</div>';
+}
+
+function renderCalendar() {
+  const scheduled = leads.filter(l => l.jobDate || l.followUp).sort((a,b) => {
+    const da = new Date(a.jobDate || a.followUp || 0);
+    const db = new Date(b.jobDate || b.followUp || 0);
+    return da - db;
+  });
+  const el = document.getElementById('calendar-list');
+  if (!scheduled.length) {
+    el.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:32px;text-align:center;color:var(--gray-400);font-size:13px">No scheduled jobs or follow-ups yet.<br>Set dates in lead details to see them here.</div>';
+    return;
+  }
+  el.innerHTML = scheduled.map(l => `
+    <div style="background:#fff;border-radius:10px;border:1px solid var(--gray-200);padding:14px 16px;margin-bottom:8px;display:flex;gap:14px;align-items:center">
+      <div style="background:var(--blue-50);border-radius:8px;padding:8px 12px;text-align:center;flex-shrink:0">
+        <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase">${new Date(l.jobDate||l.followUp).toLocaleDateString('en-AU',{month:'short'})}</div>
+        <div style="font-size:20px;font-weight:700;color:var(--gray-900)">${new Date(l.jobDate||l.followUp).getDate()}</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13.5px;font-weight:600;color:var(--gray-900)">${l.name}</div>
+        <div style="font-size:12px;color:var(--gray-500)">${l.jobDate?'Job scheduled':'Follow-up'} · ${l.address||'—'}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ═══════════════════════════════════════════
+   NEW LEAD MODAL
+═══════════════════════════════════════════ */
+function openModal() { document.getElementById('modal-overlay').classList.add('open'); }
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function overlayClick(e) { if (e.target === e.currentTarget) closeModal(); }
+
+function saveLead() {
+  const name    = document.getElementById('m-name').value.trim();
+  const phone   = document.getElementById('m-phone').value.trim();
+  const email   = document.getElementById('m-email').value.trim();
+  const subject = document.getElementById('m-subject').value.trim();
+  const value   = parseInt(document.getElementById('m-value').value) || 0;
+  const source  = document.getElementById('m-source').value;
+
+  if (!name) { alert('Name is required.'); return; }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' ' +
+    now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+
+  leads.unshift({
+    id: nextId++,
+    name, phone, email, subject, value, source,
+    lp: source === 'form2' || source === 'call2' ? 'LP2' : 'LP1',
+    status: 'new', date: dateStr, dateObj: new Date(),
+    address: '', jobType: 'Residential', windows: 0,
+    starred: false, notes: '', hasCall: source.startsWith('call'), progress: 10,
+  });
+
+  closeModal();
+  ['m-name','m-phone','m-email','m-subject','m-value'].forEach(id => document.getElementById(id).value = '');
+  renderBoard();
+  showToast('New lead added ✓');
+}
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+let toastTimer;
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = `
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+      background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;
+      font-size:13px;font-weight:500;z-index:999;
+      box-shadow:0 4px 16px rgba(0,0,0,.25);
+      transition:opacity .3s;
+    `;
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2500);
+}
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+fetchAllFromAirtable();
+</script>
+</body>
+</html>
