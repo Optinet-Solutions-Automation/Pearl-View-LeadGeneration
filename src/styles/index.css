@@ -187,8 +187,9 @@ body {
 /* ── KANBAN BOARD ────────────────────────── */
 .board {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
   gap: 10px;
+  overflow-x: auto;
 }
 .col {
   background: var(--gray-100); border-radius: 12px;
@@ -441,11 +442,11 @@ body {
   background: #fff;
   border: 1.5px solid var(--gray-200);
   border-radius: 14px;
-  margin-top: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: tableIn .18s ease;
+  min-height: 420px;
 }
 @keyframes tableIn {
   from { opacity: 0; transform: translateY(8px); }

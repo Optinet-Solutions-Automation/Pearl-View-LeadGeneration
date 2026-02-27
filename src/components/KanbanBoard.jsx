@@ -110,20 +110,8 @@ export default function KanbanBoard() {
         </div>
       </div>
 
-      <div className="board">
-        {COLS.map(col => (
-          <KanbanColumn
-            key={col.id}
-            col={col}
-            leads={filteredLeads.filter(l => l.status === col.id)}
-            isSelected={selectedColId === col.id}
-            onSelect={() => openCol(col.id)}
-          />
-        ))}
-      </div>
-
-      {/* Inline table — stays within the page, no overlay */}
-      {selectedColId && selectedCol && (
+      {selectedColId && selectedCol ? (
+        /* ── Table view — replaces the board in the same area ── */
         <div className="col-table-section">
 
           {/* Header */}
@@ -251,6 +239,19 @@ export default function KanbanBoard() {
               </div>
             </>
           )}
+        </div>
+      ) : (
+        /* ── Kanban board — shown when no column is selected ── */
+        <div className="board">
+          {COLS.map(col => (
+            <KanbanColumn
+              key={col.id}
+              col={col}
+              leads={filteredLeads.filter(l => l.status === col.id)}
+              isSelected={false}
+              onSelect={() => openCol(col.id)}
+            />
+          ))}
         </div>
       )}
     </>
