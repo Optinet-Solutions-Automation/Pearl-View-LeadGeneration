@@ -137,7 +137,7 @@ export default function DetailPanel() {
             <option value="scheduled">🟢 Invoice Pending</option>
             <option value="completed">💚 Payment</option>
             <option value="jobpayment">✅ Job Payment</option>
-            <option value="lost">❌ Lost</option>
+            <option value="refuse">❌ Refuse</option>
           </select>
         </div>
 

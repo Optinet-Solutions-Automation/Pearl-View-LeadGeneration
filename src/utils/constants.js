@@ -13,7 +13,7 @@ export const STATUS_MAP = {
   Quoted: 'quoted',
   Scheduled: 'scheduled',
   Completed: 'completed',
-  Lost: 'lost',
+  Lost: 'refuse',
 };
 
 export const AT_STATUS_MAP = {
@@ -23,7 +23,7 @@ export const AT_STATUS_MAP = {
   scheduled: 'Scheduled',
   completed: 'Completed',
   jobpayment: 'Completed',
-  lost: 'Lost',
+  refuse: 'Lost',
 };
 
 export const PROG_MAP = {
@@ -33,5 +33,5 @@ export const PROG_MAP = {
   scheduled: 75,
   completed: 100,
   jobpayment: 100,
-  lost: 100,
+  refuse: 100,
 };
