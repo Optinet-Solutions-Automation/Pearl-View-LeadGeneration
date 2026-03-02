@@ -458,27 +458,8 @@ function changeStatus(id, status) {
   renderBoard();
   if (activeId === id) openPanel(id);
 
-  // Write back to Airtable if record has an airtable ID
-  if (l.airtableId) {
-    const atStatusMap = { new:'New', contacted:'Contacted', quoted:'Quoted',
-                          scheduled:'Scheduled', completed:'Completed', lost:'Lost', refused:'Refused' };
-    const atFields = { 'Lead Status': atStatusMap[status] || status };
-    if (IS_LOCAL) {
-      fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: atFields })
-      }).then(() => showToast('Status saved to Airtable ✓'))
-        .catch(() => showToast('Status updated locally (Airtable sync failed)'));
-    } else {
-      fetch('/api/update-lead', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ airtableId: l.airtableId, fields: atFields })
-      }).then(() => showToast('Status saved to Airtable ✓'))
-        .catch(() => showToast('Status updated locally (Airtable sync failed)'));
-    }
-  }
+  // Airtable sync disabled — local changes only
+  showToast('Status updated ✓');
 }
 
 function saveNote(id) {
