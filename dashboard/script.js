@@ -3,12 +3,12 @@
    DATA
 ═══════════════════════════════════════════ */
 const COLS = [
-  { id:'new',       label:'New Lead', dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
-  { id:'contacted', label:'Contacted',     dot:'#d97706', cnt:'#fef3c7/#92400e' },
-  { id:'quoted',    label:'In Progress', dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
-  { id:'scheduled', label:'Invoice Pending',     dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
-  { id:'completed', label:'Payment', dot:'#16a34a', cnt:'#dcfce7/#14532d' },
-  { id:'completed', label:'Job Payment', dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'new',       label:'New Lead',       dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
+  { id:'contacted', label:'Contacted',      dot:'#d97706', cnt:'#fef3c7/#92400e' },
+  { id:'quoted',    label:'In Progress',    dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
+  { id:'scheduled', label:'Invoice Pending',dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
+  { id:'completed', label:'Job Payment',    dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'refused',   label:'Refused',        dot:'#dc2626', cnt:'#fee2e2/#991b1b' },
 ];
 
 /* ═══════════════════════════════════════════
@@ -21,9 +21,11 @@ const AT_TABLE    = window.AIRTABLE_TABLE || '';
 let nextId = 100;
 let leads = [];
 
-let activeId  = null;
+let activeId   = null;
 let searchTerm = '';
 let isLoading  = true;
+let statFilter = null; // null | 'new' | 'calls' | 'quoted' | 'scheduled' | 'completed' | 'refused'
+let dragLeadId = null;
 
 /* ═══════════════════════════════════════════
    AIRTABLE FETCH + NORMALISE
@@ -59,10 +61,10 @@ function normaliseRecord(rec, idx) {
 
   // Status
   const statusMap = { 'New':'new', 'Contacted':'contacted', 'Quoted':'quoted',
-                      'Scheduled':'scheduled', 'Completed':'completed', 'Lost':'lost' };
+                      'Scheduled':'scheduled', 'Completed':'completed', 'Lost':'lost', 'Refused':'refused' };
   const rawStatus = f['Lead Status'] || 'New';
   const status = statusMap[rawStatus] || 'new';
-  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100 };
+  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100, refused:100 };
 
   // Name — show proper name, not phone number for unknown callers
   const name = f['Client Name'] || (isCall ? 'Unknown Caller' : 'Unknown');
@@ -153,19 +155,31 @@ function showLoading(on) {
 ═══════════════════════════════════════════ */
 function renderBoard() {
   const board = document.getElementById('board');
-  const filtered = searchTerm
-    ? leads.filter(l =>
-        l.name.toLowerCase().includes(searchTerm) ||
-        l.subject.toLowerCase().includes(searchTerm) ||
-        (l.phone || '').toLowerCase().includes(searchTerm)
-      )
-    : leads;
+
+  // Apply search + stat filter
+  let filtered = leads;
+  if (searchTerm) {
+    filtered = filtered.filter(l =>
+      l.name.toLowerCase().includes(searchTerm) ||
+      l.subject.toLowerCase().includes(searchTerm) ||
+      (l.phone || '').toLowerCase().includes(searchTerm)
+    );
+  }
+  if (statFilter === 'calls') {
+    filtered = filtered.filter(l => l.hasCall);
+  } else if (statFilter) {
+    filtered = filtered.filter(l => l.status === statFilter);
+  }
 
   board.innerHTML = COLS.map(col => {
     const colLeads = filtered.filter(l => l.status === col.id);
     const [bgC, textC] = col.cnt.split('/');
     return `
-      <div class="col">
+      <div class="col" id="col-${col.id}"
+        ondragover="allowDrop(event)"
+        ondrop="dropOnCol(event,'${col.id}')"
+        ondragenter="this.classList.add('drag-over')"
+        ondragleave="handleDragLeave(event,this)">
         <div class="col-hdr">
           <div class="col-dot" style="background:${col.dot}"></div>
           <span class="col-lbl">${col.label}</span>
@@ -180,25 +194,36 @@ function renderBoard() {
       </div>`;
   }).join('');
 
-  // update stats from real data
+  // Update stats
   const newCount       = leads.filter(l => l.status === 'new').length;
   const callCount      = leads.filter(l => l.hasCall).length;
   const quotedCount    = leads.filter(l => l.status === 'quoted').length;
   const scheduledCount = leads.filter(l => l.status === 'scheduled').length;
+  const refusedCount   = leads.filter(l => l.status === 'refused').length;
   const completedLeads = leads.filter(l => l.status === 'completed');
   const totalRevenue   = completedLeads.reduce((sum, l) => sum + (parseFloat(l.invoice) || parseFloat(l.value) || 0), 0);
 
-  document.getElementById('stat-new').textContent       = newCount;
-  document.getElementById('stat-new-sub').textContent   = `${leads.length} total leads`;
-  document.getElementById('stat-calls').textContent     = callCount;
-  document.getElementById('stat-calls-sub').textContent = `${leads.filter(l=>!l.hasCall).length} form submissions`;
-  document.getElementById('stat-quotes').textContent    = quotedCount;
-  document.getElementById('stat-quotes-sub').textContent= quotedCount === 1 ? 'Awaiting client response' : 'Awaiting client response';
-  document.getElementById('stat-scheduled').textContent = scheduledCount;
-  document.getElementById('stat-scheduled-sub').textContent = scheduledCount === 1 ? '1 job booked' : `${scheduledCount} jobs booked`;
-  document.getElementById('stat-revenue').textContent   = totalRevenue > 0 ? '$' + totalRevenue.toFixed(2) : '$0';
-  document.getElementById('stat-revenue-sub').textContent = `${completedLeads.length} job${completedLeads.length !== 1 ? 's' : ''} completed`;
+  document.getElementById('stat-new').textContent           = newCount;
+  document.getElementById('stat-new-sub').textContent       = `${leads.length} total leads`;
+  document.getElementById('stat-calls').textContent         = callCount;
+  document.getElementById('stat-calls-sub').textContent     = `${leads.filter(l=>!l.hasCall).length} form submissions`;
+  document.getElementById('stat-quotes').textContent        = quotedCount;
+  document.getElementById('stat-quotes-sub').textContent    = 'Awaiting client response';
+  document.getElementById('stat-scheduled').textContent     = scheduledCount;
+  document.getElementById('stat-scheduled-sub').textContent = `${scheduledCount} jobs booked`;
+  document.getElementById('stat-revenue').textContent       = totalRevenue > 0 ? '$' + totalRevenue.toFixed(2) : '$0';
+  document.getElementById('stat-revenue-sub').textContent   = `${completedLeads.length} job${completedLeads.length !== 1 ? 's' : ''} completed`;
+  document.getElementById('stat-refused').textContent       = refusedCount;
+  document.getElementById('stat-refused-sub').textContent   = `${refusedCount} declined`;
   document.getElementById('nav-count').textContent = leads.length;
+
+  // Highlight active stat card
+  const cardMap = { new:'scard-new', calls:'scard-calls', quoted:'scard-quotes',
+                    scheduled:'scard-scheduled', completed:'scard-revenue', refused:'scard-refused' };
+  document.querySelectorAll('.stat-clickable').forEach(el => el.classList.remove('stat-active'));
+  if (statFilter && cardMap[statFilter]) {
+    document.getElementById(cardMap[statFilter])?.classList.add('stat-active');
+  }
 }
 
 function cardHTML(l) {
@@ -225,9 +250,13 @@ function cardHTML(l) {
   const showView = l.status === 'new' || l.status === 'contacted';
 
   return `
-    <div class="card${activeId===l.id?' active':''}" id="card-${l.id}" onclick="openPanel('${l.id}')">
+    <div class="card${activeId===l.id?' active':''}" id="card-${l.id}"
+      draggable="true"
+      ondragstart="startDrag(event,'${l.id}')"
+      ondragend="this.classList.remove('dragging')"
+      onclick="openPanel('${l.id}')">
       <div class="card-top">
-        <span class="card-name">${l.name}</span>
+        <span class="card-name" ondblclick="startEditName(event,'${l.id}')" title="Double-click to rename">${l.name}</span>
         <span class="star${l.starred?' on':''}" onclick="toggleStar(event,'${l.id}')">${l.starred?'★':'☆'}</span>
       </div>
       <div class="tags">${srcTag}${tagChip}</div>
@@ -291,9 +320,10 @@ function openPanel(id) {
       <select class="status-sel" onchange="changeStatus('${l.id}', this.value)">
         <option value="new"       ${l.status==='new'       ?'selected':''}>🔵 New Inquiry</option>
         <option value="contacted" ${l.status==='contacted' ?'selected':''}>🟡 Contacted</option>
-        <option value="quoted"    ${l.status==='quoted'    ?'selected':''}>🟣 Quote Issued</option>
-        <option value="scheduled" ${l.status==='scheduled' ?'selected':''}>🟢 Scheduled</option>
-        <option value="completed" ${l.status==='completed' ?'selected':''}>✅ Completed</option>
+        <option value="quoted"    ${l.status==='quoted'    ?'selected':''}>🟣 In Progress</option>
+        <option value="scheduled" ${l.status==='scheduled' ?'selected':''}>🟢 Invoice Pending</option>
+        <option value="completed" ${l.status==='completed' ?'selected':''}>✅ Job Payment</option>
+        <option value="refused"   ${l.status==='refused'   ?'selected':''}>🚫 Refused</option>
         <option value="lost"      ${l.status==='lost'      ?'selected':''}>❌ Lost</option>
       </select>
     </div>
@@ -423,7 +453,7 @@ function changeStatus(id, status) {
   const l = leads.find(x => x.id === id);
   if (!l) return;
   l.status = status;
-  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100 };
+  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100, refused:100 };
   l.progress = progMap[status] || 10;
   renderBoard();
   if (activeId === id) openPanel(id);
@@ -431,8 +461,8 @@ function changeStatus(id, status) {
   // Write back to Airtable if record has an airtable ID
   if (l.airtableId) {
     const atStatusMap = { new:'New', contacted:'Contacted', quoted:'Quoted',
-                          scheduled:'Scheduled', completed:'Completed', lost:'Lost' };
-    const atFields = { 'Lead Status': atStatusMap[status] };
+                          scheduled:'Scheduled', completed:'Completed', lost:'Lost', refused:'Refused' };
+    const atFields = { 'Lead Status': atStatusMap[status] || status };
     if (IS_LOCAL) {
       fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
         method: 'PATCH',
@@ -483,7 +513,7 @@ function showPage(page, el) {
   if (el) el.classList.add('active');
 
   // Hide all pages
-  ['leads','overview','clients','calendar','reports','crew','settings'].forEach(p => {
+  ['leads','overview','settings'].forEach(p => {
     const el = document.getElementById('page-' + p);
     if (el) el.style.display = 'none';
   });
@@ -493,17 +523,17 @@ function showPage(page, el) {
   if (target) target.style.display = 'flex';
 
   // Update topbar title
-  const titles = { leads:'Leads Dashboard', overview:'Overview', clients:'Clients',
-                   calendar:'Calendar', reports:'Reports', crew:'Crew & Jobs', settings:'Settings' };
+  const titles = { leads:'Leads Dashboard', overview:'Overview', settings:'Settings' };
   document.querySelector('.topbar-title').textContent = titles[page] || page;
+
+  // Reset stat filter when switching away from leads
+  if (page !== 'leads') { statFilter = null; }
 
   // Close detail panel when switching pages
   closePanel();
 
   // Populate dynamic pages
   if (page === 'overview') renderOverview();
-  if (page === 'clients')  renderClients();
-  if (page === 'calendar') renderCalendar();
 }
 
 function renderOverview() {
@@ -670,6 +700,85 @@ function showToast(msg) {
   t.style.opacity = '1';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2500);
+}
+
+/* ═══════════════════════════════════════════
+   STAT FILTER
+═══════════════════════════════════════════ */
+function filterByStat(type) {
+  statFilter = statFilter === type ? null : type; // toggle off if already active
+  renderBoard();
+}
+
+/* ═══════════════════════════════════════════
+   DRAG AND DROP
+═══════════════════════════════════════════ */
+function startDrag(event, id) {
+  dragLeadId = id;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', id);
+  setTimeout(() => {
+    const card = document.getElementById('card-' + id);
+    if (card) card.classList.add('dragging');
+  }, 0);
+}
+
+function allowDrop(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+}
+
+function handleDragLeave(event, col) {
+  // Only remove highlight if leaving the column itself (not a child element)
+  if (!col.contains(event.relatedTarget)) {
+    col.classList.remove('drag-over');
+  }
+}
+
+function dropOnCol(event, colId) {
+  event.preventDefault();
+  const col = document.getElementById('col-' + colId);
+  if (col) col.classList.remove('drag-over');
+  const id = dragLeadId || event.dataTransfer.getData('text/plain');
+  if (!id) return;
+  dragLeadId = null;
+  const l = leads.find(x => String(x.id) === String(id));
+  if (!l || l.status === colId) return;
+  changeStatus(l.id, colId);
+}
+
+/* ═══════════════════════════════════════════
+   INLINE NAME EDIT
+═══════════════════════════════════════════ */
+function startEditName(event, id) {
+  event.stopPropagation();
+  const span = event.target;
+  const l = leads.find(x => String(x.id) === String(id));
+  if (!l) return;
+
+  const input = document.createElement('input');
+  input.value = l.name;
+  input.style.cssText = 'font-size:12.5px;font-weight:700;color:var(--gray-900);' +
+    'border:none;border-bottom:1.5px solid var(--primary);outline:none;' +
+    'background:transparent;width:100%;font-family:inherit;padding:0;';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  function save() {
+    const newName = input.value.trim() || l.name;
+    l.name = newName;
+    renderBoard();
+    if (activeId == id) {
+      document.getElementById('p-name').textContent = newName;
+    }
+    showToast('Name updated ✓');
+  }
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = l.name; input.blur(); }
+  });
 }
 
 /* ═══════════════════════════════════════════
