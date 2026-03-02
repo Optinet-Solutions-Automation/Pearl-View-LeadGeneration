@@ -8,18 +8,30 @@ const AT_BASE  = import.meta.env.VITE_AIRTABLE_BASE_ID || '';
 const AT_TABLE = import.meta.env.VITE_AIRTABLE_TABLE_ID || '';
 
 function patchAirtable(airtableId, fields) {
+  if (!airtableId) { console.warn('patchAirtable: no airtableId, skipping'); return; }
+  const logFields = Object.keys(fields).join(', ');
   if (IS_LOCAL) {
     fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields }),
-    }).catch(err => console.warn('Airtable sync failed:', err));
+    })
+      .then(r => {
+        if (!r.ok) r.json().then(e => console.error('Airtable patch failed:', logFields, e));
+        else console.log('Airtable synced:', logFields);
+      })
+      .catch(err => console.error('Airtable sync error:', err));
   } else {
     fetch('/api/update-lead', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ airtableId, fields }),
-    }).catch(err => console.warn('Airtable sync failed:', err));
+    })
+      .then(r => {
+        if (!r.ok) r.json().then(e => console.error('Airtable patch failed:', logFields, e));
+        else console.log('Airtable synced:', logFields);
+      })
+      .catch(err => console.error('Airtable sync error:', err));
   }
 }
 

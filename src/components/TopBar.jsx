@@ -3,6 +3,16 @@ import { useLeadsContext } from '../context/LeadsContext';
 import { PAGE_TITLES } from './Sidebar';
 import { isToday, formatCallTime } from '../utils/dateUtils';
 
+const SEEN_KEY = 'pvl_seen_notif_ids';
+
+function getSeenIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function saveSeenIds(ids) {
+  localStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
+}
+
 export default function TopBar() {
   const {
     currentPage, searchTerm, setSearchTerm,
@@ -11,16 +21,31 @@ export default function TopBar() {
   } = useLeadsContext();
 
   const [showNotifs, setShowNotifs] = useState(false);
+  const [seenIds,    setSeenIds]    = useState(getSeenIds);
   const notifsRef = useRef(null);
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
 
-  // Only today's unanswered calls — naturally clears the next calendar day
+  // Today's unanswered calls
   const todayCalls = leads
     .filter(l => l.hasCall && l.status === 'new' && isToday(l.dateObj))
     .sort((a, b) => b.dateObj - a.dateObj);
 
-  const badgeCount = Math.min(todayCalls.length, 99);
+  // Only show calls not yet seen in the dropdown
+  const unseenCalls = todayCalls.filter(l => !seenIds.has(l.id));
+  const badgeCount  = Math.min(unseenCalls.length, 99);
+
+  // Open dropdown → immediately mark all unseen as seen → they disappear on next open
+  function handleBellClick() {
+    const opening = !showNotifs;
+    setShowNotifs(opening);
+    if (opening && unseenCalls.length > 0) {
+      const next = new Set(seenIds);
+      unseenCalls.forEach(l => next.add(l.id));
+      setSeenIds(next);
+      saveSeenIds(next);
+    }
+  }
 
   // Close when clicking outside
   useEffect(() => {
@@ -39,6 +64,11 @@ export default function TopBar() {
     setCurrentPage('leads');
     setTimeout(() => openPanel(leadId), 80);
   }
+
+  // What to show in the open dropdown:
+  // - if there are unseen calls right now → show them (they'll be marked seen on open)
+  // - if already seen this session → show empty state
+  const dropdownCalls = unseenCalls;
 
   return (
     <header className="topbar">
@@ -81,13 +111,13 @@ export default function TopBar() {
           New Lead
         </button>
 
-        {/* Notification bell — badge stays all day, clears automatically next day */}
+        {/* Notification bell */}
         <div className="notif-wrap" ref={notifsRef}>
           <button
             className="notif-btn"
-            onClick={() => setShowNotifs(v => !v)}
+            onClick={handleBellClick}
             title={badgeCount > 0
-              ? `${badgeCount} unanswered call${badgeCount !== 1 ? 's' : ''} today`
+              ? `${badgeCount} new call${badgeCount !== 1 ? 's' : ''} today`
               : 'No new calls today'}
           >
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
@@ -102,21 +132,21 @@ export default function TopBar() {
             <div className="notif-dropdown">
               <div className="notif-hdr">
                 <span className="notif-hdr-title">New Calls Today</span>
-                {todayCalls.length > 0 && (
-                  <span className="notif-hdr-count">{todayCalls.length}</span>
+                {dropdownCalls.length > 0 && (
+                  <span className="notif-hdr-count">{dropdownCalls.length}</span>
                 )}
               </div>
 
-              {todayCalls.length === 0 ? (
+              {dropdownCalls.length === 0 ? (
                 <div className="notif-empty">
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" style={{ width: '28px', height: '28px', color: 'var(--gray-300)', margin: '0 auto 8px', display: 'block' }}>
                     <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                   </svg>
-                  No new calls today
+                  All caught up!
                 </div>
               ) : (
                 <div className="notif-list">
-                  {todayCalls.map(l => (
+                  {dropdownCalls.map(l => (
                     <div
                       key={l.id}
                       className="notif-item notif-item-new"
