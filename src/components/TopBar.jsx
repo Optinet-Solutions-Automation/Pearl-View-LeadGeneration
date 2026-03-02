@@ -20,8 +20,9 @@ export default function TopBar() {
     leads, openPanel, setCurrentPage,
   } = useLeadsContext();
 
-  const [showNotifs, setShowNotifs] = useState(false);
-  const [seenIds,    setSeenIds]    = useState(getSeenIds);
+  const [showNotifs,      setShowNotifs]      = useState(false);
+  const [seenIds,         setSeenIds]         = useState(getSeenIds);
+  const [dropdownSnapshot, setDropdownSnapshot] = useState([]);
   const notifsRef = useRef(null);
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
@@ -31,19 +32,23 @@ export default function TopBar() {
     .filter(l => l.hasCall && l.status === 'new' && isToday(l.dateObj))
     .sort((a, b) => b.dateObj - a.dateObj);
 
-  // Only show calls not yet seen in the dropdown
+  // Unseen = today's calls not yet viewed this session
   const unseenCalls = todayCalls.filter(l => !seenIds.has(l.id));
   const badgeCount  = Math.min(unseenCalls.length, 99);
 
-  // Open dropdown → immediately mark all unseen as seen → they disappear on next open
+  // Open: snapshot current unseen calls so the list stays visible while reading,
+  //       then mark them all as seen so the badge drops to 0.
   function handleBellClick() {
     const opening = !showNotifs;
     setShowNotifs(opening);
-    if (opening && unseenCalls.length > 0) {
-      const next = new Set(seenIds);
-      unseenCalls.forEach(l => next.add(l.id));
-      setSeenIds(next);
-      saveSeenIds(next);
+    if (opening) {
+      setDropdownSnapshot([...unseenCalls]);
+      if (unseenCalls.length > 0) {
+        const next = new Set(seenIds);
+        unseenCalls.forEach(l => next.add(l.id));
+        setSeenIds(next);
+        saveSeenIds(next);
+      }
     }
   }
 
@@ -65,10 +70,8 @@ export default function TopBar() {
     setTimeout(() => openPanel(leadId), 80);
   }
 
-  // What to show in the open dropdown:
-  // - if there are unseen calls right now → show them (they'll be marked seen on open)
-  // - if already seen this session → show empty state
-  const dropdownCalls = unseenCalls;
+  // Dropdown renders the snapshot taken at open-time (stable, won't vanish mid-read)
+  const dropdownCalls = dropdownSnapshot;
 
   return (
     <header className="topbar">
