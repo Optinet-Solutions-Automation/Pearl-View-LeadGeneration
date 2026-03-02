@@ -3,6 +3,13 @@ import { useLeadsContext } from '../context/LeadsContext';
 import { PAGE_TITLES } from './Sidebar';
 import { isToday, formatCallTime } from '../utils/dateUtils';
 
+function notifDate(dateObj, rawDate) {
+  if (!dateObj || dateObj.getTime() === 0) return rawDate || '—';
+  if (isToday(dateObj)) return `Today · ${formatCallTime(dateObj)}`;
+  return dateObj.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+    + ' · ' + formatCallTime(dateObj);
+}
+
 export default function TopBar() {
   const {
     currentPage, searchTerm, setSearchTerm,
@@ -18,13 +25,13 @@ export default function TopBar() {
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
 
-  // All new leads (calls + forms) received today that are still unactioned
-  const todayLeads = leads
-    .filter(l => l.status === 'new' && isToday(l.dateObj))
+  // ALL unactioned leads (any date, calls + forms) still in 'new' status
+  const newLeads = leads
+    .filter(l => l.status === 'new')
     .sort((a, b) => b.dateObj - a.dateObj);
 
   // Unseen = not yet viewed this page session
-  const unseenLeads = todayLeads.filter(l => !seenIds.has(l.id));
+  const unseenLeads = newLeads.filter(l => !seenIds.has(l.id));
   const badgeCount  = Math.min(unseenLeads.length, 99);
 
   // On open: snapshot the current unseen list (stays visible while reading),
@@ -109,8 +116,8 @@ export default function TopBar() {
             className="notif-btn"
             onClick={handleBellClick}
             title={badgeCount > 0
-              ? `${badgeCount} new lead${badgeCount !== 1 ? 's' : ''} today`
-              : 'No new leads today'}
+              ? `${badgeCount} unactioned lead${badgeCount !== 1 ? 's' : ''}`
+              : 'No new leads'}
           >
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
@@ -123,7 +130,7 @@ export default function TopBar() {
           {showNotifs && (
             <div className="notif-dropdown">
               <div className="notif-hdr">
-                <span className="notif-hdr-title">New Leads Today</span>
+                <span className="notif-hdr-title">New Leads</span>
                 {dropdownLeads.length > 0 && (
                   <span className="notif-hdr-count">{dropdownLeads.length}</span>
                 )}
@@ -172,7 +179,7 @@ export default function TopBar() {
                         </div>
                         <div className="notif-item-phone">{l.phone || l.email || '—'}</div>
                         <div className="notif-item-date">
-                          Today · {formatCallTime(l.dateObj)}
+                          {notifDate(l.dateObj, l.date)}
                         </div>
                       </div>
                       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px', color: 'var(--gray-300)', flexShrink: 0 }}>
