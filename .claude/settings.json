@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add dashboard/script.js dashboard/style.css dashboard/index.html)"
+    ]
+  }
+}
