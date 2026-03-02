@@ -139,24 +139,24 @@ export default function OverviewPage() {
 
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '20px' }}>
         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '14px' }}>Lead Sources</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ background: 'var(--blue-50)', border: '1.5px solid var(--blue-200)', borderRadius: '10px', padding: '14px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--primary)', marginBottom: '6px' }}>LP Site 1 · CrystalPro</div>
-            <a href="https://crystalpro.com.au/" target="_blank" rel="noreferrer" style={{ fontSize: '12.5px', color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px' }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-              crystalpro.com.au
+        <div className="lp-grid">
+          <div className="lp-card lp-card-blue">
+            <div className="lp-card-label" style={{ color: 'var(--primary)' }}>LP Site 1 · Crystal Pro</div>
+            <a href="https://crystalpro.com.au/" target="_blank" rel="noreferrer" className="lp-card-link" style={{ color: 'var(--primary)' }}>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px', flexShrink: 0 }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+              <span>crystalpro.com.au</span>
             </a>
-            <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--gray-600)' }}>Form leads + Call leads via this LP</div>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--gray-900)', marginTop: '6px' }}>{lp1} total leads</div>
+            <div className="lp-card-desc">Form leads + Call leads via this LP</div>
+            <div className="lp-card-count">{lp1} total leads</div>
           </div>
-          <div style={{ background: '#f5f3ff', border: '1.5px solid #ddd6fe', borderRadius: '10px', padding: '14px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--purple)', marginBottom: '6px' }}>LP Site 2 · Pearl View</div>
-            <a href="https://pearlview.com.au/" target="_blank" rel="noreferrer" style={{ fontSize: '12.5px', color: 'var(--purple)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px' }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-              pearlview.com.au
+          <div className="lp-card lp-card-purple">
+            <div className="lp-card-label" style={{ color: 'var(--purple)' }}>LP Site 2 · Pearl View</div>
+            <a href="https://pearlview.com.au/" target="_blank" rel="noreferrer" className="lp-card-link" style={{ color: 'var(--purple)' }}>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px', flexShrink: 0 }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+              <span>pearlview.com.au</span>
             </a>
-            <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--gray-600)' }}>Form leads + Call leads via this LP</div>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--gray-900)', marginTop: '6px' }}>{lp2} total leads</div>
+            <div className="lp-card-desc">Form leads + Call leads via this LP</div>
+            <div className="lp-card-count">{lp2} total leads</div>
           </div>
         </div>
       </div>

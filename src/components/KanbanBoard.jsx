@@ -128,21 +128,7 @@ export default function KanbanBoard() {
   return (
     <>
       <div className="board-hdr">
-        <span className="board-title">Lead Pipeline (Kanban Board)</span>
-        <div className="board-ctrls">
-          <button className="ctrl-btn">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M3 6h18M6 12h12M9 18h6"/>
-            </svg>
-            Filter
-          </button>
-          <button className="ctrl-btn">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M12 4v16m8-8H4"/>
-            </svg>
-            Add Column
-          </button>
-        </div>
+        <span className="board-title">Lead Pipeline</span>
       </div>
 
       {isTableOpen ? (
@@ -160,14 +146,14 @@ export default function KanbanBoard() {
             {/* Column visibility picker */}
             <div className="col-picker-wrap" ref={pickerRef}>
               <button
-                className="ctrl-btn"
+                className="ctrl-btn col-toggle-btn"
                 onClick={() => setShowColPicker(v => !v)}
                 style={{ fontSize: '12px', padding: '5px 12px' }}
               >
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px' }}>
                   <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
                 </svg>
-                Columns
+                <span className="col-toggle-label">Columns</span>
               </button>
               {showColPicker && (
                 <div className="col-picker-dropdown">
