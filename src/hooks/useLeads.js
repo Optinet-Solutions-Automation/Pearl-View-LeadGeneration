@@ -78,8 +78,8 @@ export function useLeads() {
   const [leads, setLeads] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchLeads = useCallback(async () => {
-    setIsLoading(true);
+  const fetchLeads = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setIsLoading(true);
     try {
       let allRecords = [];
       if (IS_LOCAL) {
@@ -103,7 +103,7 @@ export function useLeads() {
       console.error('Failed to load from Airtable:', err);
       throw err;
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
