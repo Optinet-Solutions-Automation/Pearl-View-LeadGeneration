@@ -835,7 +835,7 @@ body {
   .lead-table { min-width: 560px; }
 
   /* Table header: title truncates, buttons never wrap */
-  .col-modal-hdr { padding: 12px 16px; overflow: hidden; }
+  .col-modal-hdr { padding: 12px 16px; }
   .col-modal-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* LP cards: stack vertically on tablet/mobile */
