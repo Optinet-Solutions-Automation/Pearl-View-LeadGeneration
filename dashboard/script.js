@@ -3,12 +3,12 @@
    DATA
 ═══════════════════════════════════════════ */
 const COLS = [
-  { id:'new',       label:'New Lead', dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
-  { id:'contacted', label:'Contacted',     dot:'#d97706', cnt:'#fef3c7/#92400e' },
-  { id:'quoted',    label:'In Progress', dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
-  { id:'scheduled', label:'Invoice Pending',     dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
-  { id:'completed', label:'Payment', dot:'#16a34a', cnt:'#dcfce7/#14532d' },
-  { id:'completed', label:'Job Payment', dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'new',       label:'New Lead',       dot:'#2563eb', cnt:'#dbeafe/#1d4ed8' },
+  { id:'contacted', label:'Contacted',      dot:'#d97706', cnt:'#fef3c7/#92400e' },
+  { id:'quoted',    label:'In Progress',    dot:'#7c3aed', cnt:'#ede9fe/#5b21b6' },
+  { id:'scheduled', label:'Invoice Pending',dot:'#0d9488', cnt:'#ccfbf1/#065f46' },
+  { id:'completed', label:'Job Payment',    dot:'#16a34a', cnt:'#dcfce7/#14532d' },
+  { id:'refused',   label:'Refused',        dot:'#dc2626', cnt:'#fee2e2/#991b1b' },
 ];
 
 /* ═══════════════════════════════════════════
@@ -59,10 +59,10 @@ function normaliseRecord(rec, idx) {
 
   // Status
   const statusMap = { 'New':'new', 'Contacted':'contacted', 'Quoted':'quoted',
-                      'Scheduled':'scheduled', 'Completed':'completed', 'Lost':'lost' };
+                      'Scheduled':'scheduled', 'Completed':'completed', 'Lost':'lost', 'Refused':'refused' };
   const rawStatus = f['Lead Status'] || 'New';
   const status = statusMap[rawStatus] || 'new';
-  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100 };
+  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100, refused:100 };
 
   // Name — show proper name, not phone number for unknown callers
   const name = f['Client Name'] || (isCall ? 'Unknown Caller' : 'Unknown');
@@ -217,7 +217,11 @@ function cardHTML(l) {
     ? `<span class="tag ${l.tag.toLowerCase().includes('sent') ? 'tag-sent' : l.tag.toLowerCase().includes('tomorrow') ? 'tag-tomorrow' : 'tag-gray'}">${l.tag}</span>`
     : '';
 
-  const valText = l.value > 0 ? `Est. $${l.value.toLocaleString()}` : 'Est. $—';
+  const valText = l.status === 'completed' && l.invoice > 0
+    ? `Paid: $${parseFloat(l.invoice).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+    : l.status === 'scheduled' && (l.invoice > 0 || l.value > 0)
+    ? `Invoice: $${parseFloat(l.invoice || l.value).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+    : l.value > 0 ? `Est. $${l.value.toLocaleString()}` : 'Est. $—';
   const durText = l.duration
     ? `<span class="card-dur"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${l.duration}</span>`
     : '';
@@ -292,8 +296,9 @@ function openPanel(id) {
         <option value="new"       ${l.status==='new'       ?'selected':''}>🔵 New Inquiry</option>
         <option value="contacted" ${l.status==='contacted' ?'selected':''}>🟡 Contacted</option>
         <option value="quoted"    ${l.status==='quoted'    ?'selected':''}>🟣 Quote Issued</option>
-        <option value="scheduled" ${l.status==='scheduled' ?'selected':''}>🟢 Scheduled</option>
-        <option value="completed" ${l.status==='completed' ?'selected':''}>✅ Completed</option>
+        <option value="scheduled" ${l.status==='scheduled' ?'selected':''}>🟢 Invoice Pending</option>
+        <option value="completed" ${l.status==='completed' ?'selected':''}>✅ Job Payment</option>
+        <option value="refused"   ${l.status==='refused'   ?'selected':''}>🚫 Refused</option>
         <option value="lost"      ${l.status==='lost'      ?'selected':''}>❌ Lost</option>
       </select>
     </div>
@@ -326,6 +331,27 @@ function openPanel(id) {
       <div class="jrow"><span class="jlbl">Est. Value</span><span class="jval" style="color:var(--primary)">${l.value > 0 ? '$' + l.value.toLocaleString() : '—'}</span></div>
       <div class="jrow"><span class="jlbl">Lead Source</span>${srcTag}</div>
     </div>
+
+    ${(l.status === 'scheduled' || l.status === 'completed') ? `
+    <div class="psec">
+      <div class="psec-title">Payment Amount</div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:600;color:var(--gray-600)">$</span>
+        <input type="number" id="pay-${l.id}" value="${l.invoice > 0 ? l.invoice : (l.value > 0 ? l.value : '')}"
+          min="0" step="0.01" placeholder="0.00"
+          style="flex:1;padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:7px;font-size:13px;font-family:inherit;outline:none;color:var(--gray-800)"
+          onfocus="this.style.borderColor='var(--primary)'"
+          onblur="this.style.borderColor='var(--gray-200)'" />
+        <button onclick="updatePaymentAmount('${l.id}', document.getElementById('pay-${l.id}').value)"
+          style="padding:7px 13px;background:var(--primary);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">
+          Save
+        </button>
+      </div>
+      ${l.invoice > 0
+        ? `<div style="font-size:11.5px;color:var(--green);font-weight:600">✓ $${parseFloat(l.invoice).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})} recorded</div>`
+        : `<div style="font-size:11px;color:var(--gray-400)">No payment recorded yet — enter amount above or it auto-fills from Quote.</div>`
+      }
+    </div>` : ''}
 
     <div class="psec">
       <div class="psec-title">Call History</div>
@@ -419,20 +445,59 @@ function toggleStar(e, id) {
   if (l) { l.starred = !l.starred; renderBoard(); if (activeId === id) openPanel(id); }
 }
 
+function updatePaymentAmount(id, amount) {
+  const l = leads.find(x => x.id === id);
+  if (!l) return;
+  const parsed = parseFloat(amount) || 0;
+  l.invoice = parsed;
+  renderBoard();
+  if (activeId === id) openPanel(id);
+
+  if (l.airtableId) {
+    const atFields = { 'Final Invoice Amount': parsed };
+    if (IS_LOCAL) {
+      fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: atFields })
+      }).then(() => showToast('Payment amount saved ✓'))
+        .catch(() => showToast('Amount saved locally (Airtable sync failed)'));
+    } else {
+      fetch('/api/update-lead', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ airtableId: l.airtableId, fields: atFields })
+      }).then(() => showToast('Payment amount saved ✓'))
+        .catch(() => showToast('Amount saved locally (Airtable sync failed)'));
+    }
+  } else {
+    showToast('Payment amount updated ✓');
+  }
+}
+
 function changeStatus(id, status) {
   const l = leads.find(x => x.id === id);
   if (!l) return;
   l.status = status;
-  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100 };
+  const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100, refused:100 };
   l.progress = progMap[status] || 10;
+
+  // Auto-fill payment from quote when moving to Job Payment
+  if (status === 'completed' && !l.invoice && l.value > 0) {
+    l.invoice = l.value;
+  }
+
   renderBoard();
   if (activeId === id) openPanel(id);
 
   // Write back to Airtable if record has an airtable ID
   if (l.airtableId) {
     const atStatusMap = { new:'New', contacted:'Contacted', quoted:'Quoted',
-                          scheduled:'Scheduled', completed:'Completed', lost:'Lost' };
-    const atFields = { 'Lead Status': atStatusMap[status] };
+                          scheduled:'Scheduled', completed:'Completed', lost:'Lost', refused:'Refused' };
+    const atFields = { 'Lead Status': atStatusMap[status] || status };
+    if (status === 'completed' && l.invoice > 0) {
+      atFields['Final Invoice Amount'] = l.invoice;
+    }
     if (IS_LOCAL) {
       fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
         method: 'PATCH',
@@ -676,37 +741,3 @@ function showToast(msg) {
    INIT
 ═══════════════════════════════════════════ */
 fetchAllFromAirtable();
-
-
-
-
-
-
-
-/* ═══════════════════════════════════════════
-   PROFILE MENU
-═══════════════════════════════════════════ */
-function toggleProfileMenu(event) {
-  event.stopPropagation();
-  const menu = document.getElementById('profile-menu');
-  menu.classList.toggle('hidden');
-}
-
-// Close the menu automatically when clicking outside of it
-document.addEventListener('click', function(event) {
-  const menu = document.getElementById('profile-menu');
-  const wrapper = document.querySelector('.user-chip-wrapper');
-  
-  if (menu && !menu.classList.contains('hidden')) {
-    if (!wrapper.contains(event.target)) {
-      menu.classList.add('hidden');
-    }
-  }
-});
-
-// Logic for signing out
-function signOut() {
-  // Replace this with your actual sign-out logic (e.g., clearing auth tokens)
-  alert('Signing out of Pearl View...');
-  // window.location.href = '/login.html'; 
-}
