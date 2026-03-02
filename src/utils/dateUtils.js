@@ -14,3 +14,18 @@ export function formatDate(raw) {
     d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })
   );
 }
+
+export function isToday(dateObj) {
+  if (!dateObj || dateObj.getTime() === 0) return false;
+  const t = new Date();
+  return (
+    dateObj.getDate()     === t.getDate()  &&
+    dateObj.getMonth()    === t.getMonth() &&
+    dateObj.getFullYear() === t.getFullYear()
+  );
+}
+
+export function formatCallTime(dateObj) {
+  if (!dateObj || dateObj.getTime() === 0) return '—';
+  return dateObj.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+}
