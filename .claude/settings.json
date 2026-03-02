@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add dashboard/script.js dashboard/style.css dashboard/index.html)"
+      "Bash(git add dashboard/script.js dashboard/style.css dashboard/index.html)",
+      "Bash(python3 -c \":*)"
     ]
   }
 }
