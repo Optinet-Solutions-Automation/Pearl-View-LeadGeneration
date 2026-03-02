@@ -3,16 +3,6 @@ import { useLeadsContext } from '../context/LeadsContext';
 import { PAGE_TITLES } from './Sidebar';
 import { isToday, formatCallTime } from '../utils/dateUtils';
 
-const SEEN_KEY = 'pvl_seen_notif_ids';
-
-function getSeenIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-function saveSeenIds(ids) {
-  localStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
-}
-
 export default function TopBar() {
   const {
     currentPage, searchTerm, setSearchTerm,
@@ -21,31 +11,16 @@ export default function TopBar() {
   } = useLeadsContext();
 
   const [showNotifs, setShowNotifs] = useState(false);
-  const [seenIds,    setSeenIds]    = useState(getSeenIds);
   const notifsRef = useRef(null);
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
 
-  // Only today's unanswered calls (hasCall + new + received today)
+  // Only today's unanswered calls — naturally clears the next calendar day
   const todayCalls = leads
     .filter(l => l.hasCall && l.status === 'new' && isToday(l.dateObj))
     .sort((a, b) => b.dateObj - a.dateObj);
 
-  // Badge = today's calls not yet viewed
-  const unseenCalls = todayCalls.filter(l => !seenIds.has(l.id));
-  const badgeCount  = Math.min(unseenCalls.length, 99);
-
-  // Open dropdown → immediately dismiss all (mark seen)
-  function handleBellClick() {
-    const opening = !showNotifs;
-    setShowNotifs(opening);
-    if (opening && unseenCalls.length > 0) {
-      const next = new Set(seenIds);
-      todayCalls.forEach(l => next.add(l.id));
-      setSeenIds(next);
-      saveSeenIds(next);
-    }
-  }
+  const badgeCount = Math.min(todayCalls.length, 99);
 
   // Close when clicking outside
   useEffect(() => {
@@ -106,12 +81,14 @@ export default function TopBar() {
           New Lead
         </button>
 
-        {/* Notification bell */}
+        {/* Notification bell — badge stays all day, clears automatically next day */}
         <div className="notif-wrap" ref={notifsRef}>
           <button
             className="notif-btn"
-            onClick={handleBellClick}
-            title={badgeCount > 0 ? `${badgeCount} unanswered call${badgeCount !== 1 ? 's' : ''} today` : 'Notifications'}
+            onClick={() => setShowNotifs(v => !v)}
+            title={badgeCount > 0
+              ? `${badgeCount} unanswered call${badgeCount !== 1 ? 's' : ''} today`
+              : 'No new calls today'}
           >
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
@@ -124,7 +101,7 @@ export default function TopBar() {
           {showNotifs && (
             <div className="notif-dropdown">
               <div className="notif-hdr">
-                <span className="notif-hdr-title">Unanswered Calls Today</span>
+                <span className="notif-hdr-title">New Calls Today</span>
                 {todayCalls.length > 0 && (
                   <span className="notif-hdr-count">{todayCalls.length}</span>
                 )}
@@ -135,37 +112,34 @@ export default function TopBar() {
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" style={{ width: '28px', height: '28px', color: 'var(--gray-300)', margin: '0 auto 8px', display: 'block' }}>
                     <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                   </svg>
-                  No unanswered calls today
+                  No new calls today
                 </div>
               ) : (
                 <div className="notif-list">
-                  {todayCalls.map(l => {
-                    const isUnseen = !seenIds.has(l.id);
-                    return (
-                      <div
-                        key={l.id}
-                        className={`notif-item${isUnseen ? ' notif-item-new' : ''}`}
-                        onClick={() => handleNotifClick(l.id)}
-                      >
-                        <div className="notif-item-icon">
-                          <svg fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
-                            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>
-                          </svg>
-                          {isUnseen && <span className="notif-item-dot" />}
-                        </div>
-                        <div className="notif-item-body">
-                          <div className="notif-item-name">{l.name}</div>
-                          <div className="notif-item-phone">{l.phone || '—'}</div>
-                          <div className="notif-item-date">
-                            Today at {formatCallTime(l.dateObj)}
-                          </div>
-                        </div>
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px', color: 'var(--gray-300)', flexShrink: 0 }}>
-                          <polyline points="9 18 15 12 9 6"/>
+                  {todayCalls.map(l => (
+                    <div
+                      key={l.id}
+                      className="notif-item notif-item-new"
+                      onClick={() => handleNotifClick(l.id)}
+                    >
+                      <div className="notif-item-icon">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
+                          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>
                         </svg>
+                        <span className="notif-item-dot" />
                       </div>
-                    );
-                  })}
+                      <div className="notif-item-body">
+                        <div className="notif-item-name">{l.name}</div>
+                        <div className="notif-item-phone">{l.phone || '—'}</div>
+                        <div className="notif-item-date">
+                          Today · {formatCallTime(l.dateObj)}
+                        </div>
+                      </div>
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px', color: 'var(--gray-300)', flexShrink: 0 }}>
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

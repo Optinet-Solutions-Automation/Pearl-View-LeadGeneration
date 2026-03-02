@@ -1,5 +1,5 @@
 import { useLeadsContext } from '../../context/LeadsContext';
-import { formatDate } from '../../utils/dateUtils';
+import { formatDate, isToday } from '../../utils/dateUtils';
 
 function LeadRow({ l, onClick, isNew }) {
   return (
@@ -56,8 +56,8 @@ export default function OverviewPage() {
   const lp1   = leads.filter(l => l.lp === 'LP1').length;
   const lp2   = leads.filter(l => l.lp === 'LP2').length;
   const recent = leads.slice(0, 10);
-  const recentNew  = recent.filter(l => l.status === 'new');
-  const recentOld  = recent.filter(l => l.status !== 'new');
+  const recentNew  = recent.filter(l => l.status === 'new' && isToday(l.dateObj));
+  const recentOld  = recent.filter(l => !(l.status === 'new' && isToday(l.dateObj)));
 
   function goToLead(id) {
     setCurrentPage('leads');
