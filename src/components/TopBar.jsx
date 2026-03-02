@@ -3,6 +3,27 @@ import { useLeadsContext } from '../context/LeadsContext';
 import { PAGE_TITLES } from './Sidebar';
 import { isToday, formatCallTime } from '../utils/dateUtils';
 
+const SEEN_KEY      = 'pvl_seen_ids';
+const SEEN_DATE_KEY = 'pvl_seen_date';
+
+// Load seen IDs — if saved on a different calendar day, wipe them so
+// a fresh day always starts with all notifications visible again.
+function getSeenIds() {
+  try {
+    const today = new Date().toDateString();
+    if (localStorage.getItem(SEEN_DATE_KEY) !== today) {
+      localStorage.removeItem(SEEN_KEY);
+      localStorage.setItem(SEEN_DATE_KEY, today);
+      return new Set();
+    }
+    return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]'));
+  } catch { return new Set(); }
+}
+function saveSeenIds(ids) {
+  localStorage.setItem(SEEN_DATE_KEY, new Date().toDateString());
+  localStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
+}
+
 function notifDate(dateObj, rawDate) {
   if (!dateObj || dateObj.getTime() === 0) return rawDate || '—';
   if (isToday(dateObj)) return `Today · ${formatCallTime(dateObj)}`;
@@ -17,9 +38,9 @@ export default function TopBar() {
     leads, openPanel, setCurrentPage,
   } = useLeadsContext();
 
-  // Pure in-memory: resets every page load so notifications always reappear
+  // Persists within the same calendar day; resets automatically each new day
   const [showNotifs,       setShowNotifs]       = useState(false);
-  const [seenIds,          setSeenIds]          = useState(() => new Set());
+  const [seenIds,          setSeenIds]          = useState(getSeenIds);
   const [dropdownSnapshot, setDropdownSnapshot] = useState([]);
   const notifsRef = useRef(null);
 
@@ -45,6 +66,7 @@ export default function TopBar() {
         const next = new Set(seenIds);
         unseenLeads.forEach(l => next.add(l.id));
         setSeenIds(next);
+        saveSeenIds(next);
       }
     }
   }
