@@ -108,7 +108,7 @@ export default function TopBar() {
         </svg>
         <input
           type="text"
-          placeholder="Search leads…"
+          placeholder={currentPage === 'clients' ? 'Search clients…' : 'Search leads…'}
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value.toLowerCase().trim())}
         />

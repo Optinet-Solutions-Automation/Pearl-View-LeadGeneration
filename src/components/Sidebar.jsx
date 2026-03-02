@@ -8,10 +8,11 @@ export const PAGE_TITLES = {
 };
 
 export default function Sidebar() {
-  const { leads, deletedLeads, currentPage, setCurrentPage, closePanel, sidebarOpen, closeSidebar } = useLeadsContext();
+  const { leads, deletedLeads, currentPage, setCurrentPage, setSearchTerm, closePanel, sidebarOpen, closeSidebar } = useLeadsContext();
 
   function navigate(page) {
     setCurrentPage(page);
+    setSearchTerm('');
     closePanel();
     closeSidebar();
   }

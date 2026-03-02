@@ -5,10 +5,9 @@ import { formatDate } from '../../utils/dateUtils';
 const PAGE_SIZE = 10;
 
 export default function ClientsPage() {
-  const { leads, openPanel, setCurrentPage } = useLeadsContext();
-  const [lpFilter,  setLpFilter]  = useState('all');
-  const [search,    setSearch]    = useState('');
-  const [page,      setPage]      = useState(1);
+  const { leads, openPanel, setCurrentPage, searchTerm } = useLeadsContext();
+  const [lpFilter, setLpFilter] = useState('all');
+  const [page,     setPage]     = useState(1);
 
   const formLeads = leads.filter(l => !l.hasCall && l.name !== 'Unknown');
   const counts = {
@@ -20,8 +19,8 @@ export default function ClientsPage() {
   // Apply LP filter then search
   const filtered = useMemo(() => {
     let list = lpFilter === 'all' ? formLeads : formLeads.filter(l => l.lp === lpFilter);
-    if (search.trim()) {
-      const term = search.trim().toLowerCase();
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
       list = list.filter(l =>
         l.name.toLowerCase().includes(term) ||
         (l.email  || '').toLowerCase().includes(term) ||
@@ -29,7 +28,7 @@ export default function ClientsPage() {
       );
     }
     return list;
-  }, [leads, lpFilter, search]);
+  }, [leads, lpFilter, searchTerm]);
 
   // Reset to page 1 when filter/search changes
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -37,7 +36,6 @@ export default function ClientsPage() {
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function changeFilter(key) { setLpFilter(key); setPage(1); }
-  function changeSearch(val) { setSearch(val);   setPage(1); }
 
   function goToLead(id) {
     setCurrentPage('leads');
@@ -63,61 +61,29 @@ export default function ClientsPage() {
         All unique clients from form submissions
       </div>
 
-      {/* LP tabs + search row */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => changeFilter(t.key)}
-              style={{
-                padding: '5px 14px', borderRadius: '20px', border: '1px solid',
-                fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-                borderColor: lpFilter === t.key ? 'var(--primary)' : 'var(--gray-200)',
-                background:  lpFilter === t.key ? 'var(--primary)' : '#fff',
-                color:       lpFilter === t.key ? '#fff' : 'var(--gray-600)',
-              }}
-            >
-              {t.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({counts[t.key]})</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Search box */}
-        <div style={{
-          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '7px',
-          background: '#fff', border: '1.5px solid var(--gray-200)', borderRadius: '8px',
-          padding: '5px 12px', minWidth: '200px',
-        }}>
-          <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" strokeWidth="2.5"
-            style={{ width: '14px', height: '14px', flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
-          <input
-            type="text"
-            placeholder="Search clients…"
-            value={search}
-            onChange={e => changeSearch(e.target.value)}
+      {/* LP tabs */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {tabs.map(t => (
+          <button
+            key={t.key}
+            onClick={() => changeFilter(t.key)}
             style={{
-              border: 'none', outline: 'none', fontSize: '13px',
-              color: 'var(--gray-900)', background: 'transparent', width: '100%',
+              padding: '5px 14px', borderRadius: '20px', border: '1px solid',
+              fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+              borderColor: lpFilter === t.key ? 'var(--primary)' : 'var(--gray-200)',
+              background:  lpFilter === t.key ? 'var(--primary)' : '#fff',
+              color:       lpFilter === t.key ? '#fff' : 'var(--gray-600)',
             }}
-          />
-          {search && (
-            <button
-              onClick={() => changeSearch('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: '15px', lineHeight: 1, padding: 0 }}
-            >
-              ✕
-            </button>
-          )}
-        </div>
+          >
+            {t.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({counts[t.key]})</span>
+          </button>
+        ))}
       </div>
 
       {/* Results summary */}
-      {search && (
+      {searchTerm && (
         <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '10px' }}>
-          {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{search}"
+          {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{searchTerm}"
         </div>
       )}
 
@@ -125,7 +91,7 @@ export default function ClientsPage() {
       <div>
         {paged.length === 0 ? (
           <div style={{ color: 'var(--gray-400)', fontSize: '13px', textAlign: 'center', padding: '40px' }}>
-            {search ? `No clients match "${search}"` : 'No clients found'}
+            {searchTerm ? `No clients match "${searchTerm}"` : 'No clients found'}
           </div>
         ) : (
           paged.map(l => (
@@ -150,7 +116,7 @@ export default function ClientsPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)' }}>
                   {/* Highlight matching text */}
-                  {search ? highlightMatch(l.name, search) : l.name}
+                  {searchTerm ? highlightMatch(l.name, searchTerm) : l.name}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
                   {l.email || l.phone || '—'}
