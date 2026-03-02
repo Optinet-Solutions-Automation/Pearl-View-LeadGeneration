@@ -1,50 +1,134 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { formatDate } from '../../utils/dateUtils';
 
+const PAGE_SIZE = 10;
+
 export default function ClientsPage() {
   const { leads, openPanel, setCurrentPage } = useLeadsContext();
-  const [lpFilter, setLpFilter] = useState('all');
+  const [lpFilter,  setLpFilter]  = useState('all');
+  const [search,    setSearch]    = useState('');
+  const [page,      setPage]      = useState(1);
 
   const formLeads = leads.filter(l => !l.hasCall && l.name !== 'Unknown');
-  const counts = { all: formLeads.length, LP1: formLeads.filter(l => l.lp === 'LP1').length, LP2: formLeads.filter(l => l.lp === 'LP2').length };
-  const filtered = lpFilter === 'all' ? formLeads : formLeads.filter(l => l.lp === lpFilter);
+  const counts = {
+    all: formLeads.length,
+    LP1: formLeads.filter(l => l.lp === 'LP1').length,
+    LP2: formLeads.filter(l => l.lp === 'LP2').length,
+  };
+
+  // Apply LP filter then search
+  const filtered = useMemo(() => {
+    let list = lpFilter === 'all' ? formLeads : formLeads.filter(l => l.lp === lpFilter);
+    if (search.trim()) {
+      const term = search.trim().toLowerCase();
+      list = list.filter(l =>
+        l.name.toLowerCase().includes(term) ||
+        (l.email  || '').toLowerCase().includes(term) ||
+        (l.phone  || '').toLowerCase().includes(term)
+      );
+    }
+    return list;
+  }, [leads, lpFilter, search]);
+
+  // Reset to page 1 when filter/search changes
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function changeFilter(key) { setLpFilter(key); setPage(1); }
+  function changeSearch(val) { setSearch(val);   setPage(1); }
 
   function goToLead(id) {
     setCurrentPage('leads');
     setTimeout(() => openPanel(id), 100);
   }
 
-  const tabs = [{ key: 'all', label: 'All' }, { key: 'LP1', label: 'Crystal Pro' }, { key: 'LP2', label: 'Pearl View' }];
+  function pageNumbers() {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages = new Set([1, totalPages, safePage, safePage - 1, safePage + 1]);
+    return [...pages].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  }
+
+  const tabs = [
+    { key: 'all', label: 'All' },
+    { key: 'LP1', label: 'Crystal Pro' },
+    { key: 'LP2', label: 'Pearl View' },
+  ];
 
   return (
     <div className="page">
-      <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '4px' }}>Clients</div>
-      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>All unique clients from form submissions</div>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setLpFilter(t.key)}
-            style={{
-              padding: '5px 14px', borderRadius: '20px', border: '1px solid',
-              fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-              borderColor: lpFilter === t.key ? 'var(--primary)' : 'var(--gray-200)',
-              background: lpFilter === t.key ? 'var(--primary)' : '#fff',
-              color: lpFilter === t.key ? '#fff' : 'var(--gray-600)',
-            }}
-          >
-            {t.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({counts[t.key]})</span>
-          </button>
-        ))}
+      <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '2px' }}>Clients</div>
+      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>
+        All unique clients from form submissions
       </div>
+
+      {/* LP tabs + search row */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => changeFilter(t.key)}
+              style={{
+                padding: '5px 14px', borderRadius: '20px', border: '1px solid',
+                fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+                borderColor: lpFilter === t.key ? 'var(--primary)' : 'var(--gray-200)',
+                background:  lpFilter === t.key ? 'var(--primary)' : '#fff',
+                color:       lpFilter === t.key ? '#fff' : 'var(--gray-600)',
+              }}
+            >
+              {t.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({counts[t.key]})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search box */}
+        <div style={{
+          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '7px',
+          background: '#fff', border: '1.5px solid var(--gray-200)', borderRadius: '8px',
+          padding: '5px 12px', minWidth: '200px',
+        }}>
+          <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" strokeWidth="2.5"
+            style={{ width: '14px', height: '14px', flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            placeholder="Search clients…"
+            value={search}
+            onChange={e => changeSearch(e.target.value)}
+            style={{
+              border: 'none', outline: 'none', fontSize: '13px',
+              color: 'var(--gray-900)', background: 'transparent', width: '100%',
+            }}
+          />
+          {search && (
+            <button
+              onClick={() => changeSearch('')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: '15px', lineHeight: 1, padding: 0 }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Results summary */}
+      {search && (
+        <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '10px' }}>
+          {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{search}"
+        </div>
+      )}
+
+      {/* Client list */}
       <div>
-        {filtered.length === 0 ? (
-          <div style={{ color: 'var(--gray-400)', fontSize: '13px', textAlign: 'center', padding: '32px' }}>
-            No clients found
+        {paged.length === 0 ? (
+          <div style={{ color: 'var(--gray-400)', fontSize: '13px', textAlign: 'center', padding: '40px' }}>
+            {search ? `No clients match "${search}"` : 'No clients found'}
           </div>
         ) : (
-          filtered.map(l => (
+          paged.map(l => (
             <div
               key={l.id}
               onClick={() => goToLead(l.id)}
@@ -54,7 +138,7 @@ export default function ClientsPage() {
                 gap: '14px', cursor: 'pointer', transition: 'border-color .15s',
               }}
               onMouseOver={e => e.currentTarget.style.borderColor = 'var(--blue-200)'}
-              onMouseOut={e => e.currentTarget.style.borderColor = 'var(--gray-200)'}
+              onMouseOut={e  => e.currentTarget.style.borderColor = 'var(--gray-200)'}
             >
               <div style={{
                 width: '38px', height: '38px', borderRadius: '50%', background: 'var(--blue-100)',
@@ -64,8 +148,13 @@ export default function ClientsPage() {
                 {l.name.charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{l.email || l.phone || '—'}</div>
+                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)' }}>
+                  {/* Highlight matching text */}
+                  {search ? highlightMatch(l.name, search) : l.name}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
+                  {l.email || l.phone || '—'}
+                </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{formatDate(l.date)}</div>
@@ -77,6 +166,44 @@ export default function ClientsPage() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="col-modal-footer" style={{ marginTop: '8px' }}>
+          <span className="pg-info">
+            Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </span>
+          <div className="pg-controls">
+            <button className="pg-btn" disabled={safePage === 1} onClick={() => setPage(p => p - 1)}>‹ Prev</button>
+            {pageNumbers().reduce((acc, pg, idx, arr) => {
+              if (idx > 0 && pg - arr[idx - 1] > 1)
+                acc.push(<span key={`gap-${pg}`} className="pg-gap">…</span>);
+              acc.push(
+                <button key={pg} className={`pg-btn pg-num${safePage === pg ? ' pg-active' : ''}`} onClick={() => setPage(pg)}>
+                  {pg}
+                </button>
+              );
+              return acc;
+            }, [])}
+            <button className="pg-btn" disabled={safePage === totalPages} onClick={() => setPage(p => p + 1)}>Next ›</button>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Bold-highlight the matched portion of text
+function highlightMatch(text, term) {
+  const idx = text.toLowerCase().indexOf(term.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark style={{ background: '#fef08a', borderRadius: '2px', padding: '0 1px' }}>
+        {text.slice(idx, idx + term.length)}
+      </mark>
+      {text.slice(idx + term.length)}
+    </>
   );
 }
