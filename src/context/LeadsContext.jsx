@@ -27,6 +27,14 @@ export function LeadsProvider({ children }) {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
   }, [fetchLeads]);
 
+  // Poll Airtable every 30s to pick up status changes made directly in Airtable
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchLeads({ silent: true }).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [fetchLeads]);
+
   const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2700);
