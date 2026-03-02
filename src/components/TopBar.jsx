@@ -6,11 +6,11 @@ import { isToday, formatCallTime } from '../utils/dateUtils';
 const SEEN_KEY = 'pvl_seen_notif_ids';
 
 function getSeenIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); }
+  try { return new Set(JSON.parse(sessionStorage.getItem(SEEN_KEY) || '[]')); }
   catch { return new Set(); }
 }
 function saveSeenIds(ids) {
-  localStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
+  sessionStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
 }
 
 export default function TopBar() {
