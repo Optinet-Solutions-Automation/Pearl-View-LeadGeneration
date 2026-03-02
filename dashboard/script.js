@@ -24,17 +24,19 @@ let leads = [];
 let activeId   = null;
 let searchTerm = '';
 let isLoading  = true;
-let statFilter = null; // null | 'new' | 'calls' | 'quoted' | 'scheduled' | 'completed' | 'refused'
+let statFilter = null;
 let dragLeadId = null;
+
+// Refuse reason modal state
+let pendingRefuseId = null;
+let pendingRefusePrevStatus = null;
 
 /* ═══════════════════════════════════════════
    AIRTABLE FETCH + NORMALISE
 ═══════════════════════════════════════════ */
 function parseDate(raw) {
   if (!raw) return new Date(0);
-  // Format A: "Mon, 27 Oct 2025, 10:17 am"  → parse directly
-  // Format B: "2025-08-28 09:50:08"          → ISO-ish
-  const s = raw.replace(',', ''); // remove first comma to help Date parsing
+  const s = raw.replace(',', '');
   const d = new Date(s);
   return isNaN(d) ? new Date(0) : d;
 }
@@ -50,7 +52,6 @@ function normaliseRecord(rec, idx) {
   const f = rec.fields;
   const isCall = !!(f['Caller ID'] || f['Call Time']);
 
-  // Source → which LP site
   const rawSrc = isCall ? (f['Call - Lead Source'] || '') : (f['Lead Source'] || '');
   let source;
   if (isCall) {
@@ -59,17 +60,14 @@ function normaliseRecord(rec, idx) {
     source = rawSrc.includes('pearlview') ? 'form2' : 'form1';
   }
 
-  // Status
   const statusMap = { 'New':'new', 'Contacted':'contacted', 'Quoted':'quoted',
                       'Scheduled':'scheduled', 'Completed':'completed', 'Lost':'lost', 'Refused':'refused' };
   const rawStatus = f['Lead Status'] || 'New';
   const status = statusMap[rawStatus] || 'new';
   const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100, refused:100 };
 
-  // Name — show proper name, not phone number for unknown callers
   const name = f['Client Name'] || (isCall ? 'Unknown Caller' : 'Unknown');
 
-  // Subject — truncate very long transcripts for display
   const fullSubject = (isCall
     ? (f['Call Recording Transcript'] || '')
     : (f['Inquiry Subject/Reason'] || ''));
@@ -102,6 +100,7 @@ function normaliseRecord(rec, idx) {
     notes:      '',
     hasCall:    isCall,
     tag:        '',
+    refuseReason: '',
     airtableId: rec.id,
   };
 }
@@ -114,7 +113,6 @@ async function fetchAllFromAirtable() {
     let allRecords = [];
 
     if (IS_LOCAL) {
-      // Local: call Airtable directly using config.js token
       let offset = '';
       do {
         const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
@@ -125,7 +123,6 @@ async function fetchAllFromAirtable() {
         offset = data.offset || '';
       } while (offset);
     } else {
-      // Vercel: call server-side API route using env vars
       const res = await fetch('/api/leads');
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
@@ -156,7 +153,6 @@ function showLoading(on) {
 function renderBoard() {
   const board = document.getElementById('board');
 
-  // Apply search + stat filter
   let filtered = leads;
   if (searchTerm) {
     filtered = filtered.filter(l =>
@@ -199,7 +195,7 @@ function renderBoard() {
   const callCount      = leads.filter(l => l.hasCall).length;
   const quotedCount    = leads.filter(l => l.status === 'quoted').length;
   const scheduledCount = leads.filter(l => l.status === 'scheduled').length;
-  const refusedCount   = leads.filter(l => l.status === 'refused').length;
+  const refusedLeads   = leads.filter(l => l.status === 'refused');
   const completedLeads = leads.filter(l => l.status === 'completed');
   const totalRevenue   = completedLeads.reduce((sum, l) => sum + (parseFloat(l.invoice) || parseFloat(l.value) || 0), 0);
 
@@ -213,8 +209,18 @@ function renderBoard() {
   document.getElementById('stat-scheduled-sub').textContent = `${scheduledCount} jobs booked`;
   document.getElementById('stat-revenue').textContent       = totalRevenue > 0 ? '$' + totalRevenue.toFixed(2) : '$0';
   document.getElementById('stat-revenue-sub').textContent   = `${completedLeads.length} job${completedLeads.length !== 1 ? 's' : ''} completed`;
-  document.getElementById('stat-refused').textContent       = refusedCount;
-  document.getElementById('stat-refused-sub').textContent   = `${refusedCount} declined`;
+  document.getElementById('stat-refused').textContent       = refusedLeads.length;
+
+  // Refused breakdown subtitle
+  const rc = { too_expensive:0, competition:0, no_answer:0, other:0 };
+  refusedLeads.forEach(l => { if (l.refuseReason && rc[l.refuseReason] !== undefined) rc[l.refuseReason]++; });
+  const parts = [];
+  if (rc.too_expensive) parts.push(`${rc.too_expensive} expensive`);
+  if (rc.competition)   parts.push(`${rc.competition} competition`);
+  if (rc.no_answer)     parts.push(`${rc.no_answer} no answer`);
+  if (rc.other)         parts.push(`${rc.other} other`);
+  document.getElementById('stat-refused-sub').textContent = parts.length ? parts.join(' · ') : 'Declined leads';
+
   document.getElementById('nav-count').textContent = leads.length;
 
   // Highlight active stat card
@@ -226,6 +232,8 @@ function renderBoard() {
   }
 }
 
+const REFUSE_LABELS = { too_expensive:'Too Expensive', competition:'Competition', no_answer:'No Answer', other:'Other' };
+
 function cardHTML(l) {
   const srcTag = (l.source === 'call1' || l.source === 'call2')
     ? `<span class="tag tag-call">Call · ${l.lp}</span>`
@@ -233,13 +241,16 @@ function cardHTML(l) {
     ? `<span class="tag tag-form1">Form · LP1</span>`
     : `<span class="tag tag-form2">Form · LP2</span>`;
 
-  // Truncate long transcripts/subjects for card display
   const shortSubject = (l.subject || '').length > 90
     ? l.subject.substring(0, 90) + '…'
     : (l.subject || '—');
 
   const tagChip = l.tag
     ? `<span class="tag ${l.tag.toLowerCase().includes('sent') ? 'tag-sent' : l.tag.toLowerCase().includes('tomorrow') ? 'tag-tomorrow' : 'tag-gray'}">${l.tag}</span>`
+    : '';
+
+  const refuseTag = l.status === 'refused' && l.refuseReason
+    ? `<span class="tag" style="background:#fee2e2;color:#991b1b">${REFUSE_LABELS[l.refuseReason] || l.refuseReason}</span>`
     : '';
 
   const valText = l.status === 'completed' && l.invoice > 0
@@ -263,7 +274,7 @@ function cardHTML(l) {
         <span class="card-name" ondblclick="startEditName(event,'${l.id}')" title="Double-click to rename">${l.name}</span>
         <span class="star${l.starred?' on':''}" onclick="toggleStar(event,'${l.id}')">${l.starred?'★':'☆'}</span>
       </div>
-      <div class="tags">${srcTag}${tagChip}</div>
+      <div class="tags">${srcTag}${tagChip}${refuseTag}</div>
       <div class="card-sub">${shortSubject}</div>
       <div class="card-footer">
         <span class="card-val">${valText}</span>
@@ -284,6 +295,9 @@ function openPanel(id) {
 
   document.getElementById('panel').classList.add('open');
   document.getElementById('p-name').textContent = l.name;
+  const editBtn = document.getElementById('p-name-edit-btn');
+  if (editBtn) editBtn.style.display = 'flex';
+
   const isCallLead = l.source === 'call1' || l.source === 'call2';
   document.getElementById('p-meta').textContent = `${isCallLead ? 'Direct Call · ' + l.lp : 'Form · ' + l.lp} · ${formatDate(l.date)}`;
 
@@ -293,7 +307,6 @@ function openPanel(id) {
     ? `<span class="tag tag-form1" style="font-size:11px">Form · LP1</span>`
     : `<span class="tag tag-form2" style="font-size:11px">Form · LP2</span>`;
 
-  // call section
   const transcript = l.subject || '';
   const waveHTML = l.hasCall ? `
     <div class="audio-box">
@@ -318,23 +331,37 @@ function openPanel(id) {
     </div>` : ''}
     ` : `<p style="font-size:12px;color:var(--gray-400)">No call recording for this lead.</p>`;
 
+  // Refuse reason section (shown when status is refused)
+  const refuseSection = l.status === 'refused' ? `
+    <div class="psec">
+      <div class="psec-title">Refusal Reason</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${['too_expensive','competition','no_answer','other'].map(r => `
+          <button onclick="setRefuseReason('${l.id}','${r}')"
+            style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;
+              border:1.5px solid ${l.refuseReason===r?'#dc2626':'var(--gray-200)'};
+              background:${l.refuseReason===r?'#fee2e2':'#fff'};
+              color:${l.refuseReason===r?'#991b1b':'var(--gray-600)'}">
+            ${r==='too_expensive'?'💰 Too Expensive':r==='competition'?'🏆 Competition':r==='no_answer'?'📵 No Answer':'❓ Other'}
+          </button>`).join('')}
+      </div>
+    </div>` : '';
+
   document.getElementById('panel-body').innerHTML = `
     <div class="psec">
       <div class="psec-title">Status</div>
-      <select class="status-sel" onchange="changeStatus('${l.id}', this.value)">
+      <select class="status-sel" onchange="handleStatusChange('${l.id}', this.value)">
         <option value="new"       ${l.status==='new'       ?'selected':''}>🔵 New Inquiry</option>
         <option value="contacted" ${l.status==='contacted' ?'selected':''}>🟡 Contacted</option>
-<<<<<<< HEAD
         <option value="quoted"    ${l.status==='quoted'    ?'selected':''}>🟣 In Progress</option>
-=======
-        <option value="quoted"    ${l.status==='quoted'    ?'selected':''}>🟣 Quote Issued</option>
->>>>>>> b3b57144da059a64dfe1ed2109f845eacb2c099a
         <option value="scheduled" ${l.status==='scheduled' ?'selected':''}>🟢 Invoice Pending</option>
         <option value="completed" ${l.status==='completed' ?'selected':''}>✅ Job Payment</option>
         <option value="refused"   ${l.status==='refused'   ?'selected':''}>🚫 Refused</option>
         <option value="lost"      ${l.status==='lost'      ?'selected':''}>❌ Lost</option>
       </select>
     </div>
+
+    ${refuseSection}
 
     <div class="psec">
       <div class="psec-title">Client Contact</div>
@@ -393,7 +420,7 @@ function openPanel(id) {
 
     <div class="psec">
       <div class="psec-title">Notes</div>
-      <textarea class="notes-ta" id="notes-${l.id}" placeholder="Add notes about this lead…">${l.notes}</textarea>
+      <textarea class="notes-ta" id="notes-${l.id}" placeholder="Add notes about this lead…" oninput="autoSaveNote('${l.id}')">${l.notes}</textarea>
       <button class="save-note-btn" onclick="saveNote('${l.id}')">Save Note</button>
     </div>
 
@@ -427,8 +454,51 @@ function openPanel(id) {
 
 function closePanel() {
   activeId = null;
+  const editBtn = document.getElementById('p-name-edit-btn');
+  if (editBtn) editBtn.style.display = 'none';
   document.getElementById('panel').classList.remove('open');
   renderBoard();
+}
+
+/* ═══════════════════════════════════════════
+   PANEL NAME EDIT
+═══════════════════════════════════════════ */
+function editPanelName() {
+  if (!activeId) return;
+  const l = leads.find(x => String(x.id) === String(activeId));
+  if (!l) return;
+  const h2 = document.getElementById('p-name');
+  const btn = document.getElementById('p-name-edit-btn');
+  if (!h2) return;
+
+  const input = document.createElement('input');
+  input.value = l.name;
+  input.style.cssText = 'font-size:15px;font-weight:700;color:var(--gray-900);border:none;' +
+    'border-bottom:1.5px solid var(--primary);outline:none;background:transparent;' +
+    'width:160px;font-family:inherit;padding:0;';
+  h2.replaceWith(input);
+  if (btn) btn.style.display = 'none';
+  input.focus();
+  input.select();
+
+  function save() {
+    const newName = input.value.trim() || l.name;
+    l.name = newName;
+    const newH2 = document.createElement('h2');
+    newH2.id = 'p-name';
+    newH2.textContent = newName;
+    input.replaceWith(newH2);
+    if (btn) btn.style.display = 'flex';
+    renderBoard();
+    showToast('Name updated ✓');
+    // Sync name to Airtable
+    if (l.airtableId) syncToAirtable(l.airtableId, { 'Client Name': newName });
+  }
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = l.name; input.blur(); }
+  });
 }
 
 /* ═══════════════════════════════════════════
@@ -470,6 +540,25 @@ function togglePlay(id) {
 }
 
 /* ═══════════════════════════════════════════
+   AIRTABLE SYNC HELPER
+═══════════════════════════════════════════ */
+function syncToAirtable(airtableId, fields) {
+  if (IS_LOCAL) {
+    fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    }).catch(err => console.warn('Airtable sync failed:', err));
+  } else {
+    fetch('/api/update-lead', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ airtableId, fields })
+    }).catch(err => console.warn('Airtable sync failed:', err));
+  }
+}
+
+/* ═══════════════════════════════════════════
    ACTIONS
 ═══════════════════════════════════════════ */
 function toggleStar(e, id) {
@@ -487,25 +576,56 @@ function updatePaymentAmount(id, amount) {
   if (activeId === id) openPanel(id);
 
   if (l.airtableId) {
-    const atFields = { 'Final Invoice Amount': parsed };
-    if (IS_LOCAL) {
-      fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: atFields })
-      }).then(() => showToast('Payment amount saved ✓'))
-        .catch(() => showToast('Amount saved locally (Airtable sync failed)'));
-    } else {
-      fetch('/api/update-lead', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ airtableId: l.airtableId, fields: atFields })
-      }).then(() => showToast('Payment amount saved ✓'))
-        .catch(() => showToast('Amount saved locally (Airtable sync failed)'));
-    }
+    syncToAirtable(l.airtableId, { 'Final Invoice Amount': parsed });
+    showToast('Payment amount saved ✓');
   } else {
     showToast('Payment amount updated ✓');
   }
+}
+
+/* ── STATUS CHANGE WITH REFUSE INTERCEPT ── */
+function handleStatusChange(id, newStatus) {
+  const l = leads.find(x => String(x.id) === String(id));
+  if (!l) return;
+  if (newStatus === 'refused') {
+    pendingRefuseId = id;
+    pendingRefusePrevStatus = l.status;
+    document.getElementById('refuse-modal').classList.add('open');
+  } else {
+    changeStatus(id, newStatus);
+  }
+}
+
+function confirmRefuse(reason) {
+  if (!pendingRefuseId) return;
+  const l = leads.find(x => String(x.id) === String(pendingRefuseId));
+  if (l) l.refuseReason = reason;
+  changeStatus(pendingRefuseId, 'refused');
+  document.getElementById('refuse-modal').classList.remove('open');
+  pendingRefuseId = null;
+  pendingRefusePrevStatus = null;
+}
+
+function closeRefuseModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  // Restore dropdown value if panel is showing this lead
+  if (pendingRefuseId && activeId == pendingRefuseId && pendingRefusePrevStatus) {
+    const sel = document.querySelector('.status-sel');
+    if (sel) sel.value = pendingRefusePrevStatus;
+  }
+  document.getElementById('refuse-modal').classList.remove('open');
+  pendingRefuseId = null;
+  pendingRefusePrevStatus = null;
+}
+
+function setRefuseReason(id, reason) {
+  const l = leads.find(x => String(x.id) === String(id));
+  if (!l) return;
+  l.refuseReason = reason;
+  if (activeId == id) openPanel(id);
+  renderBoard();
+  showToast('Reason updated ✓');
+  if (l.airtableId) syncToAirtable(l.airtableId, { 'Refuse Reason': REFUSE_LABELS[reason] || reason });
 }
 
 function changeStatus(id, status) {
@@ -515,7 +635,6 @@ function changeStatus(id, status) {
   const progMap = { new:10, contacted:30, quoted:55, scheduled:75, completed:100, lost:100, refused:100 };
   l.progress = progMap[status] || 10;
 
-  // Auto-fill payment from quote when moving to Job Payment
   if (status === 'completed' && !l.invoice && l.value > 0) {
     l.invoice = l.value;
   }
@@ -523,11 +642,7 @@ function changeStatus(id, status) {
   renderBoard();
   if (activeId === id) openPanel(id);
 
-<<<<<<< HEAD
-  // Airtable sync disabled — local changes only
-  showToast('Status updated ✓');
-=======
-  // Write back to Airtable if record has an airtable ID
+  // Auto-sync to Airtable
   if (l.airtableId) {
     const atStatusMap = { new:'New', contacted:'Contacted', quoted:'Quoted',
                           scheduled:'Scheduled', completed:'Completed', lost:'Lost', refused:'Refused' };
@@ -535,37 +650,31 @@ function changeStatus(id, status) {
     if (status === 'completed' && l.invoice > 0) {
       atFields['Final Invoice Amount'] = l.invoice;
     }
-    if (IS_LOCAL) {
-      fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${l.airtableId}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: atFields })
-      }).then(() => showToast('Status saved to Airtable ✓'))
-        .catch(() => showToast('Status updated locally (Airtable sync failed)'));
-    } else {
-      fetch('/api/update-lead', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ airtableId: l.airtableId, fields: atFields })
-      }).then(() => showToast('Status saved to Airtable ✓'))
-        .catch(() => showToast('Status updated locally (Airtable sync failed)'));
-    }
+    syncToAirtable(l.airtableId, atFields);
+    showToast('Status saved to Airtable ✓');
+  } else {
+    showToast('Status updated ✓');
   }
->>>>>>> b3b57144da059a64dfe1ed2109f845eacb2c099a
 }
 
-function saveNote(id) {
+let notesSaveTimer;
+function autoSaveNote(id) {
+  clearTimeout(notesSaveTimer);
+  notesSaveTimer = setTimeout(() => saveNote(id, true), 1500);
+}
+
+function saveNote(id, silent) {
   const l = leads.find(x => x.id === id);
   const ta = document.getElementById(`notes-${id}`);
   if (l && ta) {
     l.notes = ta.value;
-    showToast('Note saved ✓');
+    if (!silent) showToast('Note saved ✓');
+    if (l.airtableId) syncToAirtable(l.airtableId, { 'Notes': l.notes });
   }
 }
 
 function sendQuote(id) {
   changeStatus(id, 'quoted');
-  showToast('Status updated to Quoted');
 }
 
 function archiveLead(id) {
@@ -581,36 +690,28 @@ function searchLeads(val) {
 }
 
 function showPage(page, el) {
-  // Update nav active state
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
 
-  // Hide all pages
   ['leads','overview','settings'].forEach(p => {
     const el = document.getElementById('page-' + p);
     if (el) el.style.display = 'none';
   });
 
-  // Show target page
   const target = document.getElementById('page-' + page);
   if (target) target.style.display = 'flex';
 
-  // Update topbar title
   const titles = { leads:'Leads Dashboard', overview:'Overview', settings:'Settings' };
   document.querySelector('.topbar-title').textContent = titles[page] || page;
 
-  // Reset stat filter when switching away from leads
   if (page !== 'leads') { statFilter = null; }
 
-  // Close detail panel when switching pages
   closePanel();
 
-  // Populate dynamic pages
   if (page === 'overview') renderOverview();
 }
 
 function renderOverview() {
-  // Stats
   const calls = leads.filter(l => l.hasCall).length;
   const forms = leads.filter(l => !l.hasCall).length;
   const lp1   = leads.filter(l => l.lp === 'LP1').length;
@@ -651,7 +752,6 @@ function renderOverview() {
       <div class="stat-val">${leads.filter(l=>l.status==='completed').length}</div><div class="stat-sub">Jobs done</div>
     </div>`;
 
-  // Recent leads
   const recent = leads.slice(0, 10);
   document.getElementById('overview-recent').innerHTML = recent.map(l => `
     <div onclick="showPage('leads',document.querySelector('[data-page=leads]'));setTimeout(()=>openPanel('${l.id}'),300)"
@@ -666,52 +766,6 @@ function renderOverview() {
         <div style="font-size:11.5px;color:var(--gray-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(l.subject||'').substring(0,60)}</div>
       </div>
       <div style="font-size:11px;color:var(--gray-400);flex-shrink:0">${formatDate(l.date)}</div>
-    </div>`).join('');
-}
-
-function renderClients() {
-  // Only show form leads with a real name (not unknown)
-  const formLeads = leads.filter(l => !l.hasCall && l.name !== 'Unknown');
-  document.getElementById('clients-list').innerHTML = formLeads.map(l => `
-    <div onclick="showPage('leads',document.querySelector('[data-page=leads]'));setTimeout(()=>openPanel('${l.id}'),300)"
-      style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;
-        margin-bottom:8px;display:flex;align-items:center;gap:14px;cursor:pointer;
-        transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue-200)'" onmouseout="this.style.borderColor='var(--gray-200)'">
-      <div style="width:38px;height:38px;border-radius:50%;background:var(--blue-100);
-        display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;
-        color:var(--primary);flex-shrink:0">${l.name.charAt(0).toUpperCase()}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:600;color:var(--gray-900)">${l.name}</div>
-        <div style="font-size:12px;color:var(--gray-500)">${l.email || l.phone || '—'}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:11px;color:var(--gray-400)">${formatDate(l.date)}</div>
-        <span class="tag tag-form${l.lp==='LP2'?'2':'1'}" style="margin-top:4px;display:inline-block">Form · ${l.lp}</span>
-      </div>
-    </div>`).join('') || '<div style="color:var(--gray-400);font-size:13px;text-align:center;padding:32px">No form clients found</div>';
-}
-
-function renderCalendar() {
-  const scheduled = leads.filter(l => l.jobDate || l.followUp).sort((a,b) => {
-    const da = new Date(a.jobDate || a.followUp || 0);
-    const db = new Date(b.jobDate || b.followUp || 0);
-    return da - db;
-  });
-  const el = document.getElementById('calendar-list');
-  if (!scheduled.length) {
-    el.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid var(--gray-200);padding:32px;text-align:center;color:var(--gray-400);font-size:13px">No scheduled jobs or follow-ups yet.<br>Set dates in lead details to see them here.</div>';
-    return;
-  }
-  el.innerHTML = scheduled.map(l => `
-    <div style="background:#fff;border-radius:10px;border:1px solid var(--gray-200);padding:14px 16px;margin-bottom:8px;display:flex;gap:14px;align-items:center">
-      <div style="background:var(--blue-50);border-radius:8px;padding:8px 12px;text-align:center;flex-shrink:0">
-        <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase">${new Date(l.jobDate||l.followUp).toLocaleDateString('en-AU',{month:'short'})}</div>
-        <div style="font-size:20px;font-weight:700;color:var(--gray-900)">${new Date(l.jobDate||l.followUp).getDate()}</div>
-      </div>
-      <div style="flex:1">
-        <div style="font-size:13.5px;font-weight:600;color:var(--gray-900)">${l.name}</div>
-        <div style="font-size:12px;color:var(--gray-500)">${l.jobDate?'Job scheduled':'Follow-up'} · ${l.address||'—'}</div>
-      </div>
     </div>`).join('');
 }
 
@@ -742,7 +796,8 @@ function saveLead() {
     lp: source === 'form2' || source === 'call2' ? 'LP2' : 'LP1',
     status: 'new', date: dateStr, dateObj: new Date(),
     address: '', jobType: 'Residential', windows: 0,
-    starred: false, notes: '', hasCall: source.startsWith('call'), progress: 10,
+    starred: false, notes: '', hasCall: source.startsWith('call'),
+    progress: 10, refuseReason: '',
   });
 
   closeModal();
@@ -779,7 +834,7 @@ function showToast(msg) {
    STAT FILTER
 ═══════════════════════════════════════════ */
 function filterByStat(type) {
-  statFilter = statFilter === type ? null : type; // toggle off if already active
+  statFilter = statFilter === type ? null : type;
   renderBoard();
 }
 
@@ -802,7 +857,6 @@ function allowDrop(event) {
 }
 
 function handleDragLeave(event, col) {
-  // Only remove highlight if leaving the column itself (not a child element)
   if (!col.contains(event.relatedTarget)) {
     col.classList.remove('drag-over');
   }
@@ -817,11 +871,11 @@ function dropOnCol(event, colId) {
   dragLeadId = null;
   const l = leads.find(x => String(x.id) === String(id));
   if (!l || l.status === colId) return;
-  changeStatus(l.id, colId);
+  handleStatusChange(l.id, colId);
 }
 
 /* ═══════════════════════════════════════════
-   INLINE NAME EDIT
+   INLINE NAME EDIT (card double-click)
 ═══════════════════════════════════════════ */
 function startEditName(event, id) {
   event.stopPropagation();
@@ -846,12 +900,26 @@ function startEditName(event, id) {
       document.getElementById('p-name').textContent = newName;
     }
     showToast('Name updated ✓');
+    if (l.airtableId) syncToAirtable(l.airtableId, { 'Client Name': newName });
   }
   input.addEventListener('blur', save);
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
     if (e.key === 'Escape') { input.value = l.name; input.blur(); }
   });
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE SIDEBAR TOGGLE
+═══════════════════════════════════════════ */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
 /* ═══════════════════════════════════════════
