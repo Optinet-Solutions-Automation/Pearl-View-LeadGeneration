@@ -1,6 +1,53 @@
 import { useLeadsContext } from '../../context/LeadsContext';
 import { formatDate } from '../../utils/dateUtils';
 
+function LeadRow({ l, onClick, isNew }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer' }}
+    >
+      {/* Icon with green dot for new call leads */}
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div style={{
+          width: '34px', height: '34px', borderRadius: '8px',
+          background: l.hasCall ? '#d1fae5' : 'var(--blue-100)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '15px',
+        }}>
+          {l.hasCall ? (
+            <svg fill="none" viewBox="0 0 24 24" stroke={isNew ? '#16a34a' : '#065f46'} strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>
+            </svg>
+          ) : '📋'}
+        </div>
+        {/* Green "NEW" dot badge on call leads that are new */}
+        {isNew && l.hasCall && (
+          <span style={{
+            position: 'absolute', top: '-4px', right: '-4px',
+            width: '10px', height: '10px',
+            background: '#16a34a', border: '2px solid #fff',
+            borderRadius: '50%', display: 'block',
+          }} />
+        )}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</span>
+          {isNew && (
+            <span style={{ fontSize: '9.5px', fontWeight: 700, background: '#dcfce7', color: '#15803d', borderRadius: '20px', padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>New</span>
+          )}
+        </div>
+        <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {(l.subject || '').substring(0, 60)}
+        </div>
+      </div>
+      <div style={{ fontSize: '11px', color: 'var(--gray-400)', flexShrink: 0 }}>{formatDate(l.date)}</div>
+    </div>
+  );
+}
+
 export default function OverviewPage() {
   const { leads, openPanel, setCurrentPage } = useLeadsContext();
 
@@ -9,6 +56,8 @@ export default function OverviewPage() {
   const lp1   = leads.filter(l => l.lp === 'LP1').length;
   const lp2   = leads.filter(l => l.lp === 'LP2').length;
   const recent = leads.slice(0, 10);
+  const recentNew  = recent.filter(l => l.status === 'new');
+  const recentOld  = recent.filter(l => l.status !== 'new');
 
   function goToLead(id) {
     setCurrentPage('leads');
@@ -114,30 +163,33 @@ export default function OverviewPage() {
 
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '20px' }}>
         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '14px' }}>Recent Leads (Last 10)</div>
-        {recent.map(l => (
-          <div
-            key={l.id}
-            onClick={() => goToLead(l.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer' }}
-          >
-            <div style={{
-              width: '34px', height: '34px', borderRadius: '8px',
-              background: l.hasCall ? '#d1fae5' : 'var(--blue-100)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, fontSize: '13px', fontWeight: 700,
-              color: l.hasCall ? '#065f46' : 'var(--primary)',
-            }}>
-              {l.hasCall ? '📞' : '📋'}
+
+        {/* ── New leads ── */}
+        {recentNew.length > 0 && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#16a34a' }}>New</span>
+              <span style={{ height: '1px', flex: 1, background: '#dcfce7' }} />
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#16a34a', background: '#dcfce7', borderRadius: '20px', padding: '1px 8px' }}>{recentNew.length}</span>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</div>
-              <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {(l.subject || '').substring(0, 60)}
-              </div>
+            {recentNew.map(l => <LeadRow key={l.id} l={l} onClick={() => goToLead(l.id)} isNew />)}
+          </>
+        )}
+
+        {/* ── Previous leads ── */}
+        {recentOld.length > 0 && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: `${recentNew.length > 0 ? '14px' : '0'} 0 6px` }}>
+              <span style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--gray-400)' }}>Previous</span>
+              <span style={{ height: '1px', flex: 1, background: 'var(--gray-100)' }} />
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--gray-400)', flexShrink: 0 }}>{formatDate(l.date)}</div>
-          </div>
-        ))}
+            {recentOld.map(l => <LeadRow key={l.id} l={l} onClick={() => goToLead(l.id)} isNew={false} />)}
+          </>
+        )}
+
+        {recent.length === 0 && (
+          <p style={{ fontSize: '13px', color: 'var(--gray-400)', textAlign: 'center', padding: '20px 0' }}>No leads yet.</p>
+        )}
       </div>
     </div>
   );

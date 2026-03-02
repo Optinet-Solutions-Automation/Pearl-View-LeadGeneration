@@ -1,5 +1,4 @@
 import { useLeadsContext } from '../context/LeadsContext';
-import { REFUSE_LABELS } from '../utils/constants';
 
 function StatCard({ id, label, value, sub, icon, iconBg, iconStroke, onClick, isActive }) {
   return (
@@ -28,9 +27,6 @@ export default function StatsRow() {
   const callCount      = leads.filter(l => l.hasCall).length;
   const formCount      = leads.filter(l => !l.hasCall).length;
   const quotedCount    = leads.filter(l => l.status === 'quoted').length;
-  const scheduledCount = leads.filter(l => l.status === 'scheduled').length;
-  const completedLeads = leads.filter(l => l.status === 'completed');
-  const totalRevenue   = completedLeads.reduce((s, l) => s + (parseFloat(l.invoice) || parseFloat(l.value) || 0), 0);
   const refusedLeads   = leads.filter(l => l.status === 'refused');
 
   // Refuse reason breakdown subtitle
@@ -71,24 +67,6 @@ export default function StatsRow() {
         isActive={statFilter === 'quoted'}
         onClick={() => toggleStatFilter('quoted')}
         icon={<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>}
-      />
-      <StatCard
-        label="Scheduled Jobs"
-        value={scheduledCount}
-        sub={`${scheduledCount} job${scheduledCount !== 1 ? 's' : ''} booked`}
-        iconBg="#f0fdfa" iconStroke="#0d9488"
-        isActive={statFilter === 'scheduled'}
-        onClick={() => toggleStatFilter('scheduled')}
-        icon={<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>}
-      />
-      <StatCard
-        label="Total Revenue"
-        value={totalRevenue > 0 ? '$' + totalRevenue.toFixed(2) : '$0'}
-        sub={`${completedLeads.length} job${completedLeads.length !== 1 ? 's' : ''} completed`}
-        iconBg="#f0fdf4" iconStroke="#16a34a"
-        isActive={statFilter === 'completed'}
-        onClick={() => toggleStatFilter('completed')}
-        icon={<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>}
       />
       <StatCard
         label="Refused"

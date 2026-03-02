@@ -8,12 +8,14 @@ import Toast from './components/Toast';
 import LoadingOverlay from './components/LoadingOverlay';
 import LeadsPage from './components/pages/LeadsPage';
 import OverviewPage from './components/pages/OverviewPage';
+import ClientsPage from './components/pages/ClientsPage';
 
 function PageBody() {
   const { currentPage } = useLeadsContext();
 
   switch (currentPage) {
     case 'overview': return <OverviewPage />;
+    case 'clients':  return <ClientsPage />;
     case 'leads':
     default:         return <LeadsPage />;
   }

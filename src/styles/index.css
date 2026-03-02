@@ -158,7 +158,7 @@ body {
 .page { flex: 1; overflow-y: auto; padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }
 
 /* ── STATS ROW ───────────────────────────── */
-.stats { display: grid; grid-template-columns: repeat(6,1fr); gap: 10px; }
+.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
 .stat-card {
   background: #fff; border-radius: 12px; padding: 14px 16px;
   border: 1px solid var(--gray-200);
@@ -816,17 +816,21 @@ body {
   }
   .sidebar.open { left: 0; }
 
-  .stats { grid-template-columns: repeat(3, 1fr); }
+  .stats { grid-template-columns: repeat(2, 1fr); }
 
   .panel.open { width: 100%; position: fixed; inset: 0; z-index: 150; }
 
-  .board { grid-template-columns: repeat(3, minmax(200px, 1fr)); }
+  /* Kanban: horizontal scroll so all columns remain visible */
+  .board {
+    grid-template-columns: repeat(6, 220px);
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
 }
 
 @media (max-width: 520px) {
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .board { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
   .topbar { padding: 0 12px; gap: 8px; }
   .topbar-title { font-size: 15px; }
-  .search-wrap { max-width: 180px; }
+  .search-wrap { max-width: 160px; }
+  .board { grid-template-columns: repeat(6, 180px); }
 }
