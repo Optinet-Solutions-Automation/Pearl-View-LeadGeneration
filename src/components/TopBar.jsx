@@ -25,9 +25,9 @@ export default function TopBar() {
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
 
-  // ALL unactioned leads (any date, calls + forms) still in 'new' status
+  // Only leads added TODAY (calls + forms) that are still new/unactioned
   const newLeads = leads
-    .filter(l => l.status === 'new')
+    .filter(l => l.status === 'new' && isToday(l.dateObj))
     .sort((a, b) => b.dateObj - a.dateObj);
 
   // Unseen = not yet viewed this page session
@@ -116,8 +116,8 @@ export default function TopBar() {
             className="notif-btn"
             onClick={handleBellClick}
             title={badgeCount > 0
-              ? `${badgeCount} unactioned lead${badgeCount !== 1 ? 's' : ''}`
-              : 'No new leads'}
+              ? `${badgeCount} new lead${badgeCount !== 1 ? 's' : ''} today`
+              : 'No new leads today'}
           >
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
@@ -130,7 +130,7 @@ export default function TopBar() {
           {showNotifs && (
             <div className="notif-dropdown">
               <div className="notif-hdr">
-                <span className="notif-hdr-title">New Leads</span>
+                <span className="notif-hdr-title">New Leads Today</span>
                 {dropdownLeads.length > 0 && (
                   <span className="notif-hdr-count">{dropdownLeads.length}</span>
                 )}
