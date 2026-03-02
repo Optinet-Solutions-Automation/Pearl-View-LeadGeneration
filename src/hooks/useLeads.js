@@ -75,8 +75,9 @@ function normaliseRecord(rec) {
 }
 
 export function useLeads() {
-  const [leads, setLeads] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [leads,        setLeads]        = useState([]);
+  const [deletedLeads, setDeletedLeads] = useState([]);
+  const [isLoading,    setIsLoading]    = useState(true);
 
   const fetchLeads = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setIsLoading(true);
@@ -147,8 +148,30 @@ export function useLeads() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
   }, []);
 
+  // Move lead to deleted history (soft delete)
   const archiveLead = useCallback((id) => {
-    setLeads(prev => prev.filter(l => l.id !== id));
+    setLeads(prev => {
+      const lead = prev.find(l => l.id === id);
+      if (lead) setDeletedLeads(d => [{ ...lead, deletedAt: new Date() }, ...d]);
+      return prev.filter(l => l.id !== id);
+    });
+  }, []);
+
+  // Permanently remove from deleted history
+  const permanentDelete = useCallback((id) => {
+    setDeletedLeads(prev => prev.filter(l => l.id !== id));
+  }, []);
+
+  // Move back from deleted history to active leads
+  const recoverLead = useCallback((id) => {
+    setDeletedLeads(prev => {
+      const lead = prev.find(l => l.id === id);
+      if (lead) {
+        const { deletedAt: _d, ...restored } = lead;
+        setLeads(ls => [restored, ...ls].sort((a, b) => b.dateObj - a.dateObj));
+      }
+      return prev.filter(l => l.id !== id);
+    });
   }, []);
 
   const addLead = useCallback((leadData) => {
@@ -166,9 +189,9 @@ export function useLeads() {
   }, []);
 
   return {
-    leads, isLoading, fetchLeads,
+    leads, deletedLeads, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote,
     renameLead, setRefuseReason,
-    archiveLead, addLead,
+    archiveLead, permanentDelete, recoverLead, addLead,
   };
 }

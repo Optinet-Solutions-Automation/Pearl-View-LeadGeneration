@@ -9,15 +9,17 @@ import LoadingOverlay from './components/LoadingOverlay';
 import LeadsPage from './components/pages/LeadsPage';
 import OverviewPage from './components/pages/OverviewPage';
 import ClientsPage from './components/pages/ClientsPage';
+import DeletedHistoryPage from './components/pages/DeletedHistoryPage';
 
 function PageBody() {
   const { currentPage } = useLeadsContext();
 
   switch (currentPage) {
-    case 'overview': return <OverviewPage />;
-    case 'clients':  return <ClientsPage />;
+    case 'overview':        return <OverviewPage />;
+    case 'clients':         return <ClientsPage />;
+    case 'deleted-history': return <DeletedHistoryPage />;
     case 'leads':
-    default:         return <LeadsPage />;
+    default:                return <LeadsPage />;
   }
 }
 

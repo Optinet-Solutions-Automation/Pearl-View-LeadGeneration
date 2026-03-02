@@ -5,10 +5,10 @@ const LeadsContext = createContext(null);
 
 export function LeadsProvider({ children }) {
   const {
-    leads, isLoading, fetchLeads,
+    leads, deletedLeads, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote,
     renameLead, setRefuseReason,
-    archiveLead, addLead,
+    archiveLead, permanentDelete, recoverLead, addLead,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -91,7 +91,18 @@ export function LeadsProvider({ children }) {
   const handleArchive = useCallback((id) => {
     archiveLead(id);
     closePanel();
-  }, [archiveLead, closePanel]);
+    showToast('Lead moved to Deleted History');
+  }, [archiveLead, closePanel, showToast]);
+
+  const handlePermanentDelete = useCallback((id) => {
+    permanentDelete(id);
+    showToast('Lead permanently deleted');
+  }, [permanentDelete, showToast]);
+
+  const handleRecoverLead = useCallback((id) => {
+    recoverLead(id);
+    showToast('Lead recovered ✓');
+  }, [recoverLead, showToast]);
 
   const handleAddLead = useCallback((data) => {
     addLead(data);
@@ -123,6 +134,7 @@ export function LeadsProvider({ children }) {
   return (
     <LeadsContext.Provider value={{
       leads,
+      deletedLeads,
       filteredLeads,
       isLoading,
       activeId,
@@ -152,6 +164,8 @@ export function LeadsProvider({ children }) {
       renameLead: handleRename,
       setRefuseReason: handleSetRefuseReason,
       archiveLead: handleArchive,
+      permanentDelete: handlePermanentDelete,
+      recoverLead: handleRecoverLead,
       addLead: handleAddLead,
       refetch: fetchLeads,
     }}>

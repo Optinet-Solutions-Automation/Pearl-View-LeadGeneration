@@ -4,10 +4,11 @@ export const PAGE_TITLES = {
   leads:    'Leads Dashboard',
   overview: 'Overview',
   clients:  'Clients',
+  'deleted-history': 'Deleted History',
 };
 
 export default function Sidebar() {
-  const { leads, currentPage, setCurrentPage, closePanel, sidebarOpen, closeSidebar } = useLeadsContext();
+  const { leads, deletedLeads, currentPage, setCurrentPage, closePanel, sidebarOpen, closeSidebar } = useLeadsContext();
 
   function navigate(page) {
     setCurrentPage(page);
@@ -24,6 +25,11 @@ export default function Sidebar() {
       {label}
       {page === 'leads' && (
         <span className="nav-badge">{leads.length || '—'}</span>
+      )}
+      {page === 'deleted-history' && deletedLeads.length > 0 && (
+        <span className="nav-badge" style={{ background: '#fee2e2', color: '#dc2626' }}>
+          {deletedLeads.length}
+        </span>
       )}
     </div>
   );
@@ -63,6 +69,11 @@ export default function Sidebar() {
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+          )}
+          {navItem('deleted-history', 'Deleted History',
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
             </svg>
           )}
         </nav>
