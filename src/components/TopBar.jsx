@@ -1,10 +1,44 @@
+import { useState, useRef, useEffect } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
 import { PAGE_TITLES } from './Sidebar';
+import { formatDate } from '../utils/dateUtils';
 
 export default function TopBar() {
-  const { currentPage, searchTerm, setSearchTerm, setModalOpen, toggleSidebar, refetch } = useLeadsContext();
+  const {
+    currentPage, searchTerm, setSearchTerm,
+    setModalOpen, toggleSidebar, refetch,
+    leads, openPanel, setCurrentPage,
+  } = useLeadsContext();
+
+  const [showNotifs, setShowNotifs] = useState(false);
+  const notifsRef = useRef(null);
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
+
+  // New call leads = hasCall + status 'new', sorted newest first
+  const newCalls = leads
+    .filter(l => l.hasCall && l.status === 'new')
+    .sort((a, b) => b.dateObj - a.dateObj);
+
+  const badgeCount = Math.min(newCalls.length, 99);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showNotifs) return;
+    function handler(e) {
+      if (notifsRef.current && !notifsRef.current.contains(e.target)) {
+        setShowNotifs(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showNotifs]);
+
+  function handleNotifClick(leadId) {
+    setShowNotifs(false);
+    setCurrentPage('leads');
+    setTimeout(() => openPanel(leadId), 80);
+  }
 
   return (
     <header className="topbar">
@@ -46,12 +80,59 @@ export default function TopBar() {
           </svg>
           New Lead
         </button>
-        <button className="notif-btn">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-          </svg>
-          <span className="notif-dot"></span>
-        </button>
+
+        {/* Notification bell */}
+        <div className="notif-wrap" ref={notifsRef}>
+          <button
+            className="notif-btn"
+            onClick={() => setShowNotifs(v => !v)}
+            title={`${newCalls.length} new call${newCalls.length !== 1 ? 's' : ''}`}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+            {badgeCount > 0 && (
+              <span className="notif-badge">{badgeCount > 9 ? '9+' : badgeCount}</span>
+            )}
+          </button>
+
+          {showNotifs && (
+            <div className="notif-dropdown">
+              <div className="notif-hdr">
+                <span className="notif-hdr-title">New Call Leads</span>
+                {newCalls.length > 0 && (
+                  <span className="notif-hdr-count">{newCalls.length}</span>
+                )}
+              </div>
+
+              {newCalls.length === 0 ? (
+                <div className="notif-empty">No new calls right now</div>
+              ) : (
+                <div className="notif-list">
+                  {newCalls.map(l => (
+                    <div key={l.id} className="notif-item" onClick={() => handleNotifClick(l.id)}>
+                      <div className="notif-item-icon">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
+                          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>
+                        </svg>
+                        <span className="notif-item-dot" />
+                      </div>
+                      <div className="notif-item-body">
+                        <div className="notif-item-name">{l.name}</div>
+                        <div className="notif-item-phone">{l.phone || '—'}</div>
+                        <div className="notif-item-date">{formatDate(l.date)}</div>
+                      </div>
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '13px', height: '13px', color: 'var(--gray-300)', flexShrink: 0 }}>
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="user-chip">
           <div className="avatar">AC</div>
           <span className="user-name">Asaf C.</span>

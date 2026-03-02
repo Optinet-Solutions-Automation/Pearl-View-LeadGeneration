@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
 import { COLS } from '../utils/constants';
 import KanbanColumn from './KanbanColumn';
+import { formatDate } from '../utils/dateUtils';
 
 const PAGE_SIZE = 10;
 
@@ -16,8 +17,22 @@ const ALL_COLS = [
   { key: 'value',   label: 'Est. Value' },
 ];
 
+const STAT_LABELS = {
+  new:     'New Leads',
+  calls:   'Calls Received',
+  quoted:  'Pending Quotes',
+  refused: 'Refused',
+};
+
+const STAT_DOT = {
+  new:     '#2563eb',
+  calls:   '#16a34a',
+  quoted:  '#d97706',
+  refused: '#dc2626',
+};
+
 export default function KanbanBoard() {
-  const { filteredLeads, openPanel } = useLeadsContext();
+  const { filteredLeads, openPanel, statFilter, toggleStatFilter } = useLeadsContext();
 
   const [selectedColId,  setSelectedColId]  = useState(null);
   const [modalSearch,    setModalSearch]    = useState('');
@@ -25,6 +40,16 @@ export default function KanbanBoard() {
   const [visibleCols,    setVisibleCols]    = useState(() => new Set(ALL_COLS.map(c => c.key)));
   const [showColPicker,  setShowColPicker]  = useState(false);
   const pickerRef = useRef(null);
+
+  // When a stat filter is activated, close any open column table
+  useEffect(() => {
+    if (statFilter) {
+      setSelectedColId(null);
+      setModalSearch('');
+      setModalPage(1);
+      setShowColPicker(false);
+    }
+  }, [statFilter]);
 
   // Close picker when clicking outside
   useEffect(() => {
@@ -39,16 +64,33 @@ export default function KanbanBoard() {
   const selectedCol   = COLS.find(c => c.id === selectedColId);
   const selectedLeads = selectedColId ? filteredLeads.filter(l => l.status === selectedColId) : [];
 
+  // Table source: stat filter table uses all filteredLeads; column table uses column leads
+  const tableLeads = statFilter ? filteredLeads : selectedLeads;
+  const tableTitle = statFilter ? STAT_LABELS[statFilter] : selectedCol?.label;
+  const tableDot   = statFilter ? STAT_DOT[statFilter] : selectedCol?.dot;
+  const isTableOpen = statFilter || selectedColId;
+
+  function closeTableFn() {
+    if (statFilter) {
+      toggleStatFilter(statFilter); // clears the filter
+    } else {
+      setSelectedColId(null);
+    }
+    setModalSearch('');
+    setModalPage(1);
+    setShowColPicker(false);
+  }
+
   const searchedLeads = useMemo(() => {
     const term = modalSearch.trim().toLowerCase();
-    if (!term) return selectedLeads;
-    return selectedLeads.filter(l =>
+    if (!term) return tableLeads;
+    return tableLeads.filter(l =>
       l.name.toLowerCase().includes(term)           ||
       (l.phone   || '').toLowerCase().includes(term) ||
       (l.email   || '').toLowerCase().includes(term) ||
       (l.subject || '').toLowerCase().includes(term)
     );
-  }, [selectedLeads, modalSearch]);
+  }, [tableLeads, modalSearch]);
 
   const totalPages = Math.max(1, Math.ceil(searchedLeads.length / PAGE_SIZE));
   const safePage   = Math.min(modalPage, totalPages);
@@ -59,13 +101,6 @@ export default function KanbanBoard() {
     setSelectedColId(colId);
     setModalSearch('');
     setModalPage(1);
-  }
-
-  function closeTable() {
-    setSelectedColId(null);
-    setModalSearch('');
-    setModalPage(1);
-    setShowColPicker(false);
   }
 
   function handleSearch(e) {
@@ -110,16 +145,16 @@ export default function KanbanBoard() {
         </div>
       </div>
 
-      {selectedColId && selectedCol ? (
-        /* ── Table view — replaces the board in the same area ── */
+      {isTableOpen ? (
+        /* ── Table view — shown for stat filter OR column selection ── */
         <div className="col-table-section">
 
           {/* Header */}
           <div className="col-modal-hdr">
-            <div className="col-dot" style={{ background: selectedCol.dot }} />
-            <span className="col-modal-title">{selectedCol.label}</span>
+            <div className="col-dot" style={{ background: tableDot }} />
+            <span className="col-modal-title">{tableTitle}</span>
             <span className="col-table-count">
-              {selectedLeads.length} lead{selectedLeads.length !== 1 ? 's' : ''}
+              {tableLeads.length} lead{tableLeads.length !== 1 ? 's' : ''}
             </span>
 
             {/* Column visibility picker */}
@@ -149,7 +184,7 @@ export default function KanbanBoard() {
               )}
             </div>
 
-            <button className="col-table-close" onClick={closeTable}>✕</button>
+            <button className="col-table-close" onClick={closeTableFn}>✕</button>
           </div>
 
           {/* Search toolbar */}
@@ -180,7 +215,7 @@ export default function KanbanBoard() {
           {/* Table body */}
           {searchedLeads.length === 0 ? (
             <div className="col-table-empty">
-              {modalSearch ? `No leads match "${modalSearch}"` : 'No leads in this column yet.'}
+              {modalSearch ? `No leads match "${modalSearch}"` : 'No leads in this category yet.'}
             </div>
           ) : (
             <>
@@ -189,6 +224,7 @@ export default function KanbanBoard() {
                   <thead>
                     <tr>
                       {activeCols.map(c => <th key={c.key}>{c.label}</th>)}
+                      {statFilter === 'calls' && <th>Status</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -200,17 +236,25 @@ export default function KanbanBoard() {
                       const subjectSnip = (l.subject || '').length > 55
                         ? l.subject.substring(0, 55) + '…'
                         : l.subject || '—';
+                      const statusCol = COLS.find(c => c.id === l.status);
 
                       return (
-                        <tr key={l.id} className="lead-trow" onClick={() => { closeTable(); openPanel(l.id); }}>
+                        <tr key={l.id} className="lead-trow" onClick={() => { closeTableFn(); openPanel(l.id); }}>
                           {visibleCols.has('num')     && <td className="lead-td-num">{startIdx + i + 1}</td>}
                           {visibleCols.has('name')    && <td className="lead-td-name">{l.name}</td>}
                           {visibleCols.has('source')  && <td><span className={`tag ${srcClass}`}>{srcLabel}</span></td>}
                           {visibleCols.has('phone')   && <td>{l.phone || '—'}</td>}
                           {visibleCols.has('email')   && <td>{l.email || '—'}</td>}
                           {visibleCols.has('subject') && <td className="lead-td-sub">{subjectSnip}</td>}
-                          {visibleCols.has('date')    && <td className="lead-td-date">{l.date || '—'}</td>}
+                          {visibleCols.has('date')    && <td className="lead-td-date">{formatDate(l.date)}</td>}
                           {visibleCols.has('value')   && <td className="lead-td-val">{l.value > 0 ? `$${l.value.toLocaleString()}` : '—'}</td>}
+                          {statFilter === 'calls' && (
+                            <td>
+                              <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: statusCol?.cnt?.split('/')[0] || 'var(--gray-100)', color: statusCol?.cnt?.split('/')[1] || 'var(--gray-600)', whiteSpace: 'nowrap' }}>
+                                {statusCol?.label || l.status}
+                              </span>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -241,7 +285,7 @@ export default function KanbanBoard() {
           )}
         </div>
       ) : (
-        /* ── Kanban board — shown when no column is selected ── */
+        /* ── Kanban board — shown when no filter/column is selected ── */
         <div className="board">
           {COLS.map(col => (
             <KanbanColumn
