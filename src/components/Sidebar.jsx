@@ -1,10 +1,11 @@
 import { useLeadsContext } from '../context/LeadsContext';
 
 export const PAGE_TITLES = {
-  leads:    'Leads Dashboard',
-  overview: 'Overview',
-  clients:  'Clients',
-  'deleted-history': 'Deleted History',
+  leads:            'Leads Dashboard',
+  overview:         'Overview',
+  clients:          'Clients',
+  'deleted-history':'Deleted History',
+  calendar:         'Calendar',
 };
 
 export default function Sidebar() {
@@ -75,6 +76,12 @@ export default function Sidebar() {
           {navItem('deleted-history', 'Deleted History',
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          )}
+          {navItem('calendar', 'Calendar',
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <path d="M16 2v4M8 2v4M3 10h18"/>
             </svg>
           )}
         </nav>

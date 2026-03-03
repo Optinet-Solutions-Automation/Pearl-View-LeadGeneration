@@ -15,6 +15,7 @@ export const STATUS_MAP = {
   Completed: 'completed',
   Refused:   'refused',
   Lost:      'refused',
+  Archived:  'archived',
 };
 
 export const AT_STATUS_MAP = {
@@ -24,6 +25,7 @@ export const AT_STATUS_MAP = {
   scheduled: 'Scheduled',
   completed: 'Completed',
   refused:   'Refused',
+  archived:  'Archived',
 };
 
 export const PROG_MAP = {

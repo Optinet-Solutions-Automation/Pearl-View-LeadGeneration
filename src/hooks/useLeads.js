@@ -99,7 +99,12 @@ export function useLeads() {
         if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
         allRecords = data.records;
       }
-      setLeads(allRecords.map(r => normaliseRecord(r)).sort((a, b) => b.dateObj - a.dateObj));
+      const all = allRecords.map(r => normaliseRecord(r));
+      const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
+      const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
+        .map(r => ({ ...r, deletedAt: r.dateObj }));
+      setLeads(active);
+      setDeletedLeads(archived);
     } catch (err) {
       console.error('Failed to load from Airtable:', err);
       throw err;
@@ -148,11 +153,22 @@ export function useLeads() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
   }, []);
 
-  // Move lead to deleted history (soft delete)
+  const saveJobType = useCallback((id, jobType) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Property Type': jobType });
+      return { ...l, jobType };
+    }));
+  }, []);
+
+  // Move lead to deleted history (soft delete) + sync to Airtable
   const archiveLead = useCallback((id) => {
     setLeads(prev => {
       const lead = prev.find(l => l.id === id);
-      if (lead) setDeletedLeads(d => [{ ...lead, deletedAt: new Date() }, ...d]);
+      if (lead) {
+        if (lead.airtableId) patchAirtable(lead.airtableId, { 'Lead Status': 'Archived' });
+        setDeletedLeads(d => [{ ...lead, deletedAt: new Date() }, ...d]);
+      }
       return prev.filter(l => l.id !== id);
     });
   }, []);
@@ -190,7 +206,7 @@ export function useLeads() {
 
   return {
     leads, deletedLeads, isLoading, fetchLeads,
-    changeStatus, toggleStar, saveNote,
+    changeStatus, toggleStar, saveNote, saveJobType,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
   };

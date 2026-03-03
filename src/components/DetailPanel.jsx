@@ -47,7 +47,7 @@ function AudioPlayer({ lead }) {
 export default function DetailPanel() {
   const {
     activeLead: l, closePanel, changeStatus,
-    saveNote, archiveLead, showToast, renameLead, setRefuseReason,
+    saveNote, saveJobType, archiveLead, showToast, renameLead, setRefuseReason,
   } = useLeadsContext();
 
   const [noteText, setNoteText]       = useState('');
@@ -86,10 +86,9 @@ export default function DetailPanel() {
     noteTimerRef.current = setTimeout(() => saveNote(l.id, val), 1500);
   }
   function handleSaveNote() { saveNote(l.id, noteText); showToast('Note saved'); }
+  function handleClearNote() { setNoteText(''); saveNote(l.id, ''); showToast('Note cleared'); }
   function handleComplete() { changeStatus(l.id, 'completed'); closePanel(); }
-  function handleArchive() {
-    if (window.confirm('Archive this lead? It will be removed from the board.')) archiveLead(l.id);
-  }
+  function handleArchive() { archiveLead(l.id); }
   function handleSendQuote() { changeStatus(l.id, 'quoted'); }
   function startEditName() { setEditNameVal(l.name); setEditingName(true); }
   function saveName() { const t = editNameVal.trim() || l.name; renameLead(l.id, t); setEditingName(false); }
@@ -193,7 +192,22 @@ export default function DetailPanel() {
         {/* Job Details */}
         <div className="psec">
           <div className="psec-title">Job Details</div>
-          <div className="jrow"><span className="jlbl">Job Type</span><span className="jval">{l.jobType || '—'}</span></div>
+          <div className="jrow" style={{ alignItems: 'center' }}>
+            <span className="jlbl">Job Type</span>
+            <select
+              className="status-sel"
+              value={l.jobType || ''}
+              onChange={e => saveJobType(l.id, e.target.value)}
+              style={{ fontSize: '12px', padding: '4px 8px', height: 'auto', flex: 1 }}
+            >
+              <option value="">— Select —</option>
+              <option value="Window">Window</option>
+              <option value="Cleaning">Cleaning</option>
+              <option value="Pressure">Pressure</option>
+              <option value="Solar">Solar</option>
+              <option value="Panels">Panels</option>
+            </select>
+          </div>
           <div className="jrow"><span className="jlbl">Windows</span><span className="jval">{l.windows || '—'}</span></div>
           <div style={{ padding: '4px 0' }}>
             <div className="jlbl" style={{ marginBottom: '4px' }}>Subject</div>
@@ -238,7 +252,10 @@ export default function DetailPanel() {
             value={noteText}
             onChange={handleNoteChange}
           />
-          <button className="save-note-btn" onClick={handleSaveNote}>Save Note</button>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+            <button className="save-note-btn" style={{ marginTop: 0 }} onClick={handleSaveNote}>Save Note</button>
+            <button className="clear-note-btn" onClick={handleClearNote}>Clear</button>
+          </div>
         </div>
 
         {/* Actions */}

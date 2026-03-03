@@ -6,7 +6,7 @@ const LeadsContext = createContext(null);
 export function LeadsProvider({ children }) {
   const {
     leads, deletedLeads, isLoading, fetchLeads,
-    changeStatus, toggleStar, saveNote,
+    changeStatus, toggleStar, saveNote, saveJobType,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
   } = useLeads();
@@ -77,6 +77,10 @@ export function LeadsProvider({ children }) {
   const handleSaveNote = useCallback((id, note) => {
     saveNote(id, note);
   }, [saveNote]);
+
+  const handleSaveJobType = useCallback((id, jobType) => {
+    saveJobType(id, jobType);
+  }, [saveJobType]);
 
   const handleRename = useCallback((id, newName) => {
     renameLead(id, newName);
@@ -161,6 +165,7 @@ export function LeadsProvider({ children }) {
       changeStatus: handleChangeStatus,
       toggleStar: handleToggleStar,
       saveNote: handleSaveNote,
+      saveJobType: handleSaveJobType,
       renameLead: handleRename,
       setRefuseReason: handleSetRefuseReason,
       archiveLead: handleArchive,
