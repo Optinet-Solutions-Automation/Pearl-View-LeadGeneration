@@ -26,7 +26,7 @@ export default function StatsRow() {
   const newCount       = leads.filter(l => l.status === 'new').length;
   const callCount      = leads.filter(l => l.hasCall).length;
   const formCount      = leads.filter(l => !l.hasCall).length;
-  const quotedCount    = leads.filter(l => l.status === 'quoted').length;
+  const quotedCount    = leads.filter(l => l.status === 'quote_sent').length;
   const refusedLeads   = leads.filter(l => l.status === 'refused');
 
   // Refuse reason breakdown subtitle
@@ -64,8 +64,8 @@ export default function StatsRow() {
         value={quotedCount}
         sub="Awaiting client response"
         iconBg="#fffbeb" iconStroke="#d97706"
-        isActive={statFilter === 'quoted'}
-        onClick={() => toggleStatFilter('quoted')}
+        isActive={statFilter === 'quote_sent'}
+        onClick={() => toggleStatFilter('quote_sent')}
         icon={<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>}
       />
       <StatCard

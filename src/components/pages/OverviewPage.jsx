@@ -120,20 +120,20 @@ export default function OverviewPage() {
               </svg>
             </div>
           </div>
-          <div className="stat-val">{leads.filter(l => l.status === 'quoted').length}</div>
+          <div className="stat-val">{leads.filter(l => l.status === 'quote_sent').length}</div>
           <div className="stat-sub">Quotes issued</div>
         </div>
         <div className="stat-card">
           <div className="stat-top">
-            <span className="stat-lbl">Completed</span>
+            <span className="stat-lbl">Job Done</span>
             <div className="stat-ico" style={{ background: '#f0fdf4' }}>
               <svg fill="none" viewBox="0 0 24 24" stroke="var(--green)" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>
           </div>
-          <div className="stat-val">{leads.filter(l => l.status === 'completed').length}</div>
-          <div className="stat-sub">Jobs done</div>
+          <div className="stat-val">{leads.filter(l => l.status === 'job_done').length}</div>
+          <div className="stat-sub">Jobs completed</div>
         </div>
       </div>
 

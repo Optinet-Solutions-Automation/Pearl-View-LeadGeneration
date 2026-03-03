@@ -3,6 +3,125 @@ import { useLeadsContext } from '../context/LeadsContext';
 import { formatDate } from '../utils/dateUtils';
 import { REFUSE_LABELS } from '../utils/constants';
 
+const BANKS = [
+  'Commonwealth Bank (CBA)',
+  'Westpac',
+  'ANZ',
+  'NAB',
+  'Bendigo Bank',
+  'Bank of Queensland',
+  'Suncorp Bank',
+  'ING Australia',
+  'Macquarie Bank',
+  'Other',
+];
+
+function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose }) {
+  const [amount,     setAmount]     = useState(initAmount ? String(initAmount) : '');
+  const [method,     setMethod]     = useState(initMethod || 'Cash');
+  const [bankName,   setBankName]   = useState('');
+  const [accountRef, setAccountRef] = useState('');
+  const [err,        setErr]        = useState('');
+
+  function handleSubmit() {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { setErr('Please enter a valid amount'); return; }
+    if (method === 'Bank' && !bankName) { setErr('Please select a bank'); return; }
+    setErr('');
+    onSubmit({ amount: amt, method, bankName: method === 'Bank' ? bankName : '', accountRef: method === 'Bank' ? accountRef : '' });
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: '16px' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)' }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Submit Payment</div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{leadName}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
+        </div>
+
+        <div style={{ padding: '18px 20px' }}>
+          {/* Amount */}
+          <label style={mlbl}>Amount Paid</label>
+          <div style={{ position: 'relative', marginBottom: '14px' }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontWeight: 700, fontSize: '15px' }}>$</span>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="0.00"
+              autoFocus
+              style={{ width: '100%', padding: '10px 12px 10px 28px', fontSize: '17px', fontWeight: 700, border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* Payment Method */}
+          <label style={mlbl}>Payment Method</label>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+            {['Cash', 'Bank'].map(m => (
+              <button
+                key={m}
+                onClick={() => setMethod(m)}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  border: `1.5px solid ${method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
+                  background: method === m ? (m === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
+                  color: method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
+                }}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Bank fields */}
+          {method === 'Bank' && (
+            <>
+              <label style={mlbl}>Bank Name</label>
+              <select
+                value={bankName}
+                onChange={e => setBankName(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: '14px', background: '#fff', color: bankName ? 'var(--gray-800)' : 'var(--gray-400)' }}
+              >
+                <option value="">— Select Bank —</option>
+                {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+
+              <label style={mlbl}>Account / Reference No.</label>
+              <input
+                type="text"
+                value={accountRef}
+                onChange={e => setAccountRef(e.target.value)}
+                placeholder="e.g. 062-000 / 12345678"
+                style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
+              />
+            </>
+          )}
+
+          {err && (
+            <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '12px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
+              {err}
+            </div>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            style={{ width: '100%', padding: '11px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            Confirm Payment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function generateWaveBars() {
   return Array.from({ length: 42 }, () => 4 + Math.floor(Math.random() * 20));
 }
@@ -47,26 +166,47 @@ function AudioPlayer({ lead }) {
 export default function DetailPanel() {
   const {
     activeLead: l, closePanel, changeStatus,
-    saveNote, saveJobType, archiveLead, showToast, renameLead, setRefuseReason,
+    saveNote, saveJobType, savePaidInfo, saveCity, saveJobDate, saveEmail,
+    archiveLead, showToast, renameLead, setRefuseReason,
   } = useLeadsContext();
 
-  const [noteText, setNoteText]       = useState('');
-  const [editingName, setEditingName] = useState(false);
-  const [editNameVal, setEditNameVal] = useState('');
-  const nameInputRef = useRef(null);
-  const noteTimerRef = useRef(null);
+  const [noteText,     setNoteText]     = useState('');
+  const [editingName,  setEditingName]  = useState(false);
+  const [editNameVal,  setEditNameVal]  = useState('');
+  const [editingCity,  setEditingCity]  = useState(false);
+  const [cityVal,      setCityVal]      = useState('');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailVal,     setEmailVal]     = useState('');
+  const [paidAmount,   setPaidAmount]   = useState('');
+  const [payMethod,    setPayMethod]    = useState('');
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const nameInputRef  = useRef(null);
+  const cityInputRef  = useRef(null);
+  const emailInputRef = useRef(null);
+  const noteTimerRef  = useRef(null);
 
   useEffect(() => {
     setEditingName(false);
-    if (l) setNoteText(l.notes || '');
+    setEditingCity(false);
+    setEditingEmail(false);
+    if (l) {
+      setNoteText(l.notes || '');
+      setPaidAmount(l.paidAmount || '');
+      setPayMethod(l.paymentMethod || '');
+    }
   }, [l?.id]);
 
   useEffect(() => {
-    if (editingName && nameInputRef.current) {
-      nameInputRef.current.focus();
-      nameInputRef.current.select();
-    }
+    if (editingName && nameInputRef.current) { nameInputRef.current.focus(); nameInputRef.current.select(); }
   }, [editingName]);
+
+  useEffect(() => {
+    if (editingCity && cityInputRef.current) { cityInputRef.current.focus(); cityInputRef.current.select(); }
+  }, [editingCity]);
+
+  useEffect(() => {
+    if (editingEmail && emailInputRef.current) { emailInputRef.current.focus(); emailInputRef.current.select(); }
+  }, [editingEmail]);
 
   if (!l) return <aside className="panel" />;
 
@@ -77,6 +217,8 @@ export default function DetailPanel() {
     ? <span className="tag tag-call" style={{ fontSize: '11px' }}>Call · {lpName}</span>
     : l.source === 'form1'
     ? <span className="tag tag-form1" style={{ fontSize: '11px' }}>Form · Crystal Pro</span>
+    : l.source === 'manual'
+    ? <span className="tag tag-gray" style={{ fontSize: '11px' }}>{l.leadChannel || 'Manual'}</span>
     : <span className="tag tag-form2" style={{ fontSize: '11px' }}>Form · Pearl View</span>;
 
   function handleNoteChange(e) {
@@ -85,11 +227,12 @@ export default function DetailPanel() {
     clearTimeout(noteTimerRef.current);
     noteTimerRef.current = setTimeout(() => saveNote(l.id, val), 1500);
   }
-  function handleSaveNote() { saveNote(l.id, noteText); showToast('Note saved'); }
+  function handleSaveNote()  { saveNote(l.id, noteText); showToast('Note saved'); }
   function handleClearNote() { setNoteText(''); saveNote(l.id, ''); showToast('Note cleared'); }
-  function handleComplete() { changeStatus(l.id, 'completed'); closePanel(); }
-  function handleArchive() { archiveLead(l.id); }
-  function handleSendQuote() { changeStatus(l.id, 'quoted'); }
+  function handleArchive()   { archiveLead(l.id); }
+  function handleSendQuote() { changeStatus(l.id, 'quote_sent'); }
+  function handleJobDone()   { changeStatus(l.id, 'job_done'); }
+
   function startEditName() { setEditNameVal(l.name); setEditingName(true); }
   function saveName() { const t = editNameVal.trim() || l.name; renameLead(l.id, t); setEditingName(false); }
   function handleNameKey(e) {
@@ -97,8 +240,65 @@ export default function DetailPanel() {
     if (e.key === 'Escape') setEditingName(false);
   }
 
+  function startEditCity() { setCityVal(l.city || ''); setEditingCity(true); }
+  function saveCity_()     { saveCity(l.id, cityVal.trim()); setEditingCity(false); }
+  function handleCityKey(e) {
+    if (e.key === 'Enter') saveCity_();
+    if (e.key === 'Escape') setEditingCity(false);
+  }
+
+  function startEditEmail() { setEmailVal(l.email || ''); setEditingEmail(true); }
+  function saveEmail_()     { saveEmail(l.id, emailVal.trim()); setEditingEmail(false); }
+  function handleEmailKey(e) {
+    if (e.key === 'Enter') saveEmail_();
+    if (e.key === 'Escape') setEditingEmail(false);
+  }
+
+  function handleSubmitPayment() {
+    setPayModalOpen(true);
+  }
+
+  function onPaymentSubmit({ amount, method, bankName, accountRef }) {
+    const payments = JSON.parse(localStorage.getItem('pvl_payments') || '[]');
+    payments.unshift({
+      id: `pay-${Date.now()}`,
+      leadId: l.id,
+      name: l.name,
+      phone: l.phone || '',
+      email: l.email || '',
+      jobType: l.jobType || '',
+      city: l.city || '',
+      amount,
+      method,
+      bankName,
+      accountRef,
+      date: new Date().toISOString(),
+    });
+    localStorage.setItem('pvl_payments', JSON.stringify(payments));
+    savePaidInfo(l.id, true, amount, method);
+    setPaidAmount(amount.toString());
+    setPayMethod(method);
+    setPayModalOpen(false);
+    showToast('Payment submitted ✓');
+  }
+
+  function handlePaidToggle(checked) {
+    const amount = checked ? (parseFloat(paidAmount) || 0) : 0;
+    const method = checked ? payMethod : '';
+    savePaidInfo(l.id, checked, amount, method);
+  }
+
+  function handlePayMethodSelect(method) {
+    setPayMethod(method);
+    savePaidInfo(l.id, l.paid, parseFloat(paidAmount) || 0, method);
+  }
+
+  function handlePaidAmountBlur() {
+    if (l.paid) savePaidInfo(l.id, true, parseFloat(paidAmount) || 0, payMethod);
+  }
+
   return (
-    <aside className="panel open">
+    <aside className="panel open" style={{ position: 'relative' }}>
       <div className="panel-hdr">
         <div className="panel-title">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -138,11 +338,10 @@ export default function DetailPanel() {
           <div className="psec-title">Status</div>
           <select className="status-sel" value={l.status} onChange={e => changeStatus(l.id, e.target.value)}>
             <option value="new">🔵 New Lead</option>
-            <option value="contacted">🟡 Contacted</option>
-            <option value="quoted">🟣 In Progress</option>
-            <option value="scheduled">🟢 Invoice Pending</option>
-            <option value="completed">✅ Job Payment</option>
+            <option value="in_progress">🟡 In Progress</option>
+            <option value="quote_sent">🟣 Quote Sent</option>
             <option value="refused">🚫 Refused</option>
+            <option value="job_done">✅ Job Done</option>
           </select>
         </div>
 
@@ -173,19 +372,48 @@ export default function DetailPanel() {
             </svg>
             <span className="prow-text">{l.phone || '—'}</span>
           </div>
-          <div className="prow">
+          {/* Email — tap to edit */}
+          <div className="prow" style={{ cursor: 'pointer' }} onClick={editingEmail ? undefined : startEditEmail}>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
               <polyline points="22,6 12,13 2,6"/>
             </svg>
-            <span className="prow-text">{l.email ? <a href={`mailto:${l.email}`}>{l.email}</a> : '—'}</span>
+            {editingEmail ? (
+              <input
+                ref={emailInputRef}
+                value={emailVal}
+                onChange={e => setEmailVal(e.target.value)}
+                onBlur={saveEmail_}
+                onKeyDown={handleEmailKey}
+                placeholder="Add email…"
+                style={{ fontSize: '13px', color: 'var(--gray-800)', border: 'none', borderBottom: '1.5px solid var(--primary)', outline: 'none', background: 'transparent', fontFamily: 'inherit', padding: 0, flex: 1 }}
+              />
+            ) : (
+              <span className="prow-text" style={{ color: l.email ? 'var(--gray-800)' : 'var(--gray-400)' }}>
+                {l.email ? <a href={`mailto:${l.email}`} onClick={e => e.stopPropagation()}>{l.email}</a> : 'Add email…'}
+              </span>
+            )}
           </div>
-          <div className="prow">
+          {/* City — building icon, tap to edit */}
+          <div className="prow" style={{ cursor: 'pointer' }} onClick={editingCity ? undefined : startEditCity}>
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
-              <circle cx="12" cy="10" r="3"/>
+              <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16M3 21h18M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
             </svg>
-            <span className="prow-text">{l.address || '—'}</span>
+            {editingCity ? (
+              <input
+                ref={cityInputRef}
+                value={cityVal}
+                onChange={e => setCityVal(e.target.value)}
+                onBlur={saveCity_}
+                onKeyDown={handleCityKey}
+                placeholder="Enter city…"
+                style={{ fontSize: '13px', color: 'var(--gray-800)', border: 'none', borderBottom: '1.5px solid var(--primary)', outline: 'none', background: 'transparent', fontFamily: 'inherit', padding: 0, flex: 1 }}
+              />
+            ) : (
+              <span className="prow-text" style={{ color: l.city ? 'var(--gray-800)' : 'var(--gray-400)' }}>
+                {l.city || 'Add city…'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -202,8 +430,9 @@ export default function DetailPanel() {
             >
               <option value="">— Select —</option>
               <option value="Window Cleaning">Window Cleaning</option>
-              <option value="Pressure Cleaning">Pressure Cleaning</option>
-              <option value="Solar Panels">Solar Panels</option>
+              <option value="Pressure Washing">Pressure Washing</option>
+              <option value="Solar Panel">Solar Panel</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           <div style={{ padding: '4px 0' }}>
@@ -218,6 +447,54 @@ export default function DetailPanel() {
             <span className="jval" style={{ color: 'var(--primary)' }}>{l.value > 0 ? '$' + l.value.toLocaleString() : '—'}</span>
           </div>
           <div className="jrow"><span className="jlbl">Lead Source</span>{srcTag}</div>
+        </div>
+
+        {/* Payment */}
+        <div className="psec">
+          <div className="psec-title">Payment</div>
+          <label className="paid-toggle-row">
+            <input
+              type="checkbox"
+              checked={!!l.paid}
+              onChange={e => handlePaidToggle(e.target.checked)}
+              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--green)' }}
+            />
+            <span style={{ fontSize: '13px', fontWeight: 600, color: l.paid ? '#15803d' : 'var(--gray-700)' }}>
+              {l.paid ? 'Paid ✓' : 'Mark as Paid'}
+            </span>
+          </label>
+          {l.paid && (
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="jrow" style={{ alignItems: 'center' }}>
+                <span className="jlbl">Amount Paid</span>
+                <input
+                  type="number"
+                  value={paidAmount}
+                  onChange={e => setPaidAmount(e.target.value)}
+                  onBlur={handlePaidAmountBlur}
+                  placeholder="0"
+                  style={{ flex: 1, fontSize: '13px', padding: '4px 8px', border: '1.5px solid var(--gray-200)', borderRadius: '6px', fontFamily: 'inherit', outline: 'none' }}
+                />
+              </div>
+              <div className="jrow" style={{ alignItems: 'center' }}>
+                <span className="jlbl">Method</span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={() => handlePayMethodSelect('Bank')}
+                    style={{ padding: '5px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1.5px solid ${payMethod === 'Bank' ? '#2563eb' : 'var(--gray-200)'}`, background: payMethod === 'Bank' ? '#eff6ff' : '#fff', color: payMethod === 'Bank' ? '#2563eb' : 'var(--gray-600)' }}
+                  >
+                    BANK
+                  </button>
+                  <button
+                    onClick={() => handlePayMethodSelect('Cash')}
+                    style={{ padding: '5px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1.5px solid ${payMethod === 'Cash' ? '#16a34a' : 'var(--gray-200)'}`, background: payMethod === 'Cash' ? '#f0fdf4' : '#fff', color: payMethod === 'Cash' ? '#16a34a' : 'var(--gray-600)' }}
+                  >
+                    CASH
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Call History */}
@@ -274,9 +551,15 @@ export default function DetailPanel() {
                 Send Quote
               </button>
             </div>
-            <button className="action-btn btn-green" onClick={handleComplete}>
+            <button className="action-btn btn-green" onClick={handleJobDone}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-              Complete Job
+              Job Done
+            </button>
+            <button className="action-btn" style={{ background: '#0d9488', borderColor: '#0d9488', color: '#fff' }} onClick={handleSubmitPayment}>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+              </svg>
+              Submit Payment
             </button>
             <button className="action-btn btn-red" onClick={handleArchive}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -289,6 +572,18 @@ export default function DetailPanel() {
           </div>
         </div>
       </div>
+
+      {payModalOpen && (
+        <PaymentModal
+          leadName={l.name}
+          initAmount={paidAmount}
+          initMethod={payMethod}
+          onSubmit={onPaymentSubmit}
+          onClose={() => setPayModalOpen(false)}
+        />
+      )}
     </aside>
   );
 }
+
+const mlbl = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-500)', marginBottom: '6px', display: 'block' };

@@ -44,7 +44,7 @@ export default function LeadCard({ lead }) {
     : lead.subject || '—';
 
   const valText = lead.value > 0 ? `Est. $${lead.value.toLocaleString()}` : 'Est. $—';
-  const showView = lead.status === 'new' || lead.status === 'contacted';
+  const showView = lead.status === 'new' || lead.status === 'in_progress';
   const isActive = activeId === lead.id;
 
   function handleStarClick(e) {

@@ -6,6 +6,8 @@ export const PAGE_TITLES = {
   clients:          'Clients',
   'deleted-history':'Deleted History',
   calendar:         'Calendar',
+  expenses:         'Expenses',
+  reports:          'Reports',
 };
 
 export default function Sidebar() {
@@ -82,6 +84,17 @@ export default function Sidebar() {
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="4" width="18" height="18" rx="2"/>
               <path d="M16 2v4M8 2v4M3 10h18"/>
+            </svg>
+          )}
+          {navItem('expenses', 'Expenses',
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+            </svg>
+          )}
+          {navItem('reports', 'Reports',
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
             </svg>
           )}
         </nav>

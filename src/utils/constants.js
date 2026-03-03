@@ -1,40 +1,41 @@
 export const COLS = [
-  { id: 'new',       label: 'New Lead',        dot: '#2563eb', cnt: '#dbeafe/#1d4ed8' },
-  { id: 'contacted', label: 'Contacted',        dot: '#d97706', cnt: '#fef3c7/#92400e' },
-  { id: 'quoted',    label: 'In Progress',      dot: '#7c3aed', cnt: '#ede9fe/#5b21b6' },
-  { id: 'scheduled', label: 'Invoice Pending',  dot: '#0d9488', cnt: '#ccfbf1/#065f46' },
-  { id: 'completed', label: 'Job Payment',      dot: '#16a34a', cnt: '#dcfce7/#14532d' },
-  { id: 'refused',   label: 'Refused',          dot: '#dc2626', cnt: '#fee2e2/#991b1b' },
+  { id: 'new',        label: 'New Lead',    dot: '#2563eb', cnt: '#dbeafe/#1d4ed8' },
+  { id: 'in_progress',label: 'In Progress', dot: '#d97706', cnt: '#fef3c7/#92400e' },
+  { id: 'quote_sent', label: 'Quote Sent',  dot: '#7c3aed', cnt: '#ede9fe/#5b21b6' },
+  { id: 'refused',    label: 'Refused',     dot: '#dc2626', cnt: '#fee2e2/#991b1b' },
+  { id: 'job_done',   label: 'Job Done',    dot: '#16a34a', cnt: '#dcfce7/#14532d' },
 ];
 
 export const STATUS_MAP = {
-  New:       'new',
-  Contacted: 'contacted',
-  Quoted:    'quoted',
-  Scheduled: 'scheduled',
-  Completed: 'completed',
-  Refused:   'refused',
-  Lost:      'refused',
-  Archived:  'archived',
+  'New':         'new',
+  'New Lead':    'new',
+  'In Progress': 'in_progress',
+  'Contacted':   'in_progress',
+  'Quote Sent':  'quote_sent',
+  'Quoted':      'quote_sent',
+  'Scheduled':   'quote_sent',
+  'Completed':   'job_done',
+  'Job Done':    'job_done',
+  'Refused':     'refused',
+  'Lost':        'refused',
+  'Archived':    'archived',
 };
 
 export const AT_STATUS_MAP = {
-  new:       'New',
-  contacted: 'Contacted',
-  quoted:    'Quoted',
-  scheduled: 'Scheduled',
-  completed: 'Completed',
-  refused:   'Refused',
-  archived:  'Archived',
+  new:         'New Lead',
+  in_progress: 'In Progress',
+  quote_sent:  'Quote Sent',
+  refused:     'Refused',
+  job_done:    'Job Done',
+  archived:    'Archived',
 };
 
 export const PROG_MAP = {
-  new:       10,
-  contacted: 30,
-  quoted:    55,
-  scheduled: 75,
-  completed: 100,
-  refused:   100,
+  new:         10,
+  in_progress: 35,
+  quote_sent:  65,
+  refused:     100,
+  job_done:    100,
 };
 
 export const REFUSE_LABELS = {
@@ -43,3 +44,15 @@ export const REFUSE_LABELS = {
   no_answer:     'No Answer',
   other:         'Other',
 };
+
+export const EXPENSE_CATEGORIES = [
+  'Salary - Employee 1',
+  'Salary - Employee 2',
+  'Salary - Employee 3',
+  'Salary - Employee 4',
+  'Fuel',
+  'Cleaning Supplies/Equipment',
+  'Advertising',
+  'Insurance',
+  'General',
+];

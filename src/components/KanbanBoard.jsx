@@ -18,17 +18,17 @@ const ALL_COLS = [
 ];
 
 const STAT_LABELS = {
-  new:     'New Leads',
-  calls:   'Calls Received',
-  quoted:  'Pending Quotes',
-  refused: 'Refused',
+  new:        'New Leads',
+  calls:      'Calls Received',
+  quote_sent: 'Pending Quotes',
+  refused:    'Refused',
 };
 
 const STAT_DOT = {
-  new:     '#2563eb',
-  calls:   '#16a34a',
-  quoted:  '#d97706',
-  refused: '#dc2626',
+  new:        '#2563eb',
+  calls:      '#16a34a',
+  quote_sent: '#7c3aed',
+  refused:    '#dc2626',
 };
 
 export default function KanbanBoard() {

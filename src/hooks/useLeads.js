@@ -69,8 +69,14 @@ function normaliseRecord(rec) {
     jobDate: f['Scheduled Cleaning Date'] || '',
     details: f['Property Details'] || '',
     status, progress: PROG_MAP[status] || 10,
-    starred: false, notes: '', hasCall: isCall, tag: '',
-    refuseReason: '', airtableId: rec.id,
+    starred: false, notes: f['Notes'] || '', hasCall: isCall, tag: '',
+    refuseReason: '',
+    paid: f['Paid'] || false,
+    paidAmount: f['Amount Paid'] || 0,
+    paymentMethod: f['Payment Method'] || '',
+    city: f['City'] || '',
+    leadChannel: f['Lead Channel'] || '',
+    airtableId: rec.id,
   };
 }
 
@@ -153,11 +159,44 @@ export function useLeads() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
   }, []);
 
+  const savePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
+      return { ...l, paid, paidAmount, paymentMethod };
+    }));
+  }, []);
+
+  const saveCity = useCallback((id, city) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'City': city });
+      return { ...l, city };
+    }));
+  }, []);
+
   const saveJobType = useCallback((id, jobType) => {
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
       if (l.airtableId) patchAirtable(l.airtableId, { 'Property Type': jobType });
       return { ...l, jobType };
+    }));
+  }, []);
+
+  const saveJobDate = useCallback((id, jobDate) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      // Airtable requires null (not '') to clear a date field
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Scheduled Cleaning Date': jobDate || null });
+      return { ...l, jobDate };
+    }));
+  }, []);
+
+  const saveEmail = useCallback((id, email) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Email': email });
+      return { ...l, email };
     }));
   }, []);
 
@@ -207,6 +246,7 @@ export function useLeads() {
   return {
     leads, deletedLeads, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
+    savePaidInfo, saveCity, saveJobDate, saveEmail,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
   };

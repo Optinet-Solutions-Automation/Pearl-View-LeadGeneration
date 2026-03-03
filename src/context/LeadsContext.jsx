@@ -7,6 +7,7 @@ export function LeadsProvider({ children }) {
   const {
     leads, deletedLeads, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
+    savePaidInfo, saveCity, saveJobDate, saveEmail,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
   } = useLeads();
@@ -81,6 +82,22 @@ export function LeadsProvider({ children }) {
   const handleSaveJobType = useCallback((id, jobType) => {
     saveJobType(id, jobType);
   }, [saveJobType]);
+
+  const handleSavePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
+    savePaidInfo(id, paid, paidAmount, paymentMethod);
+  }, [savePaidInfo]);
+
+  const handleSaveCity = useCallback((id, city) => {
+    saveCity(id, city);
+  }, [saveCity]);
+
+  const handleSaveJobDate = useCallback((id, jobDate) => {
+    saveJobDate(id, jobDate);
+  }, [saveJobDate]);
+
+  const handleSaveEmail = useCallback((id, email) => {
+    saveEmail(id, email);
+  }, [saveEmail]);
 
   const handleRename = useCallback((id, newName) => {
     renameLead(id, newName);
@@ -166,6 +183,10 @@ export function LeadsProvider({ children }) {
       toggleStar: handleToggleStar,
       saveNote: handleSaveNote,
       saveJobType: handleSaveJobType,
+      savePaidInfo: handleSavePaidInfo,
+      saveCity: handleSaveCity,
+      saveJobDate: handleSaveJobDate,
+      saveEmail: handleSaveEmail,
       renameLead: handleRename,
       setRefuseReason: handleSetRefuseReason,
       archiveLead: handleArchive,

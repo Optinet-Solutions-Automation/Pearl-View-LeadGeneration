@@ -5,7 +5,7 @@ export default function NewLeadModal() {
   const { isModalOpen, setModalOpen, addLead } = useLeadsContext();
 
   const [form, setForm] = useState({
-    source: 'form1',
+    leadChannel: 'Facebook Organic',
     name: '',
     phone: '',
     email: '',
@@ -23,14 +23,15 @@ export default function NewLeadModal() {
       return;
     }
     addLead({
-      source: form.source,
+      source: 'manual',
+      leadChannel: form.leadChannel,
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
       subject: form.subject.trim(),
       value: parseInt(form.value) || 0,
     });
-    setForm({ source: 'form1', name: '', phone: '', email: '', subject: '', value: '' });
+    setForm({ leadChannel: 'Facebook Organic', name: '', phone: '', email: '', subject: '', value: '' });
     setModalOpen(false);
   }
 
@@ -46,12 +47,14 @@ export default function NewLeadModal() {
         <div className="modal-title">+ Add New Lead</div>
 
         <div className="fgroup">
-          <label className="flabel">Source</label>
-          <select className="fselect" name="source" value={form.source} onChange={handleChange}>
-            <option value="form1">Form — LP Site 1</option>
-            <option value="form2">Form — LP Site 2</option>
-            <option value="call1">Direct Call — Crystal Pro</option>
-            <option value="call2">Direct Call — Pearl View</option>
+          <label className="flabel">Lead Source</label>
+          <select className="fselect" name="leadChannel" value={form.leadChannel} onChange={handleChange}>
+            <option value="Facebook Organic">Facebook Organic</option>
+            <option value="Recommendation">Recommendation</option>
+            <option value="Subcontractor">Subcontractor</option>
+            <option value="Door to Door">Door to Door</option>
+            <option value="Flyer">Flyer</option>
+            <option value="Other">Other</option>
           </select>
         </div>
         <div className="fgroup">
