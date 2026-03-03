@@ -201,14 +201,11 @@ export default function DetailPanel() {
               style={{ fontSize: '12px', padding: '4px 8px', height: 'auto', flex: 1 }}
             >
               <option value="">— Select —</option>
-              <option value="Window">Window</option>
-              <option value="Cleaning">Cleaning</option>
-              <option value="Pressure">Pressure</option>
-              <option value="Solar">Solar</option>
-              <option value="Panels">Panels</option>
+              <option value="Window Cleaning">Window Cleaning</option>
+              <option value="Pressure Cleaning">Pressure Cleaning</option>
+              <option value="Solar Panels">Solar Panels</option>
             </select>
           </div>
-          <div className="jrow"><span className="jlbl">Windows</span><span className="jval">{l.windows || '—'}</span></div>
           <div style={{ padding: '4px 0' }}>
             <div className="jlbl" style={{ marginBottom: '4px' }}>Subject</div>
             <div style={{ fontSize: '12px', color: 'var(--gray-800)', lineHeight: 1.55, background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '6px', padding: '8px 10px', maxHeight: '120px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
