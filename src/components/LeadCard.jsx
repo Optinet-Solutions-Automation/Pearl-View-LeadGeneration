@@ -125,6 +125,14 @@ export default function LeadCard({ lead }) {
           </span>
         )}
       </div>
+      {lead.status === 'job_done' && !lead.paid && (
+        <div style={{ marginTop: '8px', padding: '5px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', fontSize: '11px', fontWeight: 700, color: '#c2410c', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '12px', height: '12px', flexShrink: 0 }}>
+            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+          </svg>
+          Collect Payment
+        </div>
+      )}
       <div className="prog">
         <div className="prog-fill" style={{ width: `${lead.progress}%` }}></div>
       </div>

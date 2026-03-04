@@ -180,7 +180,7 @@ export function useLeads() {
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
     if (status === 'completed' && updatedLead.invoice > 0) atFields['Final Invoice Amount'] = updatedLead.invoice;
     await patchAirtable(updatedLead.airtableId, atFields);
-    // Write revenue when job is done and already paid
+    // Revenue recognized when job marked done and was already paid (converts liability → revenue).
     if (status === 'job_done' && updatedLead.paid && updatedLead.paidAmount > 0) {
       writeRevenue(updatedLead, updatedLead.paidAmount, updatedLead.paymentMethod);
     }
@@ -223,8 +223,9 @@ export function useLeads() {
       await patchAirtable(leadSnapshot.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
     }
     const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
-    // Write revenue when lead is already job_done and now being marked paid
-    if (paid && paidAmount > 0 && updatedLead?.status === 'job_done') {
+    // Revenue recognized only when BOTH job done AND paid.
+    // If job is already done and this is a new payment (wasn't paid before), write revenue now.
+    if (paid && paidAmount > 0 && !leadSnapshot?.paid && updatedLead?.status === 'job_done') {
       writeRevenue(updatedLead, paidAmount, paymentMethod);
     }
     // Update linked calendar booking if one exists (match by phone)

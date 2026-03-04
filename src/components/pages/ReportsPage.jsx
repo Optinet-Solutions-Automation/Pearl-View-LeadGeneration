@@ -88,7 +88,9 @@ export default function ReportsPage() {
     return true;
   }
 
-  const jobDoneCount = leads.filter(l => l.status === 'job_done' && inRange(l.date)).length;
+  const jobDoneCount    = leads.filter(l => l.status === 'job_done' && inRange(l.date)).length;
+  // Job done but not yet paid — needs payment collection
+  const outstandingLeads = leads.filter(l => l.status === 'job_done' && !l.paid && inRange(l.date));
 
   const filteredRevenue  = revenueRecords.filter(r => inRange(r.date))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -244,6 +246,50 @@ export default function ReportsPage() {
                     </td>
                     <td style={{ ...ptd, textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
                       ${Number(row.amount).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Awaiting Payment — job done but payment not yet collected */}
+      {outstandingLeads.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', overflow: 'hidden', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>Awaiting Payment</div>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>Job completed — payment not yet collected</div>
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: 700, background: '#fff7ed', color: '#c2410c', borderRadius: '20px', padding: '2px 10px' }}>
+              {outstandingLeads.length} unpaid
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+                  <th style={pth}>Client</th>
+                  <th style={pth}>Phone</th>
+                  <th style={pth}>Job Type</th>
+                  <th style={{ ...pth, textAlign: 'right' }}>Est. Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outstandingLeads.map(l => (
+                  <tr key={l.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                    <td style={{ ...ptd, fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</td>
+                    <td style={{ ...ptd, color: 'var(--gray-600)' }}>{l.phone || '—'}</td>
+                    <td style={ptd}>
+                      {l.jobType
+                        ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{l.jobType}</span>
+                        : <span style={{ color: 'var(--gray-400)' }}>—</span>
+                      }
+                    </td>
+                    <td style={{ ...ptd, textAlign: 'right', fontWeight: 700, color: '#c2410c' }}>
+                      {l.value > 0 ? `$${l.value.toLocaleString('en-AU', { minimumFractionDigits: 2 })}` : '—'}
                     </td>
                   </tr>
                 ))}
