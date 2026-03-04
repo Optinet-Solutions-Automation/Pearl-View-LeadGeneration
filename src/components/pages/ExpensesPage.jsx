@@ -1,16 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES } from '../../utils/constants';
-import { createRecord, deleteRecord, AT_TABLES } from '../../utils/airtableSync';
-
-const LS_KEY = 'pvl_expenses';
-
-function loadExpenses() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
-  catch { return []; }
-}
-function saveExpenses(list) {
-  localStorage.setItem(LS_KEY, JSON.stringify(list));
-}
+import { createRecord, deleteRecord, fetchRecords, AT_TABLES } from '../../utils/airtableSync';
 
 const CAT_COLORS = {
   'Salary - Employee 1':        { bg: '#eff6ff', color: '#2563eb' },
@@ -25,12 +15,26 @@ const CAT_COLORS = {
 };
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState(() => loadExpenses());
+  const [expenses, setExpenses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [form, setForm] = useState({ category: EXPENSE_CATEGORIES[0], amount: '', description: '', date: new Date().toISOString().slice(0, 10) });
   const [showForm, setShowForm] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  useEffect(() => { saveExpenses(expenses); }, [expenses]);
+  // Load expenses from Airtable on mount
+  useEffect(() => {
+    fetchRecords(AT_TABLES.expenses).then(records => {
+      const loaded = records.map(r => ({
+        id: r.id,
+        airtableId: r.id,
+        category: r.fields['Category'] || EXPENSE_CATEGORIES[0],
+        amount: parseFloat(r.fields['Amount'] || 0),
+        description: r.fields['Description'] || '',
+        date: r.fields['Date'] || '',
+      })).sort((a, b) => new Date(b.date) - new Date(a.date));
+      setExpenses(loaded);
+    }).finally(() => setIsLoading(false));
+  }, []);
 
   function handleChange(e) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -38,29 +42,30 @@ export default function ExpensesPage() {
 
   async function handleAdd() {
     if (!form.amount || parseFloat(form.amount) <= 0) { alert('Enter a valid amount.'); return; }
+    const tempId = `temp-${Date.now()}`;
     const entry = {
-      id: Date.now().toString(),
+      id: tempId,
+      airtableId: null,
       category: form.category,
       amount: parseFloat(form.amount),
       description: form.description.trim(),
       date: form.date,
-      airtableId: null,
     };
-    // Sync to Airtable (non-blocking)
-    createRecord(AT_TABLES.expenses, {
-      'Category':    entry.category,
-      'Amount':      entry.amount,
-      'Description': entry.description || '',
-      'Date':        entry.date,
-      'Local ID':    entry.id,
-    }).then(airtableId => {
-      if (airtableId) {
-        setExpenses(prev => prev.map(e => e.id === entry.id ? { ...e, airtableId } : e));
-      }
-    });
     setExpenses(prev => [entry, ...prev]);
     setForm(prev => ({ ...prev, amount: '', description: '' }));
     setShowForm(false);
+    // Write to Airtable and replace temp id with real Airtable id
+    // Note: Created_At is an auto-generated field in Airtable, do NOT write it
+    const airtableId = await createRecord(AT_TABLES.expenses, {
+      'Expense Name': `${form.category} - ${form.date}`,
+      'Category':     entry.category,
+      'Amount':       entry.amount,
+      'Description':  entry.description || '',
+      'Date':         entry.date,
+    });
+    if (airtableId) {
+      setExpenses(prev => prev.map(e => e.id === tempId ? { ...e, id: airtableId, airtableId } : e));
+    }
   }
 
   function handleDelete(id) {
@@ -77,6 +82,14 @@ export default function ExpensesPage() {
     cat,
     total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
   })).filter(c => c.total > 0);
+
+  if (isLoading) {
+    return (
+      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+        <div style={{ color: 'var(--gray-400)', fontSize: '14px' }}>Loading expenses…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

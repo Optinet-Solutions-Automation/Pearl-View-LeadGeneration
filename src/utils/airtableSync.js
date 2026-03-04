@@ -1,12 +1,13 @@
 /**
- * Generic Airtable CRUD utilities for non-leads tables.
- * Used by ExpensesPage, CalendarPage, etc.
+ * Generic Airtable CRUD + fetch utilities for non-leads tables.
+ * Used by ExpensesPage, CalendarPage, ReportsPage, DetailPanel, etc.
  *
  * Required .env vars:
- *   VITE_AIRTABLE_TOKEN       — Personal Access Token
- *   VITE_AIRTABLE_BASE_ID     — Base ID (same base as leads)
- *   VITE_AIRTABLE_EXPENSES_TABLE_ID  — Airtable table ID for Expenses
- *   VITE_AIRTABLE_CALENDAR_TABLE_ID  — Airtable table ID for Calendar Bookings
+ *   VITE_AIRTABLE_TOKEN              — Personal Access Token
+ *   VITE_AIRTABLE_BASE_ID            — Base ID (same base as leads)
+ *   VITE_AIRTABLE_EXPENSES_TABLE_ID  — Table ID/name for Expenses
+ *   VITE_AIRTABLE_CALENDAR_TABLE_ID  — Table ID/name for Bookings
+ *   VITE_AIRTABLE_REVENUE_TABLE_ID   — Table ID/name for Revenue
  */
 
 const IS_LOCAL = import.meta.env.DEV;
@@ -14,24 +15,52 @@ const AT_TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN || '';
 const AT_BASE  = import.meta.env.VITE_AIRTABLE_BASE_ID || '';
 
 export const AT_TABLES = {
-  expenses: import.meta.env.VITE_AIRTABLE_EXPENSES_TABLE_ID || '',
-  calendar: import.meta.env.VITE_AIRTABLE_CALENDAR_TABLE_ID || '',
+  expenses: import.meta.env.VITE_AIRTABLE_EXPENSES_TABLE_ID || 'Expenses',
+  calendar: import.meta.env.VITE_AIRTABLE_CALENDAR_TABLE_ID || 'Bookings',
+  revenue:  import.meta.env.VITE_AIRTABLE_REVENUE_TABLE_ID  || 'Revenue',
 };
 
-/**
- * Create a new record in an Airtable table.
- * Returns the new Airtable record ID, or null on failure.
- */
+// ─── Fetch all records from a table (handles Airtable pagination) ─────────────
+// Returns an array of raw Airtable record objects: [{ id, fields }, ...]
+export async function fetchRecords(tableId) {
+  if (!tableId) return [];
+  const allRecords = [];
+  let offset = '';
+  try {
+    if (IS_LOCAL) {
+      do {
+        const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${AT_TOKEN}` } });
+        if (!res.ok) { console.error('fetchRecords failed', tableId, res.status); return []; }
+        const data = await res.json();
+        allRecords.push(...(data.records || []));
+        offset = data.offset || '';
+      } while (offset);
+      return allRecords;
+    } else {
+      const res = await fetch(`/api/fetch-records?tableId=${encodeURIComponent(tableId)}`);
+      if (!res.ok) { console.error('fetchRecords API failed', tableId, res.status); return []; }
+      const data = await res.json();
+      return data.records || [];
+    }
+  } catch (err) {
+    console.error('fetchRecords error:', tableId, err);
+    return [];
+  }
+}
+
+// ─── Create a new record ──────────────────────────────────────────────────────
+// Returns the new Airtable record ID, or null on failure.
 export async function createRecord(tableId, fields) {
   if (!tableId) return null;
   try {
     if (IS_LOCAL) {
-      const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${tableId}`, {
+      const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields }),
       });
-      if (!res.ok) { console.error('Airtable createRecord failed', await res.json()); return null; }
+      if (!res.ok) { console.error('createRecord failed', await res.json()); return null; }
       const data = await res.json();
       return data.id || null;
     } else {
@@ -50,13 +79,11 @@ export async function createRecord(tableId, fields) {
   }
 }
 
-/**
- * Update fields on an existing Airtable record (fire-and-forget).
- */
+// ─── Update fields on an existing record (fire-and-forget) ───────────────────
 export function updateRecord(tableId, recordId, fields) {
   if (!tableId || !recordId) return;
   if (IS_LOCAL) {
-    fetch(`https://api.airtable.com/v0/${AT_BASE}/${tableId}/${recordId}`, {
+    fetch(`https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}/${recordId}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields }),
@@ -72,13 +99,11 @@ export function updateRecord(tableId, recordId, fields) {
   }
 }
 
-/**
- * Delete a record from an Airtable table (fire-and-forget).
- */
+// ─── Delete a record (fire-and-forget) ───────────────────────────────────────
 export function deleteRecord(tableId, recordId) {
   if (!tableId || !recordId) return;
   if (IS_LOCAL) {
-    fetch(`https://api.airtable.com/v0/${AT_BASE}/${tableId}/${recordId}`, {
+    fetch(`https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}/${recordId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${AT_TOKEN}` },
     })

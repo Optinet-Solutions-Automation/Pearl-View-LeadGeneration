@@ -5,11 +5,12 @@ const LeadsContext = createContext(null);
 
 export function LeadsProvider({ children }) {
   const {
-    leads, deletedLeads, isLoading, fetchLeads,
+    leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
     savePaidInfo, saveCity, saveJobDate, saveEmail,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
+    addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -55,15 +56,17 @@ export function LeadsProvider({ children }) {
       setRefuseModalId(id);
       return;
     }
-    const msg = await changeStatus(id, status);
-    if (msg) showToast(msg);
+    const result = await changeStatus(id, status);
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else if (result === 'ok') showToast('Status updated ✓');
   }, [changeStatus, showToast, leads]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
     setRefuseReason(refuseModalId, reason);
-    const msg = await changeStatus(refuseModalId, 'refused');
-    if (msg) showToast(msg);
+    const result = await changeStatus(refuseModalId, 'refused');
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else if (result === 'ok') showToast('Status updated ✓');
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
   }, [refuseModalId, changeStatus, setRefuseReason, showToast]);
@@ -83,9 +86,15 @@ export function LeadsProvider({ children }) {
     saveJobType(id, jobType);
   }, [saveJobType]);
 
-  const handleSavePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
-    savePaidInfo(id, paid, paidAmount, paymentMethod);
-  }, [savePaidInfo]);
+  const handleSavePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
+    const success = await savePaidInfo(id, paid, paidAmount, paymentMethod);
+    if (success === false) showToast('Failed to save payment — check your connection');
+    else {
+      // Re-fetch after a short delay to confirm Airtable persisted the Paid field
+      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
+    }
+    return success;
+  }, [savePaidInfo, showToast, fetchLeads]);
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);
@@ -134,6 +143,17 @@ export function LeadsProvider({ children }) {
     setStatFilter(prev => (prev === type ? null : type));
   }, []);
 
+  // Schedule an appointment from Lead Details:
+  // Creates a calBooking (linked to the lead) + sets the lead's jobDate
+  const scheduleBooking = useCallback(async (leadId, bookingData) => {
+    const localId = await addCalBooking({ ...bookingData, linkedLeadId: leadId });
+    if (bookingData.date) {
+      saveJobDate(leadId, bookingData.date);
+    }
+    showToast('Appointment scheduled ✓');
+    return localId;
+  }, [addCalBooking, saveJobDate, showToast]);
+
   const activeLead = leads.find(l => l.id === activeId) || null;
 
   const filteredLeads = useMemo(() => {
@@ -156,6 +176,7 @@ export function LeadsProvider({ children }) {
     <LeadsContext.Provider value={{
       leads,
       deletedLeads,
+      calBookings,
       filteredLeads,
       isLoading,
       activeId,
@@ -193,6 +214,11 @@ export function LeadsProvider({ children }) {
       permanentDelete: handlePermanentDelete,
       recoverLead: handleRecoverLead,
       addLead: handleAddLead,
+      addCalBooking,
+      removeCalBooking,
+      updateCalBooking,
+      recordBookingPayment,
+      scheduleBooking,
       refetch: fetchLeads,
     }}>
       {children}
