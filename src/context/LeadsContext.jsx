@@ -85,7 +85,7 @@ export function LeadsProvider({ children }) {
   }, [saveJobType]);
 
   const handleSavePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
-    savePaidInfo(id, paid, paidAmount, paymentMethod);
+    return savePaidInfo(id, paid, paidAmount, paymentMethod);
   }, [savePaidInfo]);
 
   const handleSaveCity = useCallback((id, city) => {

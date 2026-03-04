@@ -4,7 +4,7 @@ import { formatDate } from '../utils/dateUtils';
 import { REFUSE_LABELS } from '../utils/constants';
 
 
-function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose }) {
+function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose, saving }) {
   const [amount, setAmount] = useState(initAmount ? String(initAmount) : '');
   const [method, setMethod] = useState(initMethod || 'Cash');
   const [err,    setErr]    = useState('');
@@ -73,9 +73,10 @@ function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose }) {
 
           <button
             onClick={handleSubmit}
-            style={{ width: '100%', padding: '11px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            disabled={saving}
+            style={{ width: '100%', padding: '11px', background: saving ? '#6b7280' : '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
           >
-            Confirm Payment
+            {saving ? 'Saving…' : 'Confirm Payment'}
           </button>
         </div>
       </div>
@@ -237,6 +238,7 @@ export default function DetailPanel() {
   const [payMethod,    setPayMethod]    = useState('');
   const [payModalOpen,      setPayModalOpen]      = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [paymentSaving,     setPaymentSaving]     = useState(false);
   const nameInputRef  = useRef(null);
   const cityInputRef  = useRef(null);
   const emailInputRef = useRef(null);
@@ -315,12 +317,14 @@ export default function DetailPanel() {
     setPayModalOpen(true);
   }
 
-  function onPaymentSubmit({ amount, method }) {
-    savePaidInfo(l.id, true, amount, method);
+  async function onPaymentSubmit({ amount, method }) {
+    setPaymentSaving(true);
+    await savePaidInfo(l.id, true, amount, method);
     setPaidAmount(amount.toString());
     setPayMethod(method);
     setPayModalOpen(false);
-    showToast('Payment submitted ✓');
+    setPaymentSaving(false);
+    showToast('Payment saved ✓');
   }
 
   async function onScheduleSubmit(bookingData) {
@@ -613,7 +617,8 @@ export default function DetailPanel() {
           initAmount={paidAmount}
           initMethod={payMethod}
           onSubmit={onPaymentSubmit}
-          onClose={() => setPayModalOpen(false)}
+          onClose={() => { if (!paymentSaving) setPayModalOpen(false); }}
+          saving={paymentSaving}
         />
       )}
       {scheduleModalOpen && (
