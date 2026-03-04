@@ -11,6 +11,7 @@ export function LeadsProvider({ children }) {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
+    addRefusedRecord,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -73,10 +74,11 @@ export function LeadsProvider({ children }) {
     else if (result === 'ok') {
       showToast('Status updated ✓');
       setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
+      addRefusedRecord(refuseModalId, reason);
     }
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-  }, [refuseModalId, changeStatus, setRefuseReason, showToast, fetchLeads]);
+  }, [refuseModalId, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);
