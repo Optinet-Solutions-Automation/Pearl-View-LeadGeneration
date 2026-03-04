@@ -524,7 +524,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Calendar card ── */}
-      <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid var(--gray-200)', overflow: 'hidden', marginBottom: '16px' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
           <button onClick={prevMonth} className="cal-nav-btn">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px' }}><path d="M15 18l-6-6 6-6"/></svg>
@@ -586,7 +586,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Bookings table ── */}
-      <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid var(--gray-200)', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid var(--gray-200)' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>{tableTitle}</div>
