@@ -30,6 +30,16 @@ export function LeadsProvider({ children }) {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
   }, [fetchLeads]);
 
+  // One-time backfill: push any existing refused leads to the Refused table
+  useEffect(() => {
+    if (!isLoading && leads.length > 0 && !localStorage.getItem('pv_refused_synced')) {
+      leads.filter(l => l.status === 'refused').forEach(lead => {
+        addRefusedRecord(lead.id, lead.refuseReason || '');
+      });
+      localStorage.setItem('pv_refused_synced', '1');
+    }
+  }, [isLoading, leads, addRefusedRecord]);
+
   // Poll Airtable every 30s to pick up status changes made directly in Airtable
   useEffect(() => {
     const id = setInterval(() => {
