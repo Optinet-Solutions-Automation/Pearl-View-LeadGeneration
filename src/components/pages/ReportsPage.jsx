@@ -88,18 +88,18 @@ export default function ReportsPage() {
     return true;
   }
 
-  const paidLeads    = leads.filter(l => l.paid && inRange(l.date));
-  const totalIncome  = paidLeads.reduce((s, l) => s + (l.paidAmount || 0), 0);
   const jobDoneCount = leads.filter(l => l.status === 'job_done' && inRange(l.date)).length;
-
-  const incomeByJobType = {};
-  paidLeads.forEach(l => {
-    const k = l.jobType || 'Other';
-    incomeByJobType[k] = (incomeByJobType[k] || 0) + (l.paidAmount || 0);
-  });
 
   const filteredRevenue  = revenueRecords.filter(r => inRange(r.date))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const totalIncome = filteredRevenue.reduce((s, r) => s + r.amount, 0);
+
+  const incomeByJobType = {};
+  filteredRevenue.forEach(r => {
+    const k = r.jobType || 'Other';
+    incomeByJobType[k] = (incomeByJobType[k] || 0) + r.amount;
+  });
   const filteredExpenses = expenses.filter(e => inRange(e.date));
 
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
@@ -163,7 +163,7 @@ export default function ReportsPage() {
         <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '16px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total Income</div>
           <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>${totalIncome.toLocaleString('en-AU', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>{paidLeads.length} paid job{paidLeads.length !== 1 ? 's' : ''}</div>
+          <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>{filteredRevenue.length} paid job{filteredRevenue.length !== 1 ? 's' : ''}</div>
         </div>
         <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '16px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total Expenses</div>
@@ -253,7 +253,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {paidLeads.length === 0 && filteredExpenses.length === 0 && filteredRevenue.length === 0 && (
+      {filteredRevenue.length === 0 && filteredExpenses.length === 0 && (
         <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '48px', textAlign: 'center' }}>
           <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-300)" strokeWidth="1.5" style={{ width: '48px', height: '48px', margin: '0 auto 12px', display: 'block' }}>
             <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
