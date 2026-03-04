@@ -447,13 +447,11 @@ export function useLeads() {
         'Amount':         paidAmount,
       });
 
-      // Update linked lead by phone match (fire-and-forget on leads state)
+      // Update linked lead's paid state in memory (by phone match)
+      // Note: Leads table has no payment fields — Revenue table is the persistence layer
       if (booking.phone) {
         setLeads(leads => leads.map(l => {
           if (l.phone === booking.phone && !l.paid) {
-            if (l.airtableId) patchAirtable(l.airtableId, {
-              'Paid': true, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod,
-            });
             return { ...l, paid: true, paidAmount, paymentMethod };
           }
           return l;
