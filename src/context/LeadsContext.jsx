@@ -157,9 +157,10 @@ export function LeadsProvider({ children }) {
     showToast('Lead recovered ✓');
   }, [recoverLead, showToast]);
 
-  const handleAddLead = useCallback((data) => {
-    addLead(data);
+  const handleAddLead = useCallback(async (data) => {
     showToast('New lead added ✓');
+    const airtableId = await addLead(data);
+    if (!airtableId) showToast('Failed to save to Airtable — check connection');
   }, [addLead, showToast]);
 
   const toggleStatFilter = useCallback((type) => {
