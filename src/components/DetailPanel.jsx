@@ -498,48 +498,32 @@ export default function DetailPanel() {
         {/* Payment */}
         <div className="psec">
           <div className="psec-title">Payment</div>
-          <label className="paid-toggle-row">
-            <input
-              type="checkbox"
-              checked={!!l.paid}
-              onChange={e => handlePaidToggle(e.target.checked)}
-              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--green)' }}
-            />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: l.paid ? '#15803d' : 'var(--gray-700)' }}>
-              {l.paid ? 'Paid ✓' : 'Mark as Paid'}
-            </span>
-          </label>
-          {l.paid && (
-            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div className="jrow" style={{ alignItems: 'center' }}>
-                <span className="jlbl">Amount Paid</span>
-                <input
-                  type="number"
-                  value={paidAmount}
-                  onChange={e => setPaidAmount(e.target.value)}
-                  onBlur={handlePaidAmountBlur}
-                  placeholder="0"
-                  style={{ flex: 1, fontSize: '13px', padding: '4px 8px', border: '1.5px solid var(--gray-200)', borderRadius: '6px', fontFamily: 'inherit', outline: 'none' }}
-                />
-              </div>
-              <div className="jrow" style={{ alignItems: 'center' }}>
-                <span className="jlbl">Method</span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    onClick={() => handlePayMethodSelect('Bank')}
-                    style={{ padding: '5px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1.5px solid ${payMethod === 'Bank' ? '#2563eb' : 'var(--gray-200)'}`, background: payMethod === 'Bank' ? '#eff6ff' : '#fff', color: payMethod === 'Bank' ? '#2563eb' : 'var(--gray-600)' }}
-                  >
-                    BANK
-                  </button>
-                  <button
-                    onClick={() => handlePayMethodSelect('Cash')}
-                    style={{ padding: '5px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1.5px solid ${payMethod === 'Cash' ? '#16a34a' : 'var(--gray-200)'}`, background: payMethod === 'Cash' ? '#f0fdf4' : '#fff', color: payMethod === 'Cash' ? '#16a34a' : 'var(--gray-600)' }}
-                  >
-                    CASH
-                  </button>
+          {l.paid ? (
+            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>✓ Payment Recorded</div>
+                <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '3px' }}>
+                  ${(l.paidAmount || 0).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                  {l.paymentMethod ? ` · ${l.paymentMethod.toUpperCase()}` : ''}
                 </div>
               </div>
+              <button
+                onClick={handleSubmitPayment}
+                style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d', background: '#fff', border: '1px solid #86efac', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+              >
+                Edit
+              </button>
             </div>
+          ) : (
+            <button
+              onClick={handleSubmitPayment}
+              style={{ width: '100%', padding: '13px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px', flexShrink: 0 }}>
+                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+              </svg>
+              Record Payment
+            </button>
           )}
         </div>
 
@@ -581,46 +565,38 @@ export default function DetailPanel() {
         {/* Actions */}
         <div className="psec" style={{ borderBottom: 'none' }}>
           <div className="psec-title">Actions</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-            <div className="action-grid">
-              <button className="action-btn btn-blue">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                Assign Crew
-              </button>
-              <button className="action-btn btn-dark" onClick={handleSendQuote}>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Row 1: Send Quote + Job Done */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
                   <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                 </svg>
                 Send Quote
               </button>
+              <button className="action-btn btn-green" onClick={handleJobDone} style={{ minHeight: '44px' }}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Job Done
+              </button>
             </div>
-            <button className="action-btn btn-green" onClick={handleJobDone}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-              Job Done
-            </button>
-            <button className="action-btn" style={{ background: '#0d9488', borderColor: '#0d9488', color: '#fff' }} onClick={handleSubmitPayment}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-              </svg>
-              Submit Payment
-            </button>
+            {/* Row 2: Schedule Appointment (full width) */}
             <button
               className="action-btn"
-              style={{ background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' }}
+              style={{ background: '#7c3aed', borderColor: '#7c3aed', color: '#fff', minHeight: '44px' }}
               onClick={() => setScheduleModalOpen(true)}
             >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                 <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
                 <line x1="3" y1="10" x2="21" y2="10"/>
               </svg>
               Schedule Appointment
             </button>
-            <button className="action-btn btn-red" onClick={handleArchive}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            {/* Row 3: Archive (full width, subtle) */}
+            <button className="action-btn btn-red" onClick={handleArchive} style={{ minHeight: '44px' }}>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
                 <polyline points="21 8 21 21 3 21 3 8"/>
                 <rect x="1" y="3" width="22" height="5"/>
                 <line x1="10" y1="12" x2="14" y2="12"/>

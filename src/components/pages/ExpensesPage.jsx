@@ -55,13 +55,13 @@ export default function ExpensesPage() {
     setForm(prev => ({ ...prev, amount: '', description: '' }));
     setShowForm(false);
     // Write to Airtable and replace temp id with real Airtable id
+    // Note: Created_At is an auto-generated field in Airtable, do NOT write it
     const airtableId = await createRecord(AT_TABLES.expenses, {
       'Expense Name': `${form.category} - ${form.date}`,
       'Category':     entry.category,
       'Amount':       entry.amount,
       'Description':  entry.description || '',
       'Date':         entry.date,
-      'Created_At':   new Date().toISOString(),
     });
     if (airtableId) {
       setExpenses(prev => prev.map(e => e.id === tempId ? { ...e, id: airtableId, airtableId } : e));
