@@ -3,32 +3,17 @@ import { useLeadsContext } from '../context/LeadsContext';
 import { formatDate } from '../utils/dateUtils';
 import { REFUSE_LABELS } from '../utils/constants';
 
-const BANKS = [
-  'Commonwealth Bank (CBA)',
-  'Westpac',
-  'ANZ',
-  'NAB',
-  'Bendigo Bank',
-  'Bank of Queensland',
-  'Suncorp Bank',
-  'ING Australia',
-  'Macquarie Bank',
-  'Other',
-];
 
 function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose }) {
-  const [amount,     setAmount]     = useState(initAmount ? String(initAmount) : '');
-  const [method,     setMethod]     = useState(initMethod || 'Cash');
-  const [bankName,   setBankName]   = useState('');
-  const [accountRef, setAccountRef] = useState('');
-  const [err,        setErr]        = useState('');
+  const [amount, setAmount] = useState(initAmount ? String(initAmount) : '');
+  const [method, setMethod] = useState(initMethod || 'Cash');
+  const [err,    setErr]    = useState('');
 
   function handleSubmit() {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { setErr('Please enter a valid amount'); return; }
-    if (method === 'Bank' && !bankName) { setErr('Please select a bank'); return; }
     setErr('');
-    onSubmit({ amount: amt, method, bankName: method === 'Bank' ? bankName : '', accountRef: method === 'Bank' ? accountRef : '' });
+    onSubmit({ amount: amt, method, bankName: '', accountRef: '' });
   }
 
   return (
@@ -79,30 +64,6 @@ function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose }) {
               </button>
             ))}
           </div>
-
-          {/* Bank fields */}
-          {method === 'Bank' && (
-            <>
-              <label style={mlbl}>Bank Name</label>
-              <select
-                value={bankName}
-                onChange={e => setBankName(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: '14px', background: '#fff', color: bankName ? 'var(--gray-800)' : 'var(--gray-400)' }}
-              >
-                <option value="">— Select Bank —</option>
-                {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-
-              <label style={mlbl}>Account / Reference No.</label>
-              <input
-                type="text"
-                value={accountRef}
-                onChange={e => setAccountRef(e.target.value)}
-                placeholder="e.g. 062-000 / 12345678"
-                style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
-              />
-            </>
-          )}
 
           {err && (
             <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '12px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>

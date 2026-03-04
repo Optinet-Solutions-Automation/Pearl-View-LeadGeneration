@@ -212,18 +212,24 @@ export function useLeads() {
     });
   }, []);
 
-  // Permanently remove from deleted history
+  // Permanently remove from deleted history + delete from Airtable
   const permanentDelete = useCallback((id) => {
-    setDeletedLeads(prev => prev.filter(l => l.id !== id));
+    setDeletedLeads(prev => {
+      const lead = prev.find(l => l.id === id);
+      if (lead?.airtableId) patchAirtable(lead.airtableId, { 'Lead Status': 'Archived' });
+      return prev.filter(l => l.id !== id);
+    });
   }, []);
 
-  // Move back from deleted history to active leads
+  // Move back from deleted history to active leads + restore Airtable status
   const recoverLead = useCallback((id) => {
     setDeletedLeads(prev => {
       const lead = prev.find(l => l.id === id);
       if (lead) {
+        if (lead.airtableId) patchAirtable(lead.airtableId, { 'Lead Status': 'New Lead' });
         const { deletedAt: _d, ...restored } = lead;
-        setLeads(ls => [restored, ...ls].sort((a, b) => b.dateObj - a.dateObj));
+        const recoveredLead = { ...restored, status: 'new', progress: 10 };
+        setLeads(ls => [recoveredLead, ...ls].sort((a, b) => b.dateObj - a.dateObj));
       }
       return prev.filter(l => l.id !== id);
     });

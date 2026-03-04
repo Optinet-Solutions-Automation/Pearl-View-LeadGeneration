@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES } from '../../utils/constants';
+import { createRecord, deleteRecord, AT_TABLES } from '../../utils/airtableSync';
 
 const LS_KEY = 'pvl_expenses';
 
@@ -35,15 +36,36 @@ export default function ExpensesPage() {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!form.amount || parseFloat(form.amount) <= 0) { alert('Enter a valid amount.'); return; }
-    const entry = { id: Date.now().toString(), category: form.category, amount: parseFloat(form.amount), description: form.description.trim(), date: form.date };
+    const entry = {
+      id: Date.now().toString(),
+      category: form.category,
+      amount: parseFloat(form.amount),
+      description: form.description.trim(),
+      date: form.date,
+      airtableId: null,
+    };
+    // Sync to Airtable (non-blocking)
+    createRecord(AT_TABLES.expenses, {
+      'Category':    entry.category,
+      'Amount':      entry.amount,
+      'Description': entry.description || '',
+      'Date':        entry.date,
+      'Local ID':    entry.id,
+    }).then(airtableId => {
+      if (airtableId) {
+        setExpenses(prev => prev.map(e => e.id === entry.id ? { ...e, airtableId } : e));
+      }
+    });
     setExpenses(prev => [entry, ...prev]);
     setForm(prev => ({ ...prev, amount: '', description: '' }));
     setShowForm(false);
   }
 
   function handleDelete(id) {
+    const expense = expenses.find(e => e.id === id);
+    if (expense?.airtableId) deleteRecord(AT_TABLES.expenses, expense.airtableId);
     setExpenses(prev => prev.filter(e => e.id !== id));
     setDeleteId(null);
   }

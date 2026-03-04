@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
+import { createRecord, updateRecord, deleteRecord, AT_TABLES } from '../../utils/airtableSync';
 
 const DAYS     = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const SERVICES = ['Window Cleaning', 'Pressure Washing', 'Solar Panel', 'Other'];
-const CAL_BANKS = [
-  'Commonwealth Bank (CBA)', 'Westpac', 'ANZ', 'NAB',
-  'Bendigo Bank', 'Bank of Queensland', 'Suncorp Bank',
-  'ING Australia', 'Macquarie Bank', 'Other',
-];
-const ROWS_PER_PAGE = 8;
+const ROWS_PER_PAGE = 50;
 
 function mkDate(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -92,30 +88,6 @@ function CalPaymentModal({ booking, initMethod, onClose }) {
               style={{ width: '100%', padding: '9px 12px 9px 26px', fontSize: '16px', fontWeight: 700, border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
-
-          {/* Bank fields */}
-          {method === 'Bank' && (
-            <>
-              <label style={fLbl}>Bank Name</label>
-              <select
-                value={bankName}
-                onChange={e => setBankName(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: '14px', background: '#fff', color: bankName ? 'var(--gray-800)' : 'var(--gray-400)' }}
-              >
-                <option value="">— Select Bank —</option>
-                {CAL_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-
-              <label style={fLbl}>Account / Reference No.</label>
-              <input
-                type="text"
-                value={accountRef}
-                onChange={e => setAccountRef(e.target.value)}
-                placeholder="e.g. 062-000 / 12345678"
-                style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
-              />
-            </>
-          )}
 
           {err && (
             <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
@@ -441,13 +413,34 @@ export default function CalendarPage() {
   useEffect(() => { setTablePage(0); }, [tableSearch, month, year, selectedDay]);
 
   function addCalBooking(data) {
-    const record  = { id: `cal-${Date.now()}`, ...data };
+    const record  = { id: `cal-${Date.now()}`, ...data, airtableId: null };
     const updated = [record, ...calBookings];
     setCalBookings(updated);
     localStorage.setItem('pvl_cal_bookings', JSON.stringify(updated));
+    // Sync to Airtable
+    createRecord(AT_TABLES.calendar, {
+      'Client Name':     record.clientName || '',
+      'Phone':           record.phone || '',
+      'Email':           record.email || '',
+      'City':            record.city || '',
+      'Service':         record.service || '',
+      'Payment Method':  record.paymentMethod || '',
+      'Date':            record.date || '',
+      'Local ID':        record.id,
+    }).then(airtableId => {
+      if (airtableId) {
+        setCalBookings(prev => {
+          const next = prev.map(b => b.id === record.id ? { ...b, airtableId } : b);
+          localStorage.setItem('pvl_cal_bookings', JSON.stringify(next));
+          return next;
+        });
+      }
+    });
   }
 
   function removeCalBooking(id) {
+    const booking = calBookings.find(b => b.id === id);
+    if (booking?.airtableId) deleteRecord(AT_TABLES.calendar, booking.airtableId);
     const updated = calBookings.filter(b => b.id !== id);
     setCalBookings(updated);
     localStorage.setItem('pvl_cal_bookings', JSON.stringify(updated));
@@ -457,6 +450,18 @@ export default function CalendarPage() {
     const updated = calBookings.map(b => b.id === id ? { ...b, ...data } : b);
     setCalBookings(updated);
     localStorage.setItem('pvl_cal_bookings', JSON.stringify(updated));
+    // Sync to Airtable
+    const booking = calBookings.find(b => b.id === id);
+    if (booking?.airtableId) {
+      updateRecord(AT_TABLES.calendar, booking.airtableId, {
+        'Client Name':    data.clientName || booking.clientName || '',
+        'Phone':          data.phone      ?? booking.phone ?? '',
+        'Email':          data.email      ?? booking.email ?? '',
+        'City':           data.city       ?? booking.city  ?? '',
+        'Service':        data.service    ?? booking.service ?? '',
+        'Payment Method': data.paymentMethod ?? booking.paymentMethod ?? '',
+      });
+    }
   }
 
   const monthLeadBookings = leads
