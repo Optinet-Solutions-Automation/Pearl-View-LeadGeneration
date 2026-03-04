@@ -221,6 +221,11 @@ export function useLeads() {
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
+    // Write revenue record when job is marked as done
+    if (status === 'job_done') {
+      const amount = updatedLead.invoice || updatedLead.value || 0;
+      writeRevenue(updatedLead, amount, updatedLead.paymentMethod || 'Cash');
+    }
     // Re-confirm status in case a background fetch ran mid-PATCH and overwrote it
     setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, status, progress: PROG_MAP[status] || 10 }));
     return 'ok';
@@ -250,7 +255,7 @@ export function useLeads() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
   }, []);
 
-  // ─── Save payment info: persisted via Revenue table (Leads table has no payment fields) ─
+  // ─── Save payment info: updates Leads table + linked calendar booking ─────────
   const savePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
     let leadSnapshot = null;
     setLeads(prev => prev.map(l => {
@@ -258,12 +263,15 @@ export function useLeads() {
       leadSnapshot = l;
       return { ...l, paid, paidAmount, paymentMethod };
     }));
-    const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
-    // Revenue table IS the persistence mechanism for payments (Leads table has no payment fields).
-    // Write a Revenue record for any new payment (amount > 0, not previously paid).
-    if (paid && paidAmount > 0 && !leadSnapshot?.paid) {
-      await writeRevenue(updatedLead, paidAmount, paymentMethod);
+    // Persist payment fields to Leads table in Airtable
+    if (leadSnapshot?.airtableId) {
+      patchAirtable(leadSnapshot.airtableId, {
+        'Paid':           paid,
+        'Amount Paid':    paidAmount,
+        'Payment Method': paymentMethod,
+      });
     }
+    const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
       setCalBookings(prev => {
@@ -279,7 +287,7 @@ export function useLeads() {
       });
     }
     return true;
-  }, []);
+  }, [patchAirtable]);
 
   const saveCity = useCallback((id, city) => {
     setLeads(prev => prev.map(l => {
@@ -330,10 +338,10 @@ export function useLeads() {
   const permanentDelete = useCallback((id) => {
     setDeletedLeads(prev => {
       const lead = prev.find(l => l.id === id);
-      if (lead?.airtableId) patchAirtable(lead.airtableId, { 'Lead Status': 'Archived' });
+      if (lead?.airtableId) deleteRecord(AT_TABLE, lead.airtableId);
       return prev.filter(l => l.id !== id);
     });
-  }, [patchAirtable]);
+  }, []);
 
   // Move back from deleted history to active leads + restore Airtable status
   const recoverLead = useCallback((id) => {
@@ -349,18 +357,33 @@ export function useLeads() {
     });
   }, [patchAirtable]);
 
-  const addLead = useCallback((leadData) => {
+  const addLead = useCallback(async (leadData) => {
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const tempId = String(Date.now());
     setLeads(prev => [{
-      id: String(Date.now()), ...leadData,
+      id: tempId, ...leadData,
       lp: leadData.source === 'form2' || leadData.source === 'call2' ? 'LP2' : 'LP1',
       status: 'new', date: dateStr, dateObj: now,
       address: '', jobType: 'Residential', windows: 0,
-      starred: false, notes: '', hasCall: leadData.source.startsWith('call'),
+      starred: false, notes: '', hasCall: leadData.source?.startsWith('call') || false,
       progress: 10, refuseReason: '', airtableId: null,
     }, ...prev]);
+    // Create record in Airtable
+    const airtableId = await createRecord(AT_TABLE, {
+      'Client Name':             leadData.name,
+      'Phone Number':            leadData.phone   || '',
+      'Email':                   leadData.email   || '',
+      'Inquiry Subject/Reason':  leadData.subject || '',
+      'Lead Status':             'New Lead',
+      'Lead Channel':            leadData.leadChannel || '',
+      'Quote Amount':            leadData.value   || 0,
+      'Inquiry Date':            now.toISOString(),
+    });
+    if (airtableId) {
+      setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId } : l));
+    }
   }, []);
 
   // ─── Calendar booking operations ─────────────────────────────────────────────

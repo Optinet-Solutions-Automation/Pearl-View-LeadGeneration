@@ -200,7 +200,7 @@ export default function ReportsPage() {
       )}
 
       {filteredRevenue.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', overflow: 'hidden', marginBottom: '16px' }}>
+        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>Revenue Transactions</div>
             <span style={{ fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#15803d', borderRadius: '20px', padding: '2px 10px' }}>
@@ -257,7 +257,7 @@ export default function ReportsPage() {
 
       {/* Awaiting Payment — job done but payment not yet collected */}
       {outstandingLeads.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', overflow: 'hidden', marginBottom: '16px' }}>
+        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
             <div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>Awaiting Payment</div>

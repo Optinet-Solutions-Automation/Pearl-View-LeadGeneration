@@ -45,7 +45,7 @@ export default async (req, res) => {
       offset = data.offset || '';
     } while (offset);
 
-    res.setHeader('Cache-Control', 's-maxage=30');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ records: allRecords });
   } catch (err) {
     return res.status(500).json({ error: err.message });
