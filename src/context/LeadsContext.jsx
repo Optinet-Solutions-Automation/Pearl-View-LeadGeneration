@@ -56,15 +56,17 @@ export function LeadsProvider({ children }) {
       setRefuseModalId(id);
       return;
     }
-    const msg = await changeStatus(id, status);
-    if (msg) showToast(msg);
+    const result = await changeStatus(id, status);
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else if (result === 'ok') showToast('Status updated ✓');
   }, [changeStatus, showToast, leads]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
     setRefuseReason(refuseModalId, reason);
-    const msg = await changeStatus(refuseModalId, 'refused');
-    if (msg) showToast(msg);
+    const result = await changeStatus(refuseModalId, 'refused');
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else if (result === 'ok') showToast('Status updated ✓');
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
   }, [refuseModalId, changeStatus, setRefuseReason, showToast]);
@@ -84,9 +86,11 @@ export function LeadsProvider({ children }) {
     saveJobType(id, jobType);
   }, [saveJobType]);
 
-  const handleSavePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
-    return savePaidInfo(id, paid, paidAmount, paymentMethod);
-  }, [savePaidInfo]);
+  const handleSavePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
+    const success = await savePaidInfo(id, paid, paidAmount, paymentMethod);
+    if (success === false) showToast('Failed to save payment — check your connection');
+    return success;
+  }, [savePaidInfo, showToast]);
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);

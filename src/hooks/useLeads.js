@@ -168,9 +168,11 @@ export function useLeads() {
 
   // ─── Awaits the PATCH so refreshing after a status change shows the new value ─
   const changeStatus = useCallback(async (id, status) => {
+    let prevLead = null;
     let updatedLead = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
+      prevLead = l;
       const updated = { ...l, status, progress: PROG_MAP[status] || 10 };
       if (status === 'completed' && !l.invoice && l.value > 0) updated.invoice = l.value;
       updatedLead = updated;
@@ -179,12 +181,17 @@ export function useLeads() {
     if (!updatedLead?.airtableId) return 'Status updated';
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
     if (status === 'completed' && updatedLead.invoice > 0) atFields['Final Invoice Amount'] = updatedLead.invoice;
-    await patchAirtable(updatedLead.airtableId, atFields);
+    const result = await patchAirtable(updatedLead.airtableId, atFields);
+    if (!result) {
+      // PATCH failed — revert optimistic update
+      setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
+      return 'error';
+    }
     // Revenue recognized when job marked done and was already paid (converts liability → revenue).
     if (status === 'job_done' && updatedLead.paid && updatedLead.paidAmount > 0) {
       writeRevenue(updatedLead, updatedLead.paidAmount, updatedLead.paymentMethod);
     }
-    return 'Saved to Airtable';
+    return 'ok';
   }, [patchAirtable]);
 
   const toggleStar = useCallback((id) => {
@@ -220,14 +227,20 @@ export function useLeads() {
       return { ...l, paid, paidAmount, paymentMethod };
     }));
     if (leadSnapshot?.airtableId) {
-      await patchAirtable(leadSnapshot.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
+      const result = await patchAirtable(leadSnapshot.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
+      if (!result) {
+        // PATCH failed — revert optimistic update
+        setLeads(prev => prev.map(l => l.id === id ? leadSnapshot : l));
+        return false;
+      }
     }
     const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
     // Revenue recognized only when BOTH job done AND paid.
-    // If job is already done and this is a new payment (wasn't paid before), write revenue now.
+    // Only write if PATCH confirmed above (returned true) and this is a new payment.
     if (paid && paidAmount > 0 && !leadSnapshot?.paid && updatedLead?.status === 'job_done') {
       writeRevenue(updatedLead, paidAmount, paymentMethod);
     }
+    return true;
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
       setCalBookings(prev => {

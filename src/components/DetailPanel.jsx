@@ -319,11 +319,12 @@ export default function DetailPanel() {
 
   async function onPaymentSubmit({ amount, method }) {
     setPaymentSaving(true);
-    await savePaidInfo(l.id, true, amount, method);
+    const success = await savePaidInfo(l.id, true, amount, method);
+    setPaymentSaving(false);
+    if (success === false) return; // toast already shown by context, keep modal open
     setPaidAmount(amount.toString());
     setPayMethod(method);
     setPayModalOpen(false);
-    setPaymentSaving(false);
     showToast('Payment saved ✓');
   }
 
