@@ -72,8 +72,9 @@ function normaliseCalBooking(rec) {
   };
 }
 
-// ─── Write a Revenue record when a job is done and paid ───────────────────────
-function writeRevenue(lead, paidAmount, paymentMethod) {
+// ─── Write a Revenue record when payment is recorded ─────────────────────────
+// status: 'Job Done' counts as income in Reports; anything else is In Progress
+function writeRevenue(lead, paidAmount, paymentMethod, status) {
   if (!paidAmount || paidAmount <= 0) return Promise.resolve(null);
   return createRecord(AT_TABLES.revenue, {
     'Revenue Name':   `${lead.name} - ${lead.jobType || 'Window Cleaning'}`,
@@ -84,6 +85,7 @@ function writeRevenue(lead, paidAmount, paymentMethod) {
     'City':           lead.city || '',
     'Payment_Method': paymentMethod || 'Cash',
     'Amount':         paidAmount,
+    'Status':         status || 'In Progress',
   });
 }
 
@@ -223,6 +225,18 @@ export function useLeads() {
     }
     // Re-confirm status in case a background fetch ran mid-PATCH and overwrote it
     setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, status, progress: PROG_MAP[status] || 10 }));
+    // Scenario 3 → Scenario 1: lead already had payment but wasn't job_done yet — now it is
+    // Update the Revenue record Status to 'Job Done' so it counts as income in Reports
+    if (status === 'job_done' && updatedLead?.paid && updatedLead?.paidAmount > 0) {
+      fetchRecords(AT_TABLES.revenue).then(revRecs => {
+        const phone = (updatedLead.phone || '').replace(/\s/g, '').toLowerCase();
+        const match = revRecs.find(r => {
+          const rPhone = (r.fields?.['Phone'] || '').replace(/\s/g, '').toLowerCase();
+          return rPhone === phone && parseFloat(r.fields?.['Amount'] || 0) > 0;
+        });
+        if (match) updateRecord(AT_TABLES.revenue, match.id, { 'Status': 'Job Done' });
+      });
+    }
     return 'ok';
   }, [patchAirtable]);
 
@@ -271,9 +285,11 @@ export function useLeads() {
       });
     }
     const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
-    // Write Revenue record only when job is done AND payment is being confirmed
-    if (paid && paidAmount > 0 && !leadSnapshot?.paid && leadSnapshot?.status === 'job_done') {
-      writeRevenue(updatedLead, paidAmount, paymentMethod);
+    // Always write Revenue when payment is first confirmed — Status determines if it counts as income
+    // 'Job Done' → shows in Reports income; anything else → In Progress (payment recorded but not yet revenue)
+    if (paid && paidAmount > 0 && !leadSnapshot?.paid) {
+      const revStatus = leadSnapshot?.status === 'job_done' ? 'Job Done' : 'In Progress';
+      writeRevenue(updatedLead, paidAmount, paymentMethod, revStatus);
     }
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
@@ -476,7 +492,7 @@ export function useLeads() {
         });
       }
 
-      // Write Revenue record
+      // Write Revenue record — calendar booking payments are always completed jobs
       createRecord(AT_TABLES.revenue, {
         'Revenue Name':   `${booking.clientName} - ${booking.service || 'Window Cleaning'}`,
         'Date':           new Date().toISOString().split('T')[0],
@@ -486,6 +502,7 @@ export function useLeads() {
         'City':           booking.city || '',
         'Payment_Method': paymentMethod || 'Cash',
         'Amount':         paidAmount,
+        'Status':         'Job Done',
       });
 
       // Update linked lead's paid state in memory (by phone match)

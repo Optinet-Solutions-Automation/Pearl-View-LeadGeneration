@@ -65,6 +65,7 @@ export default function ReportsPage() {
         method: r.fields['Payment_Method'] || '',
         amount: parseFloat(r.fields['Amount'] || 0),
         date:   r.fields['Date']           || '',
+        status: r.fields['Status']         || '',
       })));
     }).finally(() => setIsLoading(false));
   }, []);
@@ -92,7 +93,9 @@ export default function ReportsPage() {
   // Job done but not yet paid — needs payment collection
   const outstandingLeads = leads.filter(l => l.status === 'job_done' && !l.paid && inRange(l.date));
 
-  const filteredRevenue  = revenueRecords.filter(r => inRange(r.date))
+  // Only count records with Status='Job Done' (or no Status for old records) as income
+  const filteredRevenue = revenueRecords
+    .filter(r => inRange(r.date) && (r.status === 'Job Done' || r.status === ''))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const totalIncome = filteredRevenue.reduce((s, r) => s + r.amount, 0);
