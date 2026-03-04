@@ -413,10 +413,20 @@ export function useLeads() {
         });
     try {
       const r = await req;
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        console.error('addLead: Airtable rejected the record:', err);
+        return null;
+      }
       const data = await r.json();
-      if (data.id) setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId: data.id } : l));
+      if (data.id) {
+        setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId: data.id } : l));
+        return data.id;
+      }
+      return null;
     } catch (err) {
       console.error('addLead: failed to create in Airtable', err);
+      return null;
     }
   }, []);
 
