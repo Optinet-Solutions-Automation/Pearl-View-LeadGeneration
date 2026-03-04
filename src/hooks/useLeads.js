@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { STATUS_MAP, AT_STATUS_MAP, PROG_MAP } from '../utils/constants';
 import { parseDate } from '../utils/dateUtils';
 import { createRecord, updateRecord, deleteRecord, fetchRecords, AT_TABLES } from '../utils/airtableSync';
@@ -7,34 +7,6 @@ const IS_LOCAL = import.meta.env.DEV;
 const AT_TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN || '';
 const AT_BASE  = import.meta.env.VITE_AIRTABLE_BASE_ID || '';
 const AT_TABLE = import.meta.env.VITE_AIRTABLE_TABLE_ID || '';
-
-function patchAirtable(airtableId, fields) {
-  if (!airtableId) { console.warn('patchAirtable: no airtableId, skipping'); return; }
-  const logFields = Object.keys(fields).join(', ');
-  if (IS_LOCAL) {
-    fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields }),
-    })
-      .then(r => {
-        if (!r.ok) r.json().then(e => console.error('Airtable patch failed:', logFields, e));
-        else console.log('Airtable synced:', logFields);
-      })
-      .catch(err => console.error('Airtable sync error:', err));
-  } else {
-    fetch('/api/update-lead', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ airtableId, fields }),
-    })
-      .then(r => {
-        if (!r.ok) r.json().then(e => console.error('Airtable patch failed:', logFields, e));
-        else console.log('Airtable synced:', logFields);
-      })
-      .catch(err => console.error('Airtable sync error:', err));
-  }
-}
 
 function normaliseRecord(rec) {
   const f = rec.fields;
@@ -120,8 +92,41 @@ export function useLeads() {
   const [deletedLeads, setDeletedLeads] = useState([]);
   const [calBookings,  setCalBookings]  = useState([]);
   const [isLoading,    setIsLoading]    = useState(true);
+  // Track in-flight Airtable writes so silent polls don't overwrite optimistic UI
+  const pendingWrites = useRef(0);
+
+  // ─── Awaitable Airtable PATCH — tracks in-flight count ───────────────────────
+  const patchAirtable = useCallback((airtableId, fields) => {
+    if (!airtableId) { console.warn('patchAirtable: no airtableId, skipping'); return Promise.resolve(null); }
+    const logFields = Object.keys(fields).join(', ');
+    pendingWrites.current++;
+    const req = IS_LOCAL
+      ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      : fetch('/api/update-lead', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ airtableId, fields }),
+        });
+    return req
+      .then(r => {
+        if (!r.ok) return r.json().then(e => { console.error('Airtable patch failed:', logFields, e); return null; });
+        console.log('Airtable synced:', logFields);
+        return r.json();
+      })
+      .catch(err => { console.error('Airtable sync error:', err); return null; })
+      .finally(() => { pendingWrites.current--; });
+  }, []);
 
   const fetchLeads = useCallback(async ({ silent = false } = {}) => {
+    // Don't overwrite optimistic UI while writes are in-flight
+    if (silent && pendingWrites.current > 0) {
+      console.log('Skipping silent poll — writes in-flight');
+      return;
+    }
     if (!silent) setIsLoading(true);
     try {
       // ── Fetch leads ──────────────────────────────────────────────────────────
@@ -159,8 +164,9 @@ export function useLeads() {
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, []);
+  }, [patchAirtable]);
 
+  // ─── Awaits the PATCH so refreshing after a status change shows the new value ─
   const changeStatus = useCallback(async (id, status) => {
     let updatedLead = null;
     setLeads(prev => prev.map(l => {
@@ -173,13 +179,13 @@ export function useLeads() {
     if (!updatedLead?.airtableId) return 'Status updated';
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
     if (status === 'completed' && updatedLead.invoice > 0) atFields['Final Invoice Amount'] = updatedLead.invoice;
-    patchAirtable(updatedLead.airtableId, atFields);
+    await patchAirtable(updatedLead.airtableId, atFields);
     // Write revenue when job is done and already paid
     if (status === 'job_done' && updatedLead.paid && updatedLead.paidAmount > 0) {
       writeRevenue(updatedLead, updatedLead.paidAmount, updatedLead.paymentMethod);
     }
     return 'Saved to Airtable';
-  }, []);
+  }, [patchAirtable]);
 
   const toggleStar = useCallback((id) => {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, starred: !l.starred } : l));
@@ -191,7 +197,7 @@ export function useLeads() {
       if (l.airtableId) patchAirtable(l.airtableId, { 'Notes': note });
       return { ...l, notes: note };
     }));
-  }, []);
+  }, [patchAirtable]);
 
   const renameLead = useCallback((id, newName) => {
     setLeads(prev => prev.map(l => {
@@ -199,28 +205,32 @@ export function useLeads() {
       if (l.airtableId) patchAirtable(l.airtableId, { 'Client Name': newName });
       return { ...l, name: newName };
     }));
-  }, []);
+  }, [patchAirtable]);
 
   const setRefuseReason = useCallback((id, reason) => {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
   }, []);
 
-  const savePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
-    let updatedLead = null;
+  // ─── Awaits the PATCH so payment info is committed before any refresh ─────────
+  const savePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
+    let leadSnapshot = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
-      updatedLead = { ...l, paid, paidAmount, paymentMethod };
-      return updatedLead;
+      leadSnapshot = l;
+      return { ...l, paid, paidAmount, paymentMethod };
     }));
+    if (leadSnapshot?.airtableId) {
+      await patchAirtable(leadSnapshot.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
+    }
+    const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
     // Write revenue when lead is already job_done and now being marked paid
     if (paid && paidAmount > 0 && updatedLead?.status === 'job_done') {
       writeRevenue(updatedLead, paidAmount, paymentMethod);
     }
     // Update linked calendar booking if one exists (match by phone)
-    if (paid && paidAmount > 0) {
+    if (paid && paidAmount > 0 && updatedLead?.phone) {
       setCalBookings(prev => {
-        const linked = prev.find(b => b.linkedLeadId === id || (b.phone && updatedLead?.phone && b.phone === updatedLead.phone));
+        const linked = prev.find(b => b.linkedLeadId === id || (b.phone && updatedLead.phone && b.phone === updatedLead.phone));
         if (linked?.airtableId) {
           updateRecord(AT_TABLES.calendar, linked.airtableId, {
             'Booking Status': 'Completed',
@@ -231,7 +241,7 @@ export function useLeads() {
         return prev;
       });
     }
-  }, []);
+  }, [patchAirtable]);
 
   const saveCity = useCallback((id, city) => {
     setLeads(prev => prev.map(l => {
@@ -239,7 +249,7 @@ export function useLeads() {
       if (l.airtableId) patchAirtable(l.airtableId, { 'City': city });
       return { ...l, city };
     }));
-  }, []);
+  }, [patchAirtable]);
 
   const saveJobType = useCallback((id, jobType) => {
     setLeads(prev => prev.map(l => {
@@ -247,7 +257,7 @@ export function useLeads() {
       if (l.airtableId) patchAirtable(l.airtableId, { 'Property Type': jobType });
       return { ...l, jobType };
     }));
-  }, []);
+  }, [patchAirtable]);
 
   const saveJobDate = useCallback((id, jobDate) => {
     setLeads(prev => prev.map(l => {
@@ -256,7 +266,7 @@ export function useLeads() {
       if (l.airtableId) patchAirtable(l.airtableId, { 'Scheduled Cleaning Date': jobDate || null });
       return { ...l, jobDate };
     }));
-  }, []);
+  }, [patchAirtable]);
 
   const saveEmail = useCallback((id, email) => {
     setLeads(prev => prev.map(l => {
@@ -264,7 +274,7 @@ export function useLeads() {
       if (l.airtableId) patchAirtable(l.airtableId, { 'Email': email });
       return { ...l, email };
     }));
-  }, []);
+  }, [patchAirtable]);
 
   // Move lead to deleted history (soft delete) + sync to Airtable
   const archiveLead = useCallback((id) => {
@@ -276,7 +286,7 @@ export function useLeads() {
       }
       return prev.filter(l => l.id !== id);
     });
-  }, []);
+  }, [patchAirtable]);
 
   // Permanently remove from deleted history + delete from Airtable
   const permanentDelete = useCallback((id) => {
@@ -285,7 +295,7 @@ export function useLeads() {
       if (lead?.airtableId) patchAirtable(lead.airtableId, { 'Lead Status': 'Archived' });
       return prev.filter(l => l.id !== id);
     });
-  }, []);
+  }, [patchAirtable]);
 
   // Move back from deleted history to active leads + restore Airtable status
   const recoverLead = useCallback((id) => {
@@ -299,7 +309,7 @@ export function useLeads() {
       }
       return prev.filter(l => l.id !== id);
     });
-  }, []);
+  }, [patchAirtable]);
 
   const addLead = useCallback((leadData) => {
     const now = new Date();
@@ -417,7 +427,7 @@ export function useLeads() {
         : b
       );
     });
-  }, []);
+  }, [patchAirtable]);
 
   return {
     leads, deletedLeads, calBookings, isLoading, fetchLeads,
