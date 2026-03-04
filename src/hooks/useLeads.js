@@ -373,8 +373,8 @@ export function useLeads() {
       starred: false, notes: '', hasCall: leadData.source?.startsWith('call') || false,
       progress: 10, refuseReason: '', airtableId: null,
     }, ...prev]);
-    // Create record in Airtable
-    const airtableId = await createRecord(AT_TABLE, {
+    // Create record in Airtable — use dedicated endpoint (mirrors patchAirtable pattern)
+    const fields = {
       'Client Name':             leadData.name,
       'Phone Number':            leadData.phone   || '',
       'Email':                   leadData.email   || '',
@@ -383,9 +383,24 @@ export function useLeads() {
       'Lead Channel':            leadData.leadChannel || '',
       'Quote Amount':            leadData.value   || 0,
       'Inquiry Date':            now.toISOString(),
-    });
-    if (airtableId) {
-      setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId } : l));
+    };
+    const req = IS_LOCAL
+      ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        })
+      : fetch('/api/create-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        });
+    try {
+      const r = await req;
+      const data = await r.json();
+      if (data.id) setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId: data.id } : l));
+    } catch (err) {
+      console.error('addLead: failed to create in Airtable', err);
     }
   }, []);
 
