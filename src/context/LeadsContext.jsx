@@ -94,10 +94,28 @@ export function LeadsProvider({ children }) {
   }, [saveJobType]);
 
   const handleSavePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
-    const success = await savePaidInfo(id, paid, paidAmount, paymentMethod);
-    if (success === false) showToast('Failed to save payment — check your connection');
-    return success;
-  }, [savePaidInfo, showToast]);
+    const result = await savePaidInfo(id, paid, paidAmount, paymentMethod);
+    if (!result?.success && result !== true) {
+      showToast('Failed to save payment — check your connection');
+      return false;
+    }
+    const wasJobDone = result?.wasJobDone ?? result === true;
+    if (paid && paidAmount > 0 && !wasJobDone) {
+      // S3: payment recorded but job not done yet — auto-advance to In Progress if still New
+      const lead = leads.find(l => l.id === id);
+      if (lead?.status === 'new') {
+        await changeStatus(id, 'in_progress');
+        showToast('Payment recorded · Status → In Progress');
+      } else {
+        showToast('Payment recorded ✓');
+      }
+    } else {
+      showToast('Payment recorded ✓');
+    }
+    // Re-fetch after a short delay to confirm Revenue record was written
+    setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
+    return result;
+  }, [savePaidInfo, changeStatus, showToast, fetchLeads, leads]);
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);
