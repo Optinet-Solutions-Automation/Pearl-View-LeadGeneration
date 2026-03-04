@@ -89,8 +89,12 @@ export function LeadsProvider({ children }) {
   const handleSavePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
     const success = await savePaidInfo(id, paid, paidAmount, paymentMethod);
     if (success === false) showToast('Failed to save payment — check your connection');
+    else {
+      // Re-fetch after a short delay to confirm Airtable persisted the Paid field
+      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
+    }
     return success;
-  }, [savePaidInfo, showToast]);
+  }, [savePaidInfo, showToast, fetchLeads]);
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);

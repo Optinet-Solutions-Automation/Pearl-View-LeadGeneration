@@ -44,8 +44,8 @@ function normaliseRecord(rec) {
     status, progress: PROG_MAP[status] || 10,
     starred: false, notes: f['Notes'] || '', hasCall: isCall, tag: '',
     refuseReason: '',
-    paid: f['Paid'] || false,
-    paidAmount: f['Amount Paid'] || 0,
+    paidAmount: parseFloat(f['Amount Paid'] || 0),
+    paid: !!(f['Paid'] || parseFloat(f['Amount Paid'] || 0) > 0),
     paymentMethod: f['Payment Method'] || '',
     city: f['City'] || '',
     leadChannel: f['Lead Channel'] || '',
@@ -240,7 +240,6 @@ export function useLeads() {
     if (paid && paidAmount > 0 && !leadSnapshot?.paid && updatedLead?.status === 'job_done') {
       writeRevenue(updatedLead, paidAmount, paymentMethod);
     }
-    return true;
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
       setCalBookings(prev => {
@@ -255,6 +254,7 @@ export function useLeads() {
         return prev;
       });
     }
+    return true;
   }, [patchAirtable]);
 
   const saveCity = useCallback((id, city) => {
