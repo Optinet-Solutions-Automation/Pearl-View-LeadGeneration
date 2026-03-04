@@ -74,8 +74,8 @@ function normaliseCalBooking(rec) {
 
 // ─── Write a Revenue record when a job is done and paid ───────────────────────
 function writeRevenue(lead, paidAmount, paymentMethod) {
-  if (!paidAmount || paidAmount <= 0) return;
-  createRecord(AT_TABLES.revenue, {
+  if (!paidAmount || paidAmount <= 0) return Promise.resolve(null);
+  return createRecord(AT_TABLES.revenue, {
     'Revenue Name':   `${lead.name} - ${lead.jobType || 'Window Cleaning'}`,
     'Date':           new Date().toISOString().split('T')[0],
     'Client Name':    lead.name,
@@ -147,7 +147,31 @@ export function useLeads() {
         if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
         allRecords = data.records;
       }
-      const all = allRecords.map(r => normaliseRecord(r));
+      // ── Fetch revenue to derive paid status (Leads table has no payment fields) ──
+      const revenueRecs = await fetchRecords(AT_TABLES.revenue);
+      // Build phone → payment lookup (highest amount wins per phone)
+      const paymentByPhone = {};
+      revenueRecs.forEach(r => {
+        const phone = (r.fields?.['Phone'] || '').replace(/\s/g, '').toLowerCase();
+        const amount = parseFloat(r.fields?.['Amount'] || 0);
+        if (phone && amount > 0) {
+          const existing = paymentByPhone[phone];
+          if (!existing || amount > existing.paidAmount) {
+            paymentByPhone[phone] = {
+              paid: true,
+              paidAmount: amount,
+              paymentMethod: r.fields?.['Payment_Method'] || '',
+            };
+          }
+        }
+      });
+
+      const all = allRecords.map(r => {
+        const lead = normaliseRecord(r);
+        const phoneKey = (lead.phone || '').replace(/\s/g, '').toLowerCase();
+        const payment = phoneKey ? (paymentByPhone[phoneKey] || {}) : {};
+        return { ...lead, ...payment };
+      });
       const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
       const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
         .map(r => ({ ...r, deletedAt: r.dateObj }));
@@ -187,10 +211,6 @@ export function useLeads() {
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
-    // Revenue recognized when job marked done and was already paid (converts liability → revenue).
-    if (status === 'job_done' && updatedLead.paid && updatedLead.paidAmount > 0) {
-      writeRevenue(updatedLead, updatedLead.paidAmount, updatedLead.paymentMethod);
-    }
     return 'ok';
   }, [patchAirtable]);
 
@@ -218,7 +238,7 @@ export function useLeads() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
   }, []);
 
-  // ─── Awaits the PATCH so payment info is committed before any refresh ─────────
+  // ─── Save payment info: persisted via Revenue table (Leads table has no payment fields) ─
   const savePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
     let leadSnapshot = null;
     setLeads(prev => prev.map(l => {
@@ -226,19 +246,11 @@ export function useLeads() {
       leadSnapshot = l;
       return { ...l, paid, paidAmount, paymentMethod };
     }));
-    if (leadSnapshot?.airtableId) {
-      const result = await patchAirtable(leadSnapshot.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
-      if (!result) {
-        // PATCH failed — revert optimistic update
-        setLeads(prev => prev.map(l => l.id === id ? leadSnapshot : l));
-        return false;
-      }
-    }
     const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
-    // Revenue recognized only when BOTH job done AND paid.
-    // Only write if PATCH confirmed above (returned true) and this is a new payment.
-    if (paid && paidAmount > 0 && !leadSnapshot?.paid && updatedLead?.status === 'job_done') {
-      writeRevenue(updatedLead, paidAmount, paymentMethod);
+    // Revenue table IS the persistence mechanism for payments (Leads table has no payment fields).
+    // Write a Revenue record for any new payment (amount > 0, not previously paid).
+    if (paid && paidAmount > 0 && !leadSnapshot?.paid) {
+      await writeRevenue(updatedLead, paidAmount, paymentMethod);
     }
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
@@ -255,7 +267,7 @@ export function useLeads() {
       });
     }
     return true;
-  }, [patchAirtable]);
+  }, []);
 
   const saveCity = useCallback((id, city) => {
     setLeads(prev => prev.map(l => {
