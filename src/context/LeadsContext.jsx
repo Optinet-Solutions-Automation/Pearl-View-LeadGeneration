@@ -58,18 +58,25 @@ export function LeadsProvider({ children }) {
     }
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
-    else if (result === 'ok') showToast('Status updated ✓');
-  }, [changeStatus, showToast, leads]);
+    else if (result === 'ok') {
+      showToast('Status updated ✓');
+      // Verify the change persisted in Airtable — re-sync after a short delay
+      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
+    }
+  }, [changeStatus, showToast, leads, fetchLeads]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
     setRefuseReason(refuseModalId, reason);
     const result = await changeStatus(refuseModalId, 'refused');
     if (result === 'error') showToast('Failed to save — check your connection');
-    else if (result === 'ok') showToast('Status updated ✓');
+    else if (result === 'ok') {
+      showToast('Status updated ✓');
+      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
+    }
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-  }, [refuseModalId, changeStatus, setRefuseReason, showToast]);
+  }, [refuseModalId, changeStatus, setRefuseReason, showToast, fetchLeads]);
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);
@@ -89,12 +96,8 @@ export function LeadsProvider({ children }) {
   const handleSavePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
     const success = await savePaidInfo(id, paid, paidAmount, paymentMethod);
     if (success === false) showToast('Failed to save payment — check your connection');
-    else {
-      // Re-fetch after a short delay to confirm Airtable persisted the Paid field
-      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
-    }
     return success;
-  }, [savePaidInfo, showToast, fetchLeads]);
+  }, [savePaidInfo, showToast]);
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);
