@@ -94,11 +94,14 @@ export function useLeads() {
   const [isLoading,    setIsLoading]    = useState(true);
   // Track in-flight Airtable writes so silent polls don't overwrite optimistic UI
   const pendingWrites = useRef(0);
+  // Epoch increments on every write — lets fetchLeads detect if a write started mid-fetch
+  const writeEpoch = useRef(0);
 
   // ─── Awaitable Airtable PATCH — tracks in-flight count ───────────────────────
   const patchAirtable = useCallback((airtableId, fields) => {
     if (!airtableId) { console.warn('patchAirtable: no airtableId, skipping'); return Promise.resolve(null); }
     const logFields = Object.keys(fields).join(', ');
+    writeEpoch.current++;   // signal that a write is starting
     pendingWrites.current++;
     const req = IS_LOCAL
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
@@ -127,6 +130,8 @@ export function useLeads() {
       console.log('Skipping silent poll — writes in-flight');
       return;
     }
+    // Capture epoch before fetching — if a write starts mid-fetch, we'll skip setLeads
+    const epochAtStart = writeEpoch.current;
     if (!silent) setIsLoading(true);
     try {
       // ── Fetch leads ──────────────────────────────────────────────────────────
@@ -175,6 +180,11 @@ export function useLeads() {
       const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
       const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
         .map(r => ({ ...r, deletedAt: r.dateObj }));
+      // Skip if a write started while we were fetching — our data is now stale
+      if (silent && epochAtStart !== writeEpoch.current) {
+        console.log('Skipping setLeads — write happened mid-fetch');
+        return;
+      }
       setLeads(active);
       setDeletedLeads(archived);
 
@@ -211,6 +221,8 @@ export function useLeads() {
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
+    // Re-confirm status in case a background fetch ran mid-PATCH and overwrote it
+    setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, status, progress: PROG_MAP[status] || 10 }));
     return 'ok';
   }, [patchAirtable]);
 
