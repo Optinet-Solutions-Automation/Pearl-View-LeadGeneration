@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { STATUS_MAP, AT_STATUS_MAP, PROG_MAP } from '../utils/constants';
 import { parseDate } from '../utils/dateUtils';
+import { createRecord, updateRecord, deleteRecord, fetchRecords, AT_TABLES } from '../utils/airtableSync';
 
 const IS_LOCAL = import.meta.env.DEV;
 const AT_TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN || '';
@@ -80,14 +81,50 @@ function normaliseRecord(rec) {
   };
 }
 
+// ─── Normalise a raw Airtable Bookings record into the calBooking shape ───────
+function normaliseCalBooking(rec) {
+  const f = rec.fields;
+  return {
+    id:            `cal-${rec.id}`,
+    airtableId:    rec.id,
+    clientName:    f['Client Name']    || '',
+    phone:         f['Phone']          || '',
+    email:         '',
+    city:          f['City']           || '',
+    service:       f['Job_Service']    || '',
+    paymentMethod: 'Cash',
+    date:          f['Date']           ? f['Date'].split('T')[0] : '',
+    bookingStatus: f['Booking Status'] || 'Scheduled',
+    amount:        f['Amount']         || 0,
+    linkedLeadId:  null,
+  };
+}
+
+// ─── Write a Revenue record when a job is done and paid ───────────────────────
+function writeRevenue(lead, paidAmount, paymentMethod) {
+  if (!paidAmount || paidAmount <= 0) return;
+  createRecord(AT_TABLES.revenue, {
+    'Revenue Name':   `${lead.name} - ${lead.jobType || 'Window Cleaning'}`,
+    'Date':           new Date().toISOString().split('T')[0],
+    'Client Name':    lead.name,
+    'Phone':          lead.phone || '',
+    'Job_Service':    lead.jobType || 'Window Cleaning',
+    'City':           lead.city || '',
+    'Payment_Method': paymentMethod || 'Cash',
+    'Amount':         paidAmount,
+  });
+}
+
 export function useLeads() {
   const [leads,        setLeads]        = useState([]);
   const [deletedLeads, setDeletedLeads] = useState([]);
+  const [calBookings,  setCalBookings]  = useState([]);
   const [isLoading,    setIsLoading]    = useState(true);
 
   const fetchLeads = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setIsLoading(true);
     try {
+      // ── Fetch leads ──────────────────────────────────────────────────────────
       let allRecords = [];
       if (IS_LOCAL) {
         let offset = '';
@@ -111,6 +148,11 @@ export function useLeads() {
         .map(r => ({ ...r, deletedAt: r.dateObj }));
       setLeads(active);
       setDeletedLeads(archived);
+
+      // ── Fetch cal bookings (in parallel, non-blocking) ───────────────────────
+      fetchRecords(AT_TABLES.calendar).then(recs => {
+        setCalBookings(recs.map(r => normaliseCalBooking(r)));
+      });
     } catch (err) {
       console.error('Failed to load from Airtable:', err);
       throw err;
@@ -132,6 +174,10 @@ export function useLeads() {
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
     if (status === 'completed' && updatedLead.invoice > 0) atFields['Final Invoice Amount'] = updatedLead.invoice;
     patchAirtable(updatedLead.airtableId, atFields);
+    // Write revenue when job is done and already paid
+    if (status === 'job_done' && updatedLead.paid && updatedLead.paidAmount > 0) {
+      writeRevenue(updatedLead, updatedLead.paidAmount, updatedLead.paymentMethod);
+    }
     return 'Saved to Airtable';
   }, []);
 
@@ -160,11 +206,31 @@ export function useLeads() {
   }, []);
 
   const savePaidInfo = useCallback((id, paid, paidAmount, paymentMethod) => {
+    let updatedLead = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
       if (l.airtableId) patchAirtable(l.airtableId, { 'Paid': paid, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod });
-      return { ...l, paid, paidAmount, paymentMethod };
+      updatedLead = { ...l, paid, paidAmount, paymentMethod };
+      return updatedLead;
     }));
+    // Write revenue when lead is already job_done and now being marked paid
+    if (paid && paidAmount > 0 && updatedLead?.status === 'job_done') {
+      writeRevenue(updatedLead, paidAmount, paymentMethod);
+    }
+    // Update linked calendar booking if one exists (match by phone)
+    if (paid && paidAmount > 0) {
+      setCalBookings(prev => {
+        const linked = prev.find(b => b.linkedLeadId === id || (b.phone && updatedLead?.phone && b.phone === updatedLead.phone));
+        if (linked?.airtableId) {
+          updateRecord(AT_TABLES.calendar, linked.airtableId, {
+            'Booking Status': 'Completed',
+            'Amount': paidAmount,
+          });
+          return prev.map(b => b.id === linked.id ? { ...b, bookingStatus: 'Completed', amount: paidAmount } : b);
+        }
+        return prev;
+      });
+    }
   }, []);
 
   const saveCity = useCallback((id, city) => {
@@ -249,11 +315,116 @@ export function useLeads() {
     }, ...prev]);
   }, []);
 
+  // ─── Calendar booking operations ─────────────────────────────────────────────
+
+  const addCalBooking = useCallback(async (data) => {
+    const localId = `cal-${Date.now()}`;
+    const record = {
+      id: localId, airtableId: null,
+      clientName: data.clientName || '', phone: data.phone || '',
+      email: data.email || '', city: data.city || '',
+      service: data.service || '', paymentMethod: data.paymentMethod || 'Cash',
+      date: data.date || '', bookingStatus: 'Scheduled', amount: data.amount || 0,
+      linkedLeadId: data.linkedLeadId || null,
+    };
+    setCalBookings(prev => [record, ...prev]);
+    // Write to Airtable Bookings table
+    const airtableId = await createRecord(AT_TABLES.calendar, {
+      'Booking Name':   `${record.clientName} - ${record.date}`,
+      'Client Name':    record.clientName,
+      'Date':           record.date,
+      'Job_Service':    record.service,
+      'City':           record.city,
+      'Phone':          record.phone,
+      'Booking Status': 'Scheduled',
+      'Amount':         record.amount || 0,
+    });
+    if (airtableId) {
+      setCalBookings(prev => prev.map(b => b.id === localId ? { ...b, airtableId } : b));
+    }
+    return localId;
+  }, []);
+
+  const removeCalBooking = useCallback((id) => {
+    setCalBookings(prev => {
+      const booking = prev.find(b => b.id === id);
+      if (booking?.airtableId) deleteRecord(AT_TABLES.calendar, booking.airtableId);
+      return prev.filter(b => b.id !== id);
+    });
+  }, []);
+
+  const updateCalBooking = useCallback((id, data) => {
+    setCalBookings(prev => {
+      const booking = prev.find(b => b.id === id);
+      if (booking?.airtableId) {
+        const patch = {};
+        if (data.clientName !== undefined) patch['Client Name']    = data.clientName;
+        if (data.phone      !== undefined) patch['Phone']          = data.phone;
+        if (data.city       !== undefined) patch['City']           = data.city;
+        if (data.service    !== undefined) patch['Job_Service']    = data.service;
+        if (data.bookingStatus !== undefined) patch['Booking Status'] = data.bookingStatus;
+        if (data.amount     !== undefined) patch['Amount']         = data.amount;
+        if (Object.keys(patch).length) updateRecord(AT_TABLES.calendar, booking.airtableId, patch);
+      }
+      return prev.map(b => b.id === id ? { ...b, ...data } : b);
+    });
+  }, []);
+
+  // Record payment for a calendar booking:
+  // - Updates the booking status + amount
+  // - Creates a Revenue record
+  // - Updates the linked lead's paid status (match by phone)
+  const recordBookingPayment = useCallback((bookingId, paidAmount, paymentMethod) => {
+    setCalBookings(prev => {
+      const booking = prev.find(b => b.id === bookingId);
+      if (!booking) return prev;
+
+      // Update booking in Airtable
+      if (booking.airtableId) {
+        updateRecord(AT_TABLES.calendar, booking.airtableId, {
+          'Booking Status': 'Completed',
+          'Amount': paidAmount,
+        });
+      }
+
+      // Write Revenue record
+      createRecord(AT_TABLES.revenue, {
+        'Revenue Name':   `${booking.clientName} - ${booking.service || 'Window Cleaning'}`,
+        'Date':           new Date().toISOString().split('T')[0],
+        'Client Name':    booking.clientName,
+        'Phone':          booking.phone || '',
+        'Job_Service':    booking.service || 'Window Cleaning',
+        'City':           booking.city || '',
+        'Payment_Method': paymentMethod || 'Cash',
+        'Amount':         paidAmount,
+      });
+
+      // Update linked lead by phone match (fire-and-forget on leads state)
+      if (booking.phone) {
+        setLeads(leads => leads.map(l => {
+          if (l.phone === booking.phone && !l.paid) {
+            if (l.airtableId) patchAirtable(l.airtableId, {
+              'Paid': true, 'Amount Paid': paidAmount, 'Payment Method': paymentMethod,
+            });
+            return { ...l, paid: true, paidAmount, paymentMethod };
+          }
+          return l;
+        }));
+      }
+
+      return prev.map(b => b.id === bookingId
+        ? { ...b, bookingStatus: 'Completed', amount: paidAmount, paymentMethod }
+        : b
+      );
+    });
+  }, []);
+
   return {
-    leads, deletedLeads, isLoading, fetchLeads,
+    leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
     savePaidInfo, saveCity, saveJobDate, saveEmail,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
+    addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
   };
 }

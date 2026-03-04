@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
-import { createRecord, updateRecord, deleteRecord, AT_TABLES } from '../../utils/airtableSync';
 
 const DAYS     = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -11,9 +10,9 @@ function mkDate(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-// ── Calendar payment modal (for booking items) ──────────────────────────────
-function CalPaymentModal({ booking, initMethod, onClose }) {
-  const [method, setMethod] = useState(initMethod || 'Cash');
+// ── Payment modal for calendar bookings ──────────────────────────────────────
+function CalPaymentModal({ booking, onClose, onConfirm }) {
+  const [method, setMethod] = useState('Cash');
   const [amount, setAmount] = useState('');
   const [err,    setErr]    = useState('');
 
@@ -21,22 +20,7 @@ function CalPaymentModal({ booking, initMethod, onClose }) {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { setErr('Please enter a valid amount'); return; }
     setErr('');
-    const payments = JSON.parse(localStorage.getItem('pvl_payments') || '[]');
-    payments.unshift({
-      id: `pay-${Date.now()}`,
-      name: booking.clientName,
-      phone: booking.phone || '',
-      email: booking.email || '',
-      jobType: booking.service || '',
-      city: booking.city || '',
-      amount: amt,
-      method,
-      bankName: '',
-      accountRef: '',
-      date: new Date().toISOString(),
-      sourceBookingId: booking.id,
-    });
-    localStorage.setItem('pvl_payments', JSON.stringify(payments));
+    onConfirm(amt, method);
     onClose();
   }
 
@@ -53,52 +37,32 @@ function CalPaymentModal({ booking, initMethod, onClose }) {
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
         </div>
-
         <div style={{ padding: '16px 20px' }}>
-          {/* Method */}
           <label style={fLbl}>Payment Method</label>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
             {['Cash', 'Bank'].map(m => (
-              <button
-                key={m}
-                onClick={() => setMethod(m)}
-                style={{
-                  flex: 1, padding: '9px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  border: `1.5px solid ${method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
-                  background: method === m ? (m === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
-                  color: method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
-                }}
-              >
+              <button key={m} onClick={() => setMethod(m)} style={{
+                flex: 1, padding: '9px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+                border: `1.5px solid ${method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
+                background: method === m ? (m === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
+                color: method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
+              }}>
                 {m.toUpperCase()}
               </button>
             ))}
           </div>
-
-          {/* Amount */}
           <label style={fLbl}>Amount</label>
           <div style={{ position: 'relative', marginBottom: '14px' }}>
             <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontWeight: 700, fontSize: '14px' }}>$</span>
             <input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0.00"
-              autoFocus
+              type="number" value={amount} onChange={e => setAmount(e.target.value)}
+              placeholder="0.00" autoFocus
               style={{ width: '100%', padding: '9px 12px 9px 26px', fontSize: '16px', fontWeight: 700, border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
-
-          {err && (
-            <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
-              {err}
-            </div>
-          )}
-
-          <button
-            onClick={handleSubmit}
-            style={{ width: '100%', padding: '10px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
+          {err && <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
+          <button onClick={handleSubmit} style={{ width: '100%', padding: '10px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             Confirm Payment
           </button>
         </div>
@@ -107,69 +71,39 @@ function CalPaymentModal({ booking, initMethod, onClose }) {
   );
 }
 
-// ── Shared appointment form fields ──────────────────────────────────────────
+// ── Shared appointment form fields ───────────────────────────────────────────
 function AppointmentFormFields({ form, setField }) {
   return (
     <>
-      <label style={fLbl}>Payment Method</label>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-        {['Cash', 'Bank'].map(m => (
-          <button
-            key={m}
-            onClick={() => setField('paymentMethod', m)}
-            style={{
-              flex: 1, padding: '9px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
-              cursor: 'pointer', fontFamily: 'inherit',
-              border: `1.5px solid ${form.paymentMethod === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
-              background: form.paymentMethod === m ? (m === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
-              color: form.paymentMethod === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
-            }}
-          >
-            {m.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
       <label style={fLbl}>Service</label>
       <select value={form.service} onChange={e => setField('service', e.target.value)} style={{ ...fInput, appearance: 'none' }}>
         {SERVICES.map(s => <option key={s}>{s}</option>)}
       </select>
-
       <label style={fLbl}>Client Name <span style={{ color: '#dc2626' }}>*</span></label>
       <input value={form.clientName} onChange={e => setField('clientName', e.target.value)} placeholder="Full name…" style={fInput} />
-
       <label style={fLbl}>Phone</label>
       <input value={form.phone} onChange={e => setField('phone', e.target.value)} placeholder="e.g. 0400 000 000" style={fInput} />
-
-      <label style={fLbl}>Email</label>
-      <input value={form.email} onChange={e => setField('email', e.target.value)} placeholder="email@example.com" type="email" style={fInput} />
-
       <label style={fLbl}>City / Location</label>
       <input value={form.city} onChange={e => setField('city', e.target.value)} placeholder="e.g. Brisbane" style={{ ...fInput, marginBottom: 0 }} />
     </>
   );
 }
 
-// ── Edit booking modal ───────────────────────────────────────────────────────
+// ── Edit booking modal ────────────────────────────────────────────────────────
 function EditBookingModal({ booking, onSave, onClose }) {
   const [form, setForm] = useState({
-    clientName:    booking.clientName    || '',
-    phone:         booking.phone         || '',
-    email:         booking.email         || '',
-    city:          booking.city          || '',
-    service:       booking.service       || 'Window Cleaning',
-    paymentMethod: booking.paymentMethod || 'Cash',
+    clientName: booking.clientName || '',
+    phone:      booking.phone      || '',
+    city:       booking.city       || '',
+    service:    booking.service    || 'Window Cleaning',
   });
   const [err, setErr] = useState('');
-
   function setField(k, v) { setForm(f => ({ ...f, [k]: v })); }
-
   function handleSave() {
     if (!form.clientName.trim()) { setErr('Client name is required'); return; }
     setErr('');
     onSave(form);
   }
-
   return (
     <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
@@ -182,15 +116,8 @@ function EditBookingModal({ booking, onSave, onClose }) {
         </div>
         <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
           <AppointmentFormFields form={form} setField={setField} />
-          {err && (
-            <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
-              {err}
-            </div>
-          )}
-          <button
-            onClick={handleSave}
-            style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}
-          >
+          {err && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
+          <button onClick={handleSave} style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}>
             Save Changes
           </button>
         </div>
@@ -199,13 +126,13 @@ function EditBookingModal({ booking, onSave, onClose }) {
   );
 }
 
-// ── Booking modal ────────────────────────────────────────────────────────────
-function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCalBooking, removeCalBooking, onClose }) {
+// ── Booking modal (click a day on the calendar) ───────────────────────────────
+function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCalBooking, removeCalBooking, onClose, onPayCal }) {
   const [tab,     setTab]     = useState('book');
   const [search,  setSearch]  = useState('');
-  const [form,    setForm]    = useState({ clientName: '', phone: '', email: '', city: '', service: 'Window Cleaning', paymentMethod: 'Cash' });
+  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', service: 'Window Cleaning' });
   const [formErr, setFormErr] = useState('');
-  const [payFor,  setPayFor]  = useState(null); // { booking, method }
+  const [payFor,  setPayFor]  = useState(null);
 
   const targetDate  = mkDate(year, month, day);
   const displayDate = `${MONTHS[month]} ${day}, ${year}`;
@@ -215,7 +142,7 @@ function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCa
   const totalBooked = bookedLeads.length + bookedCal.length;
 
   const unbookedAll = leads.filter(l => l.jobDate !== targetDate);
-  const filtered    = unbookedAll.filter(l =>
+  const filtered = unbookedAll.filter(l =>
     !search ||
     l.name.toLowerCase().includes(search.toLowerCase()) ||
     (l.phone || '').includes(search)
@@ -229,7 +156,7 @@ function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCa
     if (!form.clientName.trim()) { setFormErr('Client name is required'); return; }
     setFormErr('');
     addCalBooking({ ...form, date: targetDate });
-    setForm({ clientName: '', phone: '', email: '', city: '', service: 'Window Cleaning', paymentMethod: 'Cash' });
+    setForm({ clientName: '', phone: '', city: '', service: 'Window Cleaning' });
   }
 
   const tabStyle = (active) => ({
@@ -243,8 +170,6 @@ function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCa
     <>
       <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
-
-          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 0', flexShrink: 0 }}>
             <div>
               <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Book Appointment</div>
@@ -252,88 +177,64 @@ function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCa
             </div>
             <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
           </div>
-
-          {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '1px solid var(--gray-100)', marginTop: '10px', flexShrink: 0 }}>
             <button style={tabStyle(tab === 'book')} onClick={() => setTab('book')}>Book Lead</button>
-            <button style={tabStyle(tab === 'new')} onClick={() => setTab('new')}>+ New Appointment</button>
+            <button style={tabStyle(tab === 'new')}  onClick={() => setTab('new')}>+ New Appointment</button>
           </div>
-
           <div style={{ overflowY: 'auto', flex: 1 }}>
-
-            {/* ── Book Lead tab ── */}
             {tab === 'book' && (
               <>
                 {totalBooked > 0 && (
                   <div style={{ padding: '14px 20px 0' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#15803d', marginBottom: '8px' }}>
-                      Booked on this day
-                    </div>
-
-                    {/* Existing lead bookings */}
+                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#15803d', marginBottom: '8px' }}>Booked on this day</div>
                     {bookedLeads.map(l => (
                       <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', marginBottom: '6px' }}>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
                           <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', marginTop: '1px' }}>{l.phone || '—'}{l.jobType ? ` · ${l.jobType}` : ''}</div>
                         </div>
-                        <button onClick={() => unbook(l.id)} style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, marginLeft: '10px' }}>
-                          Remove
-                        </button>
+                        <button onClick={() => unbook(l.id)} style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, marginLeft: '10px' }}>Remove</button>
                       </div>
                     ))}
-
-                    {/* Calendar (manual) bookings with CASH / BANK payment buttons */}
                     {bookedCal.map(b => (
                       <div key={b.id} style={{ padding: '10px 12px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '10px', marginBottom: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                           <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-900)' }}>{b.clientName}</span>
-                              <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '10px', flexShrink: 0, background: b.paymentMethod === 'Cash' ? '#f0fdf4' : '#eff6ff', color: b.paymentMethod === 'Cash' ? '#15803d' : '#2563eb' }}>
-                                {b.paymentMethod.toUpperCase()}
-                              </span>
-                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-900)' }}>{b.clientName}</div>
                             <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', marginTop: '2px' }}>
                               {b.phone || '—'}{b.service ? ` · ${b.service}` : ''}{b.city ? ` · ${b.city}` : ''}
                             </div>
+                            {b.bookingStatus === 'Completed' && (
+                              <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#15803d', marginTop: '3px' }}>
+                                ✓ Paid ${(b.amount || 0).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                              </div>
+                            )}
                           </div>
-                          {/* Remove ✕ */}
                           <button
                             onClick={() => removeCalBooking(b.id)}
-                            title="Remove booking"
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: '14px', padding: '2px 4px', lineHeight: 1, flexShrink: 0, marginLeft: '6px' }}
-                          >
-                            ✕
-                          </button>
+                          >✕</button>
                         </div>
-                        {/* Payment action buttons */}
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                          <button
-                            onClick={() => setPayFor({ booking: b, method: 'Cash' })}
-                            style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: '1.5px solid #16a34a', background: '#f0fdf4', color: '#15803d' }}
-                          >
-                            $ CASH
-                          </button>
-                          <button
-                            onClick={() => setPayFor({ booking: b, method: 'Bank' })}
-                            style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: '1.5px solid #2563eb', background: '#eff6ff', color: '#2563eb' }}
-                          >
-                            🏦 BANK
-                          </button>
-                        </div>
+                        {b.bookingStatus !== 'Completed' && (
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                            <button
+                              onClick={() => setPayFor({ booking: b, method: 'Cash' })}
+                              style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: '1.5px solid #16a34a', background: '#f0fdf4', color: '#15803d' }}
+                            >$ CASH</button>
+                            <button
+                              onClick={() => setPayFor({ booking: b, method: 'Bank' })}
+                              style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: '1.5px solid #2563eb', background: '#eff6ff', color: '#2563eb' }}
+                            >🏦 BANK</button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
-
                 <div style={{ padding: '14px 20px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--gray-500)', marginBottom: '8px' }}>
-                    Book a lead
-                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--gray-500)', marginBottom: '8px' }}>Book a lead</div>
                   <input
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="Search by name or phone…"
                     style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', marginBottom: '10px', boxSizing: 'border-box' }}
                   />
@@ -358,16 +259,10 @@ function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCa
                 </div>
               </>
             )}
-
-            {/* ── New Appointment tab ── */}
             {tab === 'new' && (
               <div style={{ padding: '16px 20px' }}>
                 <AppointmentFormFields form={form} setField={setField} />
-                {formErr && (
-                  <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
-                    {formErr}
-                  </div>
-                )}
+                {formErr && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{formErr}</div>}
                 <button
                   onClick={handleSubmitNew}
                   style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}
@@ -379,24 +274,29 @@ function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCa
           </div>
         </div>
       </div>
-
-      {/* Payment modal appears on top of booking modal */}
       {payFor && (
         <CalPaymentModal
           booking={payFor.booking}
-          initMethod={payFor.method}
           onClose={() => setPayFor(null)}
+          onConfirm={(amt, method) => {
+            onPayCal(payFor.booking.id, amt, method);
+            setPayFor(null);
+          }}
         />
       )}
     </>
   );
 }
 
-// ── Main CalendarPage ────────────────────────────────────────────────────────
+// ── Main CalendarPage ─────────────────────────────────────────────────────────
 export default function CalendarPage() {
-  const { leads, saveJobDate, openPanel, setCurrentPage } = useLeadsContext();
-  const today = new Date();
+  const {
+    leads, calBookings,
+    saveJobDate, openPanel, setCurrentPage,
+    addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
+  } = useLeadsContext();
 
+  const today = new Date();
   const [year,        setYear]        = useState(today.getFullYear());
   const [month,       setMonth]       = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState(null);
@@ -404,65 +304,6 @@ export default function CalendarPage() {
   const [editBooking, setEditBooking] = useState(null);
   const [tableSearch, setTableSearch] = useState('');
   const [tablePage,   setTablePage]   = useState(0);
-
-  const [calBookings, setCalBookings] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pvl_cal_bookings') || '[]'); }
-    catch { return []; }
-  });
-
-  useEffect(() => { setTablePage(0); }, [tableSearch, month, year, selectedDay]);
-
-  function addCalBooking(data) {
-    const record  = { id: `cal-${Date.now()}`, ...data, airtableId: null };
-    const updated = [record, ...calBookings];
-    setCalBookings(updated);
-    localStorage.setItem('pvl_cal_bookings', JSON.stringify(updated));
-    // Sync to Airtable
-    createRecord(AT_TABLES.calendar, {
-      'Client Name':     record.clientName || '',
-      'Phone':           record.phone || '',
-      'Email':           record.email || '',
-      'City':            record.city || '',
-      'Service':         record.service || '',
-      'Payment Method':  record.paymentMethod || '',
-      'Date':            record.date || '',
-      'Local ID':        record.id,
-    }).then(airtableId => {
-      if (airtableId) {
-        setCalBookings(prev => {
-          const next = prev.map(b => b.id === record.id ? { ...b, airtableId } : b);
-          localStorage.setItem('pvl_cal_bookings', JSON.stringify(next));
-          return next;
-        });
-      }
-    });
-  }
-
-  function removeCalBooking(id) {
-    const booking = calBookings.find(b => b.id === id);
-    if (booking?.airtableId) deleteRecord(AT_TABLES.calendar, booking.airtableId);
-    const updated = calBookings.filter(b => b.id !== id);
-    setCalBookings(updated);
-    localStorage.setItem('pvl_cal_bookings', JSON.stringify(updated));
-  }
-
-  function updateCalBooking(id, data) {
-    const updated = calBookings.map(b => b.id === id ? { ...b, ...data } : b);
-    setCalBookings(updated);
-    localStorage.setItem('pvl_cal_bookings', JSON.stringify(updated));
-    // Sync to Airtable
-    const booking = calBookings.find(b => b.id === id);
-    if (booking?.airtableId) {
-      updateRecord(AT_TABLES.calendar, booking.airtableId, {
-        'Client Name':    data.clientName || booking.clientName || '',
-        'Phone':          data.phone      ?? booking.phone ?? '',
-        'Email':          data.email      ?? booking.email ?? '',
-        'City':           data.city       ?? booking.city  ?? '',
-        'Service':        data.service    ?? booking.service ?? '',
-        'Payment Method': data.paymentMethod ?? booking.paymentMethod ?? '',
-      });
-    }
-  }
 
   const monthLeadBookings = leads
     .filter(l => l.jobDate)
@@ -523,7 +364,6 @@ export default function CalendarPage() {
         <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Advance bookings and scheduled jobs</div>
       </div>
 
-      {/* ── Calendar card ── */}
       <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid var(--gray-200)', overflow: 'hidden', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
           <button onClick={prevMonth} className="cal-nav-btn">
@@ -534,11 +374,9 @@ export default function CalendarPage() {
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px' }}><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
-
         <div className="cal-grid-hdr">
           {DAYS.map(d => <div key={d} className="cal-day-hdr">{d}</div>)}
         </div>
-
         <div className="cal-grid-cells">
           {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`blank-${i}`} />)}
           {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -557,7 +395,6 @@ export default function CalendarPage() {
               circleBorder = '2.5px solid var(--primary)';
               if (!hasBooked) { circleColor = 'var(--primary)'; fontWeight = 700; }
             }
-
             return (
               <div key={day} onClick={() => { if (hasBooked) setSelectedDay(isSelected ? null : day); setModalDay(day); }} className="cal-day-cell">
                 <div className="cal-circle" style={{ background: circleBg, border: circleBorder }} title={`${MONTHS[month]} ${day}`}>
@@ -568,7 +405,6 @@ export default function CalendarPage() {
             );
           })}
         </div>
-
         <div className="cal-legend-wrap">
           <div className="cal-legend-item">
             <span className="cal-legend-circle" style={{ border: '1.5px solid var(--gray-300)', color: 'var(--gray-600)', background: '#fff' }}>{availableDayCount}</span>
@@ -585,7 +421,6 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ── Bookings table ── */}
       <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid var(--gray-200)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -595,9 +430,7 @@ export default function CalendarPage() {
                 {searchedRows.length} job{searchedRows.length !== 1 ? 's' : ''}
               </span>
               {selectedHasBookings && (
-                <button onClick={() => setSelectedDay(null)} style={{ fontSize: '11px', color: 'var(--gray-400)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>
-                  Show all ✕
-                </button>
+                <button onClick={() => setSelectedDay(null)} style={{ fontSize: '11px', color: 'var(--gray-400)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>Show all ✕</button>
               )}
             </div>
           </div>
@@ -606,14 +439,12 @@ export default function CalendarPage() {
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
             <input
-              value={tableSearch}
-              onChange={e => setTableSearch(e.target.value)}
+              value={tableSearch} onChange={e => { setTableSearch(e.target.value); setTablePage(0); }}
               placeholder="Search by name or phone…"
               style={{ width: '100%', padding: '8px 12px 8px 30px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
             />
           </div>
         </div>
-
         {pagedRows.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--gray-400)' }}>
             {tableSearch ? (
@@ -642,7 +473,8 @@ export default function CalendarPage() {
                     <th style={th}>Phone</th>
                     <th style={th}>Service</th>
                     <th style={th}>City</th>
-                    <th style={{ ...th, textAlign: 'right' }}>Value</th>
+                    <th style={th}>Status</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -665,52 +497,45 @@ export default function CalendarPage() {
                       <td style={{ ...td, fontWeight: 600, color: 'var(--gray-900)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {b.name}
-                          {b.isCalBooking && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>EDIT</span>}
+                          {b.isCalBooking && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>MANUAL</span>}
                         </div>
                       </td>
                       <td style={{ ...td, color: 'var(--gray-600)' }}>{b.phone || '—'}</td>
                       <td style={td}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                          {(b.jobType || b.service)
-                            ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{b.jobType || b.service}</span>
-                            : <span style={{ color: 'var(--gray-400)' }}>—</span>
-                          }
-                          {b.isCalBooking && b.paymentMethod && (
-                            <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '10px', whiteSpace: 'nowrap', background: b.paymentMethod === 'Cash' ? '#f0fdf4' : '#eff6ff', color: b.paymentMethod === 'Cash' ? '#15803d' : '#2563eb' }}>
-                              {b.paymentMethod.toUpperCase()}
-                            </span>
-                          )}
-                        </div>
+                        {(b.jobType || b.service)
+                          ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{b.jobType || b.service}</span>
+                          : <span style={{ color: 'var(--gray-400)' }}>—</span>
+                        }
                       </td>
                       <td style={{ ...td, color: 'var(--gray-500)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {b.city || b.address || '—'}
                       </td>
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
-                        {b.value > 0 ? `$${b.value.toLocaleString()}` : '—'}
+                      <td style={td}>
+                        {b.isCalBooking ? (
+                          <span style={{
+                            fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                            background: b.bookingStatus === 'Completed' ? '#f0fdf4' : b.bookingStatus === 'Cancelled' ? '#fef2f2' : '#fefce8',
+                            color: b.bookingStatus === 'Completed' ? '#15803d' : b.bookingStatus === 'Cancelled' ? '#dc2626' : '#92400e',
+                          }}>
+                            {b.bookingStatus || 'Scheduled'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)' }}>Lead</span>
+                        )}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: b.bookingStatus === 'Completed' ? '#15803d' : 'var(--primary)' }}>
+                        {(b.amount > 0 || b.value > 0) ? `$${(b.amount || b.value || 0).toLocaleString()}` : '—'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
             {totalPages > 1 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: '1px solid var(--gray-100)' }}>
-                <button
-                  onClick={() => setTablePage(p => Math.max(0, p - 1))}
-                  disabled={safePage === 0}
-                  style={{ fontSize: '12px', fontWeight: 600, color: safePage === 0 ? 'var(--gray-300)' : 'var(--primary)', background: 'none', border: `1px solid ${safePage === 0 ? 'var(--gray-200)' : 'var(--primary)'}`, borderRadius: '6px', padding: '5px 12px', cursor: safePage === 0 ? 'default' : 'pointer', fontFamily: 'inherit' }}
-                >
-                  ← Prev
-                </button>
+                <button onClick={() => setTablePage(p => Math.max(0, p - 1))} disabled={safePage === 0} style={{ fontSize: '12px', fontWeight: 600, color: safePage === 0 ? 'var(--gray-300)' : 'var(--primary)', background: 'none', border: `1px solid ${safePage === 0 ? 'var(--gray-200)' : 'var(--primary)'}`, borderRadius: '6px', padding: '5px 12px', cursor: safePage === 0 ? 'default' : 'pointer', fontFamily: 'inherit' }}>← Prev</button>
                 <span style={{ fontSize: '12px', color: 'var(--gray-500)', fontWeight: 600 }}>Page {safePage + 1} of {totalPages}</span>
-                <button
-                  onClick={() => setTablePage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={safePage === totalPages - 1}
-                  style={{ fontSize: '12px', fontWeight: 600, color: safePage === totalPages - 1 ? 'var(--gray-300)' : 'var(--primary)', background: 'none', border: `1px solid ${safePage === totalPages - 1 ? 'var(--gray-200)' : 'var(--primary)'}`, borderRadius: '6px', padding: '5px 12px', cursor: safePage === totalPages - 1 ? 'default' : 'pointer', fontFamily: 'inherit' }}
-                >
-                  Next →
-                </button>
+                <button onClick={() => setTablePage(p => Math.min(totalPages - 1, p + 1))} disabled={safePage === totalPages - 1} style={{ fontSize: '12px', fontWeight: 600, color: safePage === totalPages - 1 ? 'var(--gray-300)' : 'var(--primary)', background: 'none', border: `1px solid ${safePage === totalPages - 1 ? 'var(--gray-200)' : 'var(--primary)'}`, borderRadius: '6px', padding: '5px 12px', cursor: safePage === totalPages - 1 ? 'default' : 'pointer', fontFamily: 'inherit' }}>Next →</button>
               </div>
             )}
           </>
@@ -724,10 +549,10 @@ export default function CalendarPage() {
           calBookings={calBookings}
           addCalBooking={addCalBooking}
           removeCalBooking={removeCalBooking}
+          onPayCal={recordBookingPayment}
           onClose={() => setModalDay(null)}
         />
       )}
-
       {editBooking && (
         <EditBookingModal
           booking={editBooking}
