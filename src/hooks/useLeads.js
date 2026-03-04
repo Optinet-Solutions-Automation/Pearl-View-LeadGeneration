@@ -261,14 +261,16 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const setRefuseReason = useCallback((id, reason) => {
-    setLeads(prev => prev.map(l => {
-      if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Refuse Reason': reason });
-      return { ...l, refuseReason: reason };
-    }));
-  }, [patchAirtable]);
+    // Refuse Reason field doesn't exist in Leads table — in-memory only
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
+  }, []);
 
-  // ─── Save payment info: updates Leads table + linked calendar booking ─────────
+  // ─── Save payment info ─────────────────────────────────────────────────────────
+  // Revenue logic:
+  //   S1 job_done + paid now  → Revenue Status='Job Done'  (counts as income)
+  //   S3 paid + not job_done  → Revenue Status='In Progress' (persists payment, not income yet)
+  //      When job later marked done → changeStatus updates Revenue Status to 'Job Done'
+  // Returns { success, wasJobDone } so context can auto-advance status for S3.
   const savePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
     let leadSnapshot = null;
     setLeads(prev => prev.map(l => {
@@ -276,20 +278,12 @@ export function useLeads() {
       leadSnapshot = l;
       return { ...l, paid, paidAmount, paymentMethod };
     }));
-    // Persist payment fields to Leads table in Airtable
-    if (leadSnapshot?.airtableId) {
-      patchAirtable(leadSnapshot.airtableId, {
-        'Paid':           paid,
-        'Amount Paid':    paidAmount,
-        'Payment Method': paymentMethod,
-      });
-    }
     const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
-    // Always write Revenue when payment is first confirmed — Status determines if it counts as income
-    // 'Job Done' → shows in Reports income; anything else → In Progress (payment recorded but not yet revenue)
+    const wasJobDone = leadSnapshot?.status === 'job_done';
+    // Write Revenue with appropriate status — 'Job Done' only when job is already done
     if (paid && paidAmount > 0 && !leadSnapshot?.paid) {
-      const revStatus = leadSnapshot?.status === 'job_done' ? 'Job Done' : 'In Progress';
-      writeRevenue(updatedLead, paidAmount, paymentMethod, revStatus);
+      const revStatus = wasJobDone ? 'Job Done' : 'In Progress';
+      await writeRevenue(updatedLead, paidAmount, paymentMethod, revStatus);
     }
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
@@ -305,16 +299,13 @@ export function useLeads() {
         return prev;
       });
     }
-    return true;
-  }, [patchAirtable]);
+    return { success: true, wasJobDone };
+  }, []);
 
   const saveCity = useCallback((id, city) => {
-    setLeads(prev => prev.map(l => {
-      if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'City': city });
-      return { ...l, city };
-    }));
-  }, [patchAirtable]);
+    // City field doesn't exist in Leads table — in-memory only
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, city } : l));
+  }, []);
 
   const saveJobType = useCallback((id, jobType) => {
     setLeads(prev => prev.map(l => {
@@ -396,7 +387,6 @@ export function useLeads() {
       'Email':                   leadData.email   || '',
       'Inquiry Subject/Reason':  leadData.subject || '',
       'Lead Status':             'New Lead',
-      'Lead Channel':            leadData.leadChannel || '',
       'Quote Amount':            leadData.value   || 0,
       'Inquiry Date':            now.toISOString(),
     };
