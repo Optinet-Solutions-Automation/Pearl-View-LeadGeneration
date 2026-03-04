@@ -20,7 +20,7 @@ function patch(url, token, body) {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
+        try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
         catch (e) { reject(e); }
       });
     });
@@ -55,8 +55,9 @@ export default async (req, res) => {
     if (!airtableId || !fields) return res.status(400).json({ error: 'Missing airtableId or fields' });
 
     const url = `https://api.airtable.com/v0/${BASE}/${TABLE}/${airtableId}`;
-    const result = await patch(url, TOKEN, { fields });
-    res.json(result);
+    const { status, data } = await patch(url, TOKEN, { fields });
+    if (status !== 200) return res.status(status).json(data);
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
