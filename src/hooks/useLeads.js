@@ -221,11 +221,6 @@ export function useLeads() {
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
-    // Write revenue record when job is marked as done
-    if (status === 'job_done') {
-      const amount = updatedLead.invoice || updatedLead.value || 0;
-      writeRevenue(updatedLead, amount, updatedLead.paymentMethod || 'Cash');
-    }
     // Re-confirm status in case a background fetch ran mid-PATCH and overwrote it
     setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, status, progress: PROG_MAP[status] || 10 }));
     return 'ok';
@@ -276,6 +271,10 @@ export function useLeads() {
       });
     }
     const updatedLead = leadSnapshot ? { ...leadSnapshot, paid, paidAmount, paymentMethod } : null;
+    // Write Revenue record only when job is done AND payment is being confirmed
+    if (paid && paidAmount > 0 && !leadSnapshot?.paid && leadSnapshot?.status === 'job_done') {
+      writeRevenue(updatedLead, paidAmount, paymentMethod);
+    }
     // Update linked calendar booking if one exists (match by phone)
     if (paid && paidAmount > 0 && updatedLead?.phone) {
       setCalBookings(prev => {
