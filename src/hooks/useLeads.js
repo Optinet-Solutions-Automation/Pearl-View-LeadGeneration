@@ -43,7 +43,7 @@ function normaliseRecord(rec) {
     details: f['Property Details'] || '',
     status, progress: PROG_MAP[status] || 10,
     starred: false, notes: f['Notes'] || '', hasCall: isCall, tag: '',
-    refuseReason: f['Refuse Reason'] || '',
+    refuseReason: f['Refusal Reason'] || '',
     paidAmount: parseFloat(f['Amount Paid'] || 0),
     paid: !!(f['Paid'] || parseFloat(f['Amount Paid'] || 0) > 0),
     paymentMethod: f['Payment Method'] || '',
@@ -286,9 +286,12 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const setRefuseReason = useCallback((id, reason) => {
-    // Refuse Reason field doesn't exist in Leads table — in-memory only
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
-  }, []);
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Refusal Reason': REFUSED_REASON_MAP[reason] || reason });
+      return { ...l, refuseReason: reason };
+    }));
+  }, [patchAirtable]);
 
   // ─── Save payment info ─────────────────────────────────────────────────────────
   // Revenue logic:
