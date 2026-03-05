@@ -101,18 +101,18 @@ export function updateRecord(tableId, recordId, fields) {
   }
 }
 
-// ─── Delete a record (fire-and-forget) ───────────────────────────────────────
+// ─── Delete a record (returns Promise so callers can await if needed) ────────
 export function deleteRecord(tableId, recordId) {
-  if (!tableId || !recordId) return;
+  if (!tableId || !recordId) return Promise.resolve();
   if (IS_LOCAL) {
-    fetch(`https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}/${recordId}`, {
+    return fetch(`https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}/${recordId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${AT_TOKEN}` },
     })
       .then(r => { if (!r.ok) r.json().then(e => console.error('deleteRecord failed:', e)); })
       .catch(err => console.error('deleteRecord error:', err));
   } else {
-    fetch('/api/delete-record', {
+    return fetch('/api/delete-record', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableId, recordId }),

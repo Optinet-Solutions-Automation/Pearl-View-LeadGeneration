@@ -504,24 +504,27 @@ export function useLeads() {
     });
   }, []);
 
-  // ─── Remove lead from Refused table when status changes away from refused ─────
-  const deleteFromRefusedTable = useCallback((id) => {
+  // ─── Remove lead from Refused table — async so callers can await the delete ──
+  const deleteFromRefusedTable = useCallback(async (id) => {
+    let refusedRecordId = null;
+    let phone = null;
+    // Read lead info synchronously via functional setter
     setLeads(prev => {
       const lead = prev.find(l => l.id === id);
-      if (lead?.refusedRecordId) {
-        deleteRecord(AT_TABLES.refused, lead.refusedRecordId);
-      } else if (lead?.phone) {
-        // Fallback: look up by phone if refusedRecordId not cached yet
-        const phone = (lead.phone || '').replace(/\s/g, '').toLowerCase();
-        fetchRecords(AT_TABLES.refused).then(recs => {
-          const match = recs.find(r =>
-            (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase() === phone
-          );
-          if (match) deleteRecord(AT_TABLES.refused, match.id);
-        });
-      }
+      refusedRecordId = lead?.refusedRecordId || null;
+      phone = lead?.phone || null;
       return prev.map(l => l.id === id ? { ...l, refusedRecordId: null } : l);
     });
+    if (refusedRecordId) {
+      await deleteRecord(AT_TABLES.refused, refusedRecordId);
+    } else if (phone) {
+      const pn = phone.replace(/\s/g, '').toLowerCase();
+      const recs = await fetchRecords(AT_TABLES.refused);
+      const match = recs.find(r =>
+        (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase() === pn
+      );
+      if (match) await deleteRecord(AT_TABLES.refused, match.id);
+    }
   }, []);
 
   // ─── Calendar booking operations ─────────────────────────────────────────────

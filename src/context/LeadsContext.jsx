@@ -92,9 +92,10 @@ export function LeadsProvider({ children }) {
       return;
     }
 
-    // If lead was refused and is now moving to another status, remove from Refused table
+    // If lead was refused and is now moving to another status, AWAIT the delete
+    // so the Refused record is gone before the refetch runs (prevents status revert)
     if (lead?.status === 'refused') {
-      deleteFromRefusedTable(id);
+      await deleteFromRefusedTable(id);
     }
 
     const result = await changeStatus(id, status);
@@ -133,19 +134,21 @@ export function LeadsProvider({ children }) {
     if (!quoteTransferModalId) return;
     const id = quoteTransferModalId;
     const targetStatus = quoteTransferTargetStatus;
+    setQuoteTransferModalId(null);
+    setQuoteTransferTargetStatus(null);
+    setQuoteTransferLeadValue(0);
     if (shouldDeleteQuote) {
       clearQuoteAmount(id);
     }
+    // Always clean up any lingering Refused record (lead may have previously been refused)
+    await deleteFromRefusedTable(id);
     const result = await changeStatus(id, targetStatus);
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') {
       showToast('Status updated ✓');
       setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
     }
-    setQuoteTransferModalId(null);
-    setQuoteTransferTargetStatus(null);
-    setQuoteTransferLeadValue(0);
-  }, [quoteTransferModalId, quoteTransferTargetStatus, changeStatus, clearQuoteAmount, showToast, fetchLeads]);
+  }, [quoteTransferModalId, quoteTransferTargetStatus, changeStatus, clearQuoteAmount, deleteFromRefusedTable, showToast, fetchLeads]);
 
   const closeQuoteTransferModal = useCallback(() => {
     setQuoteTransferModalId(null);

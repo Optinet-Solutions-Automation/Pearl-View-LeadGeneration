@@ -43,7 +43,12 @@ export default function LeadCard({ lead }) {
     ? lead.subject.substring(0, 90) + '…'
     : lead.subject || '—';
 
-  const valText = lead.value > 0 ? `Est. $${lead.value.toLocaleString()}` : 'Est. $—';
+  let valText = '';
+  if (lead.status === 'job_done' && lead.paid && lead.paidAmount > 0) {
+    valText = `Paid $${lead.paidAmount.toLocaleString()}`;
+  } else if ((lead.status === 'quote_sent' || lead.status === 'job_done') && lead.value > 0) {
+    valText = `Est. $${lead.value.toLocaleString()}`;
+  }
   const showView = lead.status === 'new' || lead.status === 'in_progress';
   const isActive = activeId === lead.id;
 
