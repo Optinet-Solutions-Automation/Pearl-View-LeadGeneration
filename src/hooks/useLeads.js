@@ -121,6 +121,8 @@ export function useLeads() {
   const [isLoading,    setIsLoading]    = useState(true);
   // Track in-flight Airtable writes so silent polls don't overwrite optimistic UI
   const pendingWrites = useRef(0);
+  // IDs permanently deleted locally — filtered from fetchLeads until Airtable confirms deletion
+  const permanentlyDeletedIds = useRef(new Set());
   // Epoch increments on every write — lets fetchLeads detect if a write started mid-fetch
   const writeEpoch = useRef(0);
 
@@ -210,7 +212,9 @@ export function useLeads() {
         return { ...lead, ...payment };
       });
       const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
-      const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
+      const archived = all
+        .filter(r => r.status === 'archived' && !permanentlyDeletedIds.current.has(r.airtableId))
+        .sort((a, b) => b.dateObj - a.dateObj)
         .map(r => ({ ...r, deletedAt: r.dateObj }));
       // Skip if a write started while we were fetching — our data is now stale
       if (silent && epochAtStart !== writeEpoch.current) {
@@ -441,7 +445,11 @@ export function useLeads() {
   const permanentDelete = useCallback((id) => {
     setDeletedLeads(prev => {
       const lead = prev.find(l => l.id === id);
-      if (lead?.airtableId) deleteRecord(AT_TABLE, lead.airtableId);
+      if (lead?.airtableId) {
+        // Register ID immediately so fetchLeads polls don't bring it back before delete completes
+        permanentlyDeletedIds.current.add(lead.airtableId);
+        deleteRecord(AT_TABLE, lead.airtableId);
+      }
       return prev.filter(l => l.id !== id);
     });
   }, []);
@@ -531,9 +539,12 @@ export function useLeads() {
 
   // ─── Create a new client record in the Clients table ─────────────────────────
   const upsertClient = useCallback(async (lead) => {
-    if (!lead?.name || !lead?.phone) return;
+    if (!lead?.name) return;
     const normalPhone = (lead.phone || '').replace(/\s/g, '').toLowerCase();
-    const exists = clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone);
+    // Deduplicate: by phone (if provided), otherwise by exact name match
+    const exists = normalPhone
+      ? clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone)
+      : clients.find(c => (c.name || '').toLowerCase().trim() === (lead.name || '').toLowerCase().trim());
     if (exists) return; // already in Clients table
     const newId = await createRecord(AT_TABLES.clients, {
       'Client Name': lead.name,

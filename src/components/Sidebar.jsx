@@ -12,7 +12,7 @@ export const PAGE_TITLES = {
 
 // ── Mobile bottom navigation bar ─────────────────────────────────────────────
 export function MobileBottomNav() {
-  const { leads, currentPage, setCurrentPage, setSearchTerm, closePanel } = useLeadsContext();
+  const { leads, currentPage, setCurrentPage, setSearchTerm, closePanel, sidebarOpen, toggleSidebar } = useLeadsContext();
 
   function navigate(page) {
     setCurrentPage(page);
@@ -43,11 +43,6 @@ export function MobileBottomNav() {
         <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
       </svg>
     )},
-    { page: 'reports', label: 'Reports', icon: (
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
-        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-      </svg>
-    )},
   ];
 
   return (
@@ -65,6 +60,20 @@ export function MobileBottomNav() {
           <span className="mobile-nav-label">{t.label}</span>
         </button>
       ))}
+      {/* More tab — opens sidebar for Reports, Expenses, Deleted History */}
+      <button
+        onClick={toggleSidebar}
+        className={`mobile-nav-tab${sidebarOpen ? ' active' : ''}`}
+      >
+        <div className="mobile-nav-icon">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </div>
+        <span className="mobile-nav-label">More</span>
+      </button>
     </nav>
   );
 }

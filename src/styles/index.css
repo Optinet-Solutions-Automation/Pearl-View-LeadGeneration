@@ -848,7 +848,8 @@ body {
 
 /* ── MOBILE ──────────────────────────────── */
 @media (max-width: 768px) {
-  .burger-btn { display: flex; }
+  /* Burger hidden — navigation handled by bottom nav "More" tab */
+  .burger-btn { display: none; }
   .mobile-bottom-nav { display: flex; }
 
   .sidebar {
@@ -916,8 +917,8 @@ body {
   .stat-val  { font-size: 20px; }
   .stat-lbl  { font-size: 10px; }
 
-  /* Tighter page padding to maximise content width */
-  .page { padding: 12px 14px; gap: 12px; }
+  /* Tighter page padding to maximise content width (preserve bottom padding for nav bar) */
+  .page { padding: 12px 14px calc(12px + 58px); gap: 12px; }
 
   /* Board header */
   .board-title { font-size: 13.5px; }

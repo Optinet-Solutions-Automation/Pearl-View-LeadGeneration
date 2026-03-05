@@ -80,12 +80,13 @@ function AddClientModal({ onClose, onSave }) {
 }
 
 export default function ClientsPage() {
-  const { leads, clients, searchTerm, syncClientsFromLeads, upsertClient, showToast } = useLeadsContext();
+  const { leads, clients, syncClientsFromLeads, upsertClient, showToast } = useLeadsContext();
   const [selectedClient, setSelectedClient] = useState(null);
   const [page, setPage] = useState(1);
   const [lpFilter, setLpFilter] = useState('all');
   const [syncing, setSyncing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [localSearch, setLocalSearch] = useState('');
 
   // ── Merge Clients table with Leads ───────────────────────────────────────────
   const mergedClients = useMemo(() => {
@@ -163,15 +164,15 @@ export default function ClientsPage() {
     let result = mergedClients;
     if (lpFilter === 'LP1') result = result.filter(c => c.lp === 'LP1');
     else if (lpFilter === 'LP2') result = result.filter(c => c.lp === 'LP2');
-    if (!searchTerm.trim()) return result;
-    const term = searchTerm.trim().toLowerCase();
+    const term = localSearch.trim().toLowerCase();
+    if (!term) return result;
     return result.filter(c =>
       c.name.toLowerCase().includes(term) ||
       (c.email  || '').toLowerCase().includes(term) ||
       (c.phone  || '').toLowerCase().includes(term) ||
       (c.city   || '').toLowerCase().includes(term)
     );
-  }, [mergedClients, searchTerm, lpFilter]);
+  }, [mergedClients, localSearch, lpFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -249,7 +250,7 @@ export default function ClientsPage() {
       </div>
 
       {/* LP filter tabs */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
         {LP_TABS.map(tab => (
           <button
             key={tab.key}
@@ -267,10 +268,27 @@ export default function ClientsPage() {
         ))}
       </div>
 
+      {/* Search input */}
+      <div style={{ position: 'relative', marginBottom: '12px' }}>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', width: '14px', height: '14px', color: 'var(--gray-400)', pointerEvents: 'none' }}>
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input
+          type="text"
+          value={localSearch}
+          onChange={e => { setLocalSearch(e.target.value); setPage(1); }}
+          placeholder="Search by name, phone, city…"
+          style={{ width: '100%', padding: '8px 12px 8px 32px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', background: 'var(--gray-50)' }}
+        />
+        {localSearch && (
+          <button onClick={() => { setLocalSearch(''); setPage(1); }} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: '15px', lineHeight: 1, padding: '2px 4px' }}>✕</button>
+        )}
+      </div>
+
       {/* Results summary */}
-      {searchTerm && (
+      {localSearch && (
         <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '10px' }}>
-          {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{searchTerm}"
+          {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{localSearch}"
         </div>
       )}
 
@@ -278,7 +296,7 @@ export default function ClientsPage() {
       <div>
         {paged.length === 0 ? (
           <div style={{ color: 'var(--gray-400)', fontSize: '13px', textAlign: 'center', padding: '40px' }}>
-            {searchTerm ? `No clients match "${searchTerm}"` : 'No clients found'}
+            {localSearch ? `No clients match "${localSearch}"` : 'No clients found'}
           </div>
         ) : (
           paged.map(c => (
@@ -313,7 +331,7 @@ export default function ClientsPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                   <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {searchTerm ? highlightMatch(c.name, searchTerm) : c.name}
+                    {localSearch ? highlightMatch(c.name, localSearch) : c.name}
                   </span>
                   {c.lp && (
                     <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '6px', flexShrink: 0,
