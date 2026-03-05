@@ -137,7 +137,7 @@ function AppointmentFormFields({ form, setField, leads = [] }) {
 }
 
 // ── Edit booking modal ────────────────────────────────────────────────────────
-function EditBookingModal({ booking, onSave, onClose, leads = [] }) {
+function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [] }) {
   const [form, setForm] = useState({
     clientName: booking.clientName || '',
     phone:      booking.phone      || '',
@@ -167,6 +167,11 @@ function EditBookingModal({ booking, onSave, onClose, leads = [] }) {
           <button onClick={handleSave} style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}>
             Save Changes
           </button>
+          {onCancel && (
+            <button onClick={onCancel} style={{ width: '100%', padding: '10px', background: '#fff', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '8px' }}>
+              Cancel Booking
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -484,6 +489,7 @@ export default function CalendarPage() {
           booking={editBooking}
           leads={leads}
           onSave={data => { updateCalBooking(editBooking.id, data); setEditBooking(null); }}
+          onCancel={() => { removeCalBooking(editBooking.id); setEditBooking(null); }}
           onClose={() => setEditBooking(null)}
         />
       )}

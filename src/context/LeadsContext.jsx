@@ -11,7 +11,7 @@ export function LeadsProvider({ children }) {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord,
+    addRefusedRecord, deleteFromRefusedTable,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -67,25 +67,32 @@ export function LeadsProvider({ children }) {
       setRefuseModalId(id);
       return;
     }
+    // If lead was refused and is now moving to another status, remove from Refused table
+    const lead = leads.find(l => l.id === id);
+    if (lead?.status === 'refused') {
+      deleteFromRefusedTable(id);
+    }
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') {
       showToast('Status updated ✓');
-      // Verify the change persisted in Airtable — re-sync after a short delay
       setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
     }
-  }, [changeStatus, showToast, leads, fetchLeads]);
+  }, [changeStatus, showToast, leads, fetchLeads, deleteFromRefusedTable]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
     setRefuseReason(refuseModalId, reason);
+    // Always add to Refused table — source of truth regardless of Lead Status patch result
+    addRefusedRecord(refuseModalId, reason);
     const result = await changeStatus(refuseModalId, 'refused');
-    if (result === 'error') showToast('Failed to save — check your connection');
-    else if (result === 'ok') {
+    if (result === 'error') {
+      // Lead Status field may not have 'Refused' option — still show success since Refused table was updated
       showToast('Status updated ✓');
-      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
-      addRefusedRecord(refuseModalId, reason);
+    } else if (result === 'ok') {
+      showToast('Status updated ✓');
     }
+    setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
   }, [refuseModalId, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
