@@ -549,17 +549,20 @@ export function useLeads() {
     if (exists) return; // already in Clients table
     // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
     const newId = await createRecord(AT_TABLES.clients, {
-      'Client Name':  lead.name,
-      'Phone Number': lead.phone || '',
-      'Email':        lead.email || '',
-      'Adress':       lead.address || '',
+      'Client Name':   lead.name,
+      'Phone Number':  lead.phone   || '',
+      'Email':         lead.email   || '',
+      'Adress':        lead.address || '',
+      'City':          lead.city    || '',
+      'Notes':         lead.notes   || '',
+      'Property Type': lead.jobType || '',
     });
     if (newId) {
       setClients(prev => [...prev, {
         id: newId, airtableId: newId,
         name: lead.name, phone: lead.phone || '',
         email: lead.email || '', address: lead.address || '',
-        city: '', notes: '', jobType: '',
+        city: lead.city || '', notes: lead.notes || '', jobType: lead.jobType || '',
       }]);
     }
   }, [clients]);
@@ -605,10 +608,13 @@ export function useLeads() {
     for (const l of toCreate) {
       // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
       const id = await createRecord(AT_TABLES.clients, {
-        'Client Name':  l.name,
-        'Phone Number': l.phone   || '',
-        'Email':        l.email   || '',
-        'Adress':       l.address || '',
+        'Client Name':   l.name,
+        'Phone Number':  l.phone   || '',
+        'Email':         l.email   || '',
+        'Adress':        l.address || '',
+        'City':          l.city    || '',
+        'Notes':         l.notes   || '',
+        'Property Type': l.jobType || '',
       });
       if (id) {
         newClients.push({
