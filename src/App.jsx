@@ -32,7 +32,7 @@ function PageBody() {
 }
 
 function Dashboard() {
-  const { isLoading } = useLeadsContext();
+  const { isLoading, currentPage, setModalOpen } = useLeadsContext();
 
   // Hide bottom nav + FAB when mobile keyboard is open (input focused)
   useEffect(() => {
@@ -72,6 +72,14 @@ function Dashboard() {
       <QuoteTransferModal />
       <Toast />
       <MobileBottomNav />
+      {/* FAB — mobile-only, Leads page only */}
+      {currentPage === 'leads' && (
+        <button className="fab" onClick={() => setModalOpen(true)} aria-label="New Lead">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '22px', height: '22px' }}>
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
