@@ -137,7 +137,7 @@ export function LeadsProvider({ children }) {
     setQuoteTransferModalId(null);
     setQuoteTransferTargetStatus(null);
     setQuoteTransferLeadValue(0);
-    if (shouldDeleteQuote) clearQuoteAmount(id);
+    if (shouldDeleteQuote) await clearQuoteAmount(id);
     const result = await changeStatus(id, targetStatus);
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') showToast('Status updated ✓');

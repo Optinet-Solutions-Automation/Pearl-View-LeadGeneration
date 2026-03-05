@@ -380,11 +380,13 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const clearQuoteAmount = useCallback((id) => {
+    let airtableId = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': 0 });
+      airtableId = l.airtableId;
       return { ...l, value: 0 };
     }));
+    return airtableId ? patchAirtable(airtableId, { 'Quote Amount': 0 }) : Promise.resolve(null);
   }, [patchAirtable]);
 
   // ─── Delete payment: remove Revenue record from Airtable + clear local state ──
