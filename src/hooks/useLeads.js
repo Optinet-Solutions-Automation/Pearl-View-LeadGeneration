@@ -469,7 +469,7 @@ export function useLeads() {
       id: tempId, ...leadData,
       lp: leadData.source === 'form2' || leadData.source === 'call2' ? 'LP2' : 'LP1',
       status: 'new', date: dateStr, dateObj: now,
-      address: '', jobType: 'Residential', windows: 0,
+      address: leadData.address || '', jobType: 'Residential', windows: 0,
       starred: false, notes: '', hasCall: leadData.source?.startsWith('call') || false,
       progress: 10, refuseReason: '', airtableId: null,
     }, ...prev]);
@@ -553,6 +553,76 @@ export function useLeads() {
     }
   }, [clients]);
 
+  // ─── Populate Clients table from leads (one-time sync, skips existing) ───────
+  // Returns count of newly created records.
+  const syncClientsFromLeads = useCallback(async () => {
+    const seenPhones = new Set();
+    const seenNames  = new Set();
+    clients.forEach(c => {
+      const p = (c.phone || '').replace(/\s/g, '').toLowerCase();
+      if (p) seenPhones.add(p);
+      else   seenNames.add((c.name || '').toLowerCase().trim());
+    });
+
+    const toCreate = [];
+    const batchPhones = new Set();
+    const batchNames  = new Set();
+
+    leads.forEach(l => {
+      const rawName = (l.name || '').trim();
+      // Use phone as display name if real name is missing/unknown
+      const displayName = (rawName && rawName !== 'Unknown' && rawName !== 'Unknown Caller')
+        ? rawName : (l.phone || null);
+      if (!displayName) return;
+
+      const phone  = (l.phone || '').replace(/\s/g, '').toLowerCase();
+      const lname  = displayName.toLowerCase();
+
+      if (phone) {
+        if (seenPhones.has(phone) || batchPhones.has(phone)) return;
+        batchPhones.add(phone);
+      } else {
+        if (seenNames.has(lname) || batchNames.has(lname)) return;
+        batchNames.add(lname);
+      }
+      toCreate.push({ ...l, name: displayName });
+    });
+
+    if (toCreate.length === 0) return 0;
+
+    const newClients = [];
+    for (const l of toCreate) {
+      const id = await createRecord(AT_TABLES.clients, {
+        'Client Name': l.name,
+        'Phone':       l.phone   || '',
+        'Email':       l.email   || '',
+        'Address':     l.address || '',
+        'City':        l.city    || '',
+        'Notes':       l.notes   || '',
+      });
+      if (id) {
+        newClients.push({
+          id, airtableId: id,
+          name: l.name, phone: l.phone || '',
+          email: l.email || '', address: l.address || '',
+          city: l.city || '', notes: l.notes || '', jobType: l.jobType || '',
+        });
+      }
+      // Respect Airtable rate limit (5 req/s)
+      await new Promise(r => setTimeout(r, 220));
+    }
+    if (newClients.length > 0) setClients(prev => [...prev, ...newClients]);
+    return newClients.length;
+  }, [clients, leads]);
+
+  // ─── Update a client record in Airtable + local state ────────────────────────
+  const updateClient = useCallback((airtableId, atFields, localFields) => {
+    updateRecord(AT_TABLES.clients, airtableId, atFields);
+    setClients(prev => prev.map(c =>
+      c.airtableId === airtableId ? { ...c, ...localFields } : c
+    ));
+  }, []);
+
   // ─── Calendar booking operations ─────────────────────────────────────────────
 
   const addCalBooking = useCallback(async (data) => {
@@ -586,7 +656,10 @@ export function useLeads() {
   const removeCalBooking = useCallback((id) => {
     setCalBookings(prev => {
       const booking = prev.find(b => b.id === id);
-      if (booking?.airtableId) deleteRecord(AT_TABLES.calendar, booking.airtableId);
+      if (booking?.airtableId) {
+        // Update status to Cancelled in Airtable (don't delete — keep for records)
+        updateRecord(AT_TABLES.calendar, booking.airtableId, { 'Booking Status': 'Cancelled' });
+      }
       return prev.filter(b => b.id !== id);
     });
   }, []);
@@ -663,6 +736,6 @@ export function useLeads() {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    deletePayment, syncToClients, upsertClient,
+    deletePayment, syncToClients, upsertClient, syncClientsFromLeads, updateClient,
   };
 }

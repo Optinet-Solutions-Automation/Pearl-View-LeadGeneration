@@ -5,25 +5,98 @@ import ClientDetailModal from '../ClientDetailModal';
 
 const PAGE_SIZE = 10;
 
+const iLbl   = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-500)', marginBottom: '5px', display: 'block' };
+const iInput = { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#fff' };
+
+// ── Add Client modal ──────────────────────────────────────────────────────────
+function AddClientModal({ onClose, onSave }) {
+  const [form, setForm] = useState({ name: '', phone: '', email: '', city: '', address: '', notes: '' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  function setF(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleSave() {
+    if (!form.name.trim()) { setErr('Client name is required'); return; }
+    setSaving(true);
+    setErr('');
+    await onSave({
+      name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(),
+      city: form.city.trim(), address: form.address.trim(), notes: form.notes.trim(),
+    });
+    setSaving(false);
+    onClose();
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2100, padding: '16px' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '420px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)' }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Add Client</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--gray-400)', padding: '4px', lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ padding: '16px 20px', overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={iLbl}>Client Name <span style={{ color: '#dc2626' }}>*</span></label>
+              <input value={form.name} onChange={e => setF('name', e.target.value)} style={iInput} placeholder="Full name" autoFocus />
+            </div>
+            <div>
+              <label style={iLbl}>Phone</label>
+              <input value={form.phone} onChange={e => setF('phone', e.target.value)} style={iInput} placeholder="0400 000 000" />
+            </div>
+            <div>
+              <label style={iLbl}>Email</label>
+              <input value={form.email} onChange={e => setF('email', e.target.value)} style={iInput} placeholder="email@example.com" />
+            </div>
+            <div>
+              <label style={iLbl}>City</label>
+              <input value={form.city} onChange={e => setF('city', e.target.value)} style={iInput} placeholder="e.g. Brisbane" />
+            </div>
+            <div>
+              <label style={iLbl}>Property Type</label>
+              <input value={form.address} onChange={e => setF('address', e.target.value)} style={iInput} placeholder="e.g. Residential" />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={iLbl}>Notes</label>
+              <textarea value={form.notes} onChange={e => setF('notes', e.target.value)} style={{ ...iInput, minHeight: '60px', resize: 'vertical' }} placeholder="Internal notes…" />
+            </div>
+          </div>
+          {err && <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+          >
+            {saving ? 'Saving…' : 'Add Client'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ClientsPage() {
-  const { leads, clients, searchTerm } = useLeadsContext();
+  const { leads, clients, searchTerm, syncClientsFromLeads, upsertClient, showToast } = useLeadsContext();
   const [selectedClient, setSelectedClient] = useState(null);
   const [page, setPage] = useState(1);
+  const [lpFilter, setLpFilter] = useState('all');
+  const [syncing, setSyncing] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // ── Merge Clients table with Leads ───────────────────────────────────────────
-  // Primary source: Clients table records
-  // Supplement: leads that don't match any client (by phone) — show them too
   const mergedClients = useMemo(() => {
     const result = [];
     const seenPhones = new Set();
     const seenNames  = new Set();
 
-    // 1. Start with Clients table records (authoritative)
     clients.forEach(c => {
       const normalPhone = (c.phone || '').replace(/\s/g, '').toLowerCase();
       const normalName  = (c.name  || '').toLowerCase().trim();
 
-      // Enrich with latest lead data (status, date, value)
       const matchingLeads = leads.filter(l => {
         if (normalPhone) {
           const lp = (l.phone || '').replace(/\s/g, '').toLowerCase();
@@ -35,12 +108,12 @@ export default function ClientsPage() {
       const latestLead = matchingLeads[0];
       result.push({
         ...c,
-        // Prefer latest lead date if available
-        date:       latestLead?.date || '',
-        dateObj:    latestLead?.dateObj || new Date(0),
-        leadCount:  matchingLeads.length,
+        date:        latestLead?.date || '',
+        dateObj:     latestLead?.dateObj || new Date(0),
+        leadCount:   matchingLeads.length,
         latestStatus: latestLead?.status || null,
         latestValue:  latestLead?.value  || 0,
+        lp:          latestLead?.lp || null,
         fromClients: true,
       });
 
@@ -48,7 +121,6 @@ export default function ClientsPage() {
       if (normalName)  seenNames.add(normalName);
     });
 
-    // 2. Add leads not matched to any Clients record (so nothing is hidden)
     leads
       .filter(l => !l.hasCall && l.name !== 'Unknown' && l.name !== 'Unknown Caller')
       .forEach(l => {
@@ -56,7 +128,6 @@ export default function ClientsPage() {
         const normalName  = (l.name  || '').toLowerCase().trim();
         if (normalPhone && seenPhones.has(normalPhone)) return;
         if (!normalPhone && seenNames.has(normalName))  return;
-        // Dedup among supplemental leads themselves
         if (normalPhone) { if (seenPhones.has(normalPhone)) return; seenPhones.add(normalPhone); }
         else             { if (seenNames.has(normalName))   return; seenNames.add(normalName);  }
 
@@ -75,25 +146,32 @@ export default function ClientsPage() {
           leadCount:   1,
           latestStatus: l.status,
           latestValue:  l.value || 0,
+          lp:          l.lp || null,
           fromClients:  false,
         });
       });
 
-    // Sort by most recent
     return result.sort((a, b) => b.dateObj - a.dateObj);
   }, [clients, leads]);
 
-  // Apply search filter
+  // LP counts
+  const lp1Count = useMemo(() => mergedClients.filter(c => c.lp === 'LP1').length, [mergedClients]);
+  const lp2Count = useMemo(() => mergedClients.filter(c => c.lp === 'LP2').length, [mergedClients]);
+
+  // Apply search + LP filter
   const filtered = useMemo(() => {
-    if (!searchTerm.trim()) return mergedClients;
+    let result = mergedClients;
+    if (lpFilter === 'LP1') result = result.filter(c => c.lp === 'LP1');
+    else if (lpFilter === 'LP2') result = result.filter(c => c.lp === 'LP2');
+    if (!searchTerm.trim()) return result;
     const term = searchTerm.trim().toLowerCase();
-    return mergedClients.filter(c =>
+    return result.filter(c =>
       c.name.toLowerCase().includes(term) ||
       (c.email  || '').toLowerCase().includes(term) ||
       (c.phone  || '').toLowerCase().includes(term) ||
       (c.city   || '').toLowerCase().includes(term)
     );
-  }, [mergedClients, searchTerm]);
+  }, [mergedClients, searchTerm, lpFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -113,11 +191,80 @@ export default function ClientsPage() {
     return [...pages].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b);
   }
 
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const count = await syncClientsFromLeads();
+      if (count === 0) showToast('All clients already synced ✓');
+      else showToast(`${count} client${count !== 1 ? 's' : ''} added to Clients table ✓`);
+    } catch {
+      showToast('Sync failed — check connection');
+    }
+    setSyncing(false);
+  }
+
+  async function handleAddClient(data) {
+    await upsertClient({ name: data.name, phone: data.phone, email: data.email, city: data.city, address: data.address, notes: data.notes });
+    showToast('Client added ✓');
+  }
+
+  const LP_TABS = [
+    { key: 'all', label: `All (${mergedClients.length})` },
+    { key: 'LP1', label: `LP1 (${lp1Count})` },
+    { key: 'LP2', label: `LP2 (${lp2Count})` },
+  ];
+
   return (
     <div className="page">
-      <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '2px' }}>Clients</div>
-      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>
-        {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''} · sourced from Clients table + leads
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '2px' }}>Clients</div>
+          <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
+            {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''} · sourced from Clients table + leads
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            style={{
+              padding: '7px 13px', fontSize: '12px', fontWeight: 700, borderRadius: '8px',
+              border: '1.5px solid var(--gray-200)', background: '#fff', cursor: syncing ? 'not-allowed' : 'pointer',
+              color: syncing ? 'var(--gray-400)' : 'var(--gray-600)', fontFamily: 'inherit',
+            }}
+          >
+            {syncing ? 'Syncing…' : '↑ Sync Clients'}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              padding: '7px 13px', fontSize: '12px', fontWeight: 700, borderRadius: '8px',
+              border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            + Add Client
+          </button>
+        </div>
+      </div>
+
+      {/* LP filter tabs */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+        {LP_TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => { setLpFilter(tab.key); setPage(1); }}
+            style={{
+              padding: '5px 13px', fontSize: '12px', fontWeight: 700, borderRadius: '20px',
+              border: '1.5px solid', cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+              borderColor: lpFilter === tab.key ? 'var(--primary)' : 'var(--gray-200)',
+              background:  lpFilter === tab.key ? 'var(--primary)' : '#fff',
+              color:       lpFilter === tab.key ? '#fff' : 'var(--gray-600)',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Results summary */}
@@ -153,7 +300,6 @@ export default function ClientsPage() {
                 fontSize: '15px', fontWeight: 700, color: 'var(--primary)', flexShrink: 0, position: 'relative',
               }}>
                 {(c.name || '?').charAt(0).toUpperCase()}
-                {/* Status dot */}
                 {c.latestStatus && (
                   <span style={{
                     position: 'absolute', bottom: 0, right: 0,
@@ -165,10 +311,18 @@ export default function ClientsPage() {
 
               {/* Main info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {searchTerm ? highlightMatch(c.name, searchTerm) : c.name}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {searchTerm ? highlightMatch(c.name, searchTerm) : c.name}
+                  </span>
+                  {c.lp && (
+                    <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '6px', flexShrink: 0,
+                      background: c.lp === 'LP1' ? '#eff6ff' : '#fdf4ff',
+                      color:      c.lp === 'LP1' ? 'var(--primary)' : '#7c3aed',
+                    }}>{c.lp}</span>
+                  )}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '1px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '12px', color: 'var(--gray-500)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {c.phone && <span>{c.phone}</span>}
                   {c.city  && <span>· {c.city}</span>}
                   {!c.phone && !c.city && c.email && <span>{c.email}</span>}
@@ -220,7 +374,13 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {/* Client detail modal */}
+      {/* Modals */}
+      {showAddModal && (
+        <AddClientModal
+          onClose={() => setShowAddModal(false)}
+          onSave={handleAddClient}
+        />
+      )}
       {selectedClient && (
         <ClientDetailModal
           client={selectedClient}

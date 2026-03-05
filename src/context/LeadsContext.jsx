@@ -11,7 +11,7 @@ export function LeadsProvider({ children }) {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    deletePayment, syncToClients, upsertClient,
+    deletePayment, syncToClients, upsertClient, syncClientsFromLeads, updateClient,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -320,6 +320,8 @@ export function LeadsProvider({ children }) {
       recordBookingPayment,
       scheduleBooking,
       upsertClient,
+      syncClientsFromLeads,
+      updateClient,
       refetch: fetchLeads,
     }}>
       {children}

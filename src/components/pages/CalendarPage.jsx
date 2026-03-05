@@ -106,7 +106,8 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
   function selectSuggestion(item) {
     setField('clientName', item.name);
     setField('phone', item.phone || '');
-    if (item.city) setField('city', item.city);
+    if (item.city)    setField('city',    item.city);
+    if (item.address) setField('address', item.address);
     setShowSuggestions(false);
   }
 
@@ -147,7 +148,7 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{item.name}</span>
                   <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '1px' }}>
-                    {[item.phone, item.city].filter(Boolean).join(' · ')}
+                    {[item.phone, item.city, item.address].filter(Boolean).join(' · ')}
                   </div>
                 </div>
                 {item.fromClients && (
@@ -161,7 +162,9 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
       <label style={fLbl}>Phone</label>
       <input value={form.phone} onChange={e => setField('phone', e.target.value)} placeholder="e.g. 0400 000 000" style={fInput} />
       <label style={fLbl}>City / Location</label>
-      <input value={form.city} onChange={e => setField('city', e.target.value)} placeholder="e.g. Brisbane" style={{ ...fInput, marginBottom: 0 }} />
+      <input value={form.city} onChange={e => setField('city', e.target.value)} placeholder="e.g. Brisbane" style={fInput} />
+      <label style={fLbl}>Address</label>
+      <input value={form.address || ''} onChange={e => setField('address', e.target.value)} placeholder="e.g. 123 Main St" style={{ ...fInput, marginBottom: 0 }} />
     </>
   );
 }
@@ -172,6 +175,7 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [], clie
     clientName: booking.clientName || '',
     phone:      booking.phone      || '',
     city:       booking.city       || '',
+    address:    booking.address    || '',
     service:    booking.service    || 'Window Cleaning',
   });
   const [err, setErr] = useState('');
@@ -210,7 +214,7 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [], clie
 
 // ── Booking modal (click a day on the calendar) ───────────────────────────────
 function BookingModal({ year, month, day, leads, clients = [], addCalBooking, onClose }) {
-  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', service: 'Window Cleaning' });
+  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', address: '', service: 'Window Cleaning' });
   const [formErr, setFormErr] = useState('');
 
   const targetDate  = mkDate(year, month, day);

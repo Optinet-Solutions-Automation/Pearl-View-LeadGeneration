@@ -1,5 +1,5 @@
 import { LeadsProvider, useLeadsContext } from './context/LeadsContext';
-import Sidebar from './components/Sidebar';
+import Sidebar, { MobileBottomNav } from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DetailPanel from './components/DetailPanel';
 import NewLeadModal from './components/NewLeadModal';
@@ -46,6 +46,7 @@ function Dashboard() {
       <RefuseModal />
       <QuoteTransferModal />
       <Toast />
+      <MobileBottomNav />
     </div>
   );
 }

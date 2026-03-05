@@ -10,6 +10,65 @@ export const PAGE_TITLES = {
   reports:          'Reports',
 };
 
+// ── Mobile bottom navigation bar ─────────────────────────────────────────────
+export function MobileBottomNav() {
+  const { leads, currentPage, setCurrentPage, setSearchTerm, closePanel } = useLeadsContext();
+
+  function navigate(page) {
+    setCurrentPage(page);
+    setSearchTerm('');
+    closePanel();
+  }
+
+  const tabs = [
+    { page: 'overview', label: 'Overview', icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    )},
+    { page: 'leads', label: 'Leads', badge: leads.length || null, icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+    )},
+    { page: 'clients', label: 'Clients', icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+      </svg>
+    )},
+    { page: 'calendar', label: 'Calendar', icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+    )},
+    { page: 'reports', label: 'Reports', icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
+        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+    )},
+  ];
+
+  return (
+    <nav className="mobile-bottom-nav">
+      {tabs.map(t => (
+        <button
+          key={t.page}
+          onClick={() => navigate(t.page)}
+          className={`mobile-nav-tab${currentPage === t.page ? ' active' : ''}`}
+        >
+          <div className="mobile-nav-icon">
+            {t.icon}
+            {t.badge && <span className="mobile-nav-badge">{t.badge > 99 ? '99+' : t.badge}</span>}
+          </div>
+          <span className="mobile-nav-label">{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 export default function Sidebar() {
   const { leads, deletedLeads, currentPage, setCurrentPage, setSearchTerm, closePanel, sidebarOpen, closeSidebar } = useLeadsContext();
 
