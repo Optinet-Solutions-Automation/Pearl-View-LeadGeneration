@@ -1,5 +1,5 @@
 export const COLS = [
-  { id: 'new',        label: 'New Lead',    dot: '#2563eb', cnt: '#dbeafe/#1d4ed8' },
+  { id: 'new',        label: 'New Lead',    dot: '#0d9488', cnt: '#ccfbf1/#0f766e' },
   { id: 'in_progress',label: 'In Progress', dot: '#d97706', cnt: '#fef3c7/#92400e' },
   { id: 'quote_sent', label: 'Quote Sent',  dot: '#7c3aed', cnt: '#ede9fe/#5b21b6' },
   { id: 'refused',    label: 'Refused',     dot: '#dc2626', cnt: '#fee2e2/#991b1b' },

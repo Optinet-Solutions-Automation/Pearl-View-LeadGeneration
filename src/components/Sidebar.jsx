@@ -27,9 +27,11 @@ export function MobileBottomNav() {
         <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
       </svg>
     )},
-    { page: 'leads', label: 'Leads', badge: leads.length || null, icon: (
+    { page: 'leads', label: 'Pipeline', badge: leads.filter(l => l.status === 'new').length || null, icon: (
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
-        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        <rect x="2" y="3" width="5" height="18" rx="1.5"/>
+        <rect x="9.5" y="3" width="5" height="13" rx="1.5"/>
+        <rect x="17" y="3" width="5" height="8" rx="1.5"/>
       </svg>
     )},
     { page: 'clients', label: 'Clients', icon: (

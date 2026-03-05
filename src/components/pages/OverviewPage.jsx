@@ -53,6 +53,11 @@ export default function OverviewPage() {
 
   const calls = leads.filter(l => l.hasCall).length;
   const forms = leads.filter(l => !l.hasCall).length;
+
+  // Today's Snapshot
+  const newToday      = leads.filter(l => l.status === 'new' && isToday(l.dateObj)).length;
+  const followUpsDue  = leads.filter(l => l.followUp && new Date(l.followUp) < new Date()).length;
+  const jobsToday     = leads.filter(l => l.jobDate && isToday(new Date(l.jobDate))).length;
   const lp1   = leads.filter(l => l.lp === 'LP1').length;
   const lp2   = leads.filter(l => l.lp === 'LP2').length;
   const recent = leads.slice(0, 10);
@@ -69,6 +74,25 @@ export default function OverviewPage() {
       <div style={{ marginBottom: '4px' }}>
         <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)' }}>Overview</div>
         <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Summary of your Pearl View lead activity</div>
+      </div>
+
+      {/* ── Today's Snapshot ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+        <div style={{ background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '12px', padding: '14px 16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '6px' }}>New Today</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: '#134e4a', lineHeight: 1 }}>{newToday}</div>
+          <div style={{ fontSize: '11px', color: '#0d9488', marginTop: '4px' }}>leads received</div>
+        </div>
+        <div style={{ background: followUpsDue > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: followUpsDue > 0 ? '#dc2626' : 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '6px' }}>Follow-ups</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: followUpsDue > 0 ? '#dc2626' : 'var(--gray-400)', lineHeight: 1 }}>{followUpsDue}</div>
+          <div style={{ fontSize: '11px', color: followUpsDue > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>overdue</div>
+        </div>
+        <div style={{ background: jobsToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${jobsToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: jobsToday > 0 ? '#d97706' : 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '6px' }}>Scheduled</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: jobsToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{jobsToday}</div>
+          <div style={{ fontSize: '11px', color: jobsToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>jobs today</div>
+        </div>
       </div>
 
       <div className="stats">
