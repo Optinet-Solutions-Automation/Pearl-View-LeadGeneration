@@ -20,6 +20,7 @@ export const AT_TABLES = {
   calendar: import.meta.env.VITE_AIRTABLE_CALENDAR_TABLE_ID || 'Bookings',
   revenue:  import.meta.env.VITE_AIRTABLE_REVENUE_TABLE_ID  || 'Revenue',
   refused:  import.meta.env.VITE_AIRTABLE_REFUSED_TABLE_ID  || 'Refused',
+  clients:  import.meta.env.VITE_AIRTABLE_CLIENTS_TABLE_ID  || 'Clients',
 };
 
 // ─── Fetch all records from a table (handles Airtable pagination) ─────────────

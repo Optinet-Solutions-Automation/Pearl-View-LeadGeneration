@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 
 const DAYS     = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -72,18 +72,41 @@ function CalPaymentModal({ booking, onClose, onConfirm }) {
 }
 
 // ── Shared appointment form fields ───────────────────────────────────────────
-function AppointmentFormFields({ form, setField, leads = [] }) {
+function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const suggestions = form.clientName.trim().length >= 1
-    ? leads.filter(l =>
-        l.name && l.name.toLowerCase().includes(form.clientName.toLowerCase())
-      ).slice(0, 6)
-    : [];
+  // Merge leads + clients into one deduplicated suggestion list
+  const suggestions = useMemo(() => {
+    if (form.clientName.trim().length < 1) return [];
+    const term = form.clientName.toLowerCase();
+    const seen = new Set();
+    const result = [];
 
-  function selectSuggestion(lead) {
-    setField('clientName', lead.name);
-    setField('phone', lead.phone || '');
+    // Clients table first (richer data: city, address)
+    clients.forEach(c => {
+      if (!c.name?.toLowerCase().includes(term)) return;
+      const key = (c.phone || c.name).toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push({ id: c.id, name: c.name, phone: c.phone, city: c.city, address: c.address, fromClients: true });
+    });
+
+    // Supplement with leads not already covered
+    leads.forEach(l => {
+      if (!l.name?.toLowerCase().includes(term)) return;
+      const key = (l.phone || l.name).toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push({ id: l.id, name: l.name, phone: l.phone, city: l.city, address: l.address, fromClients: false });
+    });
+
+    return result.slice(0, 8);
+  }, [form.clientName, clients, leads]);
+
+  function selectSuggestion(item) {
+    setField('clientName', item.name);
+    setField('phone', item.phone || '');
+    if (item.city) setField('city', item.city);
     setShowSuggestions(false);
   }
 
@@ -110,19 +133,26 @@ function AppointmentFormFields({ form, setField, leads = [] }) {
             background: '#fff', border: '1.5px solid var(--gray-200)', borderRadius: '8px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginTop: '2px', overflow: 'hidden',
           }}>
-            {suggestions.map(l => (
+            {suggestions.map(item => (
               <div
-                key={l.id}
-                onMouseDown={() => selectSuggestion(l)}
+                key={item.id}
+                onMouseDown={() => selectSuggestion(item)}
                 style={{
                   padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)',
-                  display: 'flex', flexDirection: 'column', gap: '2px',
+                  display: 'flex', alignItems: 'center', gap: '8px',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--gray-50)'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}
               >
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</span>
-                {l.phone && <span style={{ fontSize: '11.5px', color: 'var(--gray-500)' }}>{l.phone}</span>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{item.name}</span>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '1px' }}>
+                    {[item.phone, item.city].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+                {item.fromClients && (
+                  <span style={{ fontSize: '9px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', padding: '1px 5px', borderRadius: '6px', flexShrink: 0 }}>CLIENT</span>
+                )}
               </div>
             ))}
           </div>
@@ -137,7 +167,7 @@ function AppointmentFormFields({ form, setField, leads = [] }) {
 }
 
 // ── Edit booking modal ────────────────────────────────────────────────────────
-function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [] }) {
+function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [], clients = [] }) {
   const [form, setForm] = useState({
     clientName: booking.clientName || '',
     phone:      booking.phone      || '',
@@ -162,7 +192,7 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [] }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
         </div>
         <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
-          <AppointmentFormFields form={form} setField={setField} leads={leads} />
+          <AppointmentFormFields form={form} setField={setField} leads={leads} clients={clients} />
           {err && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
           <button onClick={handleSave} style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}>
             Save Changes
@@ -179,7 +209,7 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [] }) {
 }
 
 // ── Booking modal (click a day on the calendar) ───────────────────────────────
-function BookingModal({ year, month, day, leads, addCalBooking, onClose }) {
+function BookingModal({ year, month, day, leads, clients = [], addCalBooking, onClose }) {
   const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', service: 'Window Cleaning' });
   const [formErr, setFormErr] = useState('');
 
@@ -206,7 +236,7 @@ function BookingModal({ year, month, day, leads, addCalBooking, onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
         </div>
         <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
-          <AppointmentFormFields form={form} setField={setField} leads={leads} />
+          <AppointmentFormFields form={form} setField={setField} leads={leads} clients={clients} />
           {formErr && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{formErr}</div>}
           <button
             onClick={handleSubmitNew}
@@ -223,7 +253,7 @@ function BookingModal({ year, month, day, leads, addCalBooking, onClose }) {
 // ── Main CalendarPage ─────────────────────────────────────────────────────────
 export default function CalendarPage() {
   const {
-    leads, calBookings,
+    leads, calBookings, clients,
     saveJobDate, openPanel, setCurrentPage,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
   } = useLeadsContext();
@@ -479,7 +509,7 @@ export default function CalendarPage() {
       {modalDay !== null && (
         <BookingModal
           year={year} month={month} day={modalDay}
-          leads={leads}
+          leads={leads} clients={clients}
           addCalBooking={addCalBooking}
           onClose={() => setModalDay(null)}
         />
@@ -487,7 +517,7 @@ export default function CalendarPage() {
       {editBooking && (
         <EditBookingModal
           booking={editBooking}
-          leads={leads}
+          leads={leads} clients={clients}
           onSave={data => { updateCalBooking(editBooking.id, data); setEditBooking(null); }}
           onCancel={() => { removeCalBooking(editBooking.id); setEditBooking(null); }}
           onClose={() => setEditBooking(null)}

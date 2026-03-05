@@ -97,10 +97,27 @@ function writeRevenue(lead, paidAmount, paymentMethod, status) {
   });
 }
 
+// ─── Normalise a raw Airtable Clients record ──────────────────────────────────
+function normaliseClient(rec) {
+  const f = rec.fields;
+  return {
+    id:         rec.id,
+    airtableId: rec.id,
+    name:       f['Client Name']   || f['Name'] || '',
+    phone:      f['Phone']         || f['Phone Number'] || '',
+    email:      f['Email']         || '',
+    address:    f['Address']       || f['Service Address'] || f['Adress'] || '',
+    city:       f['City']          || '',
+    notes:      f['Notes']         || '',
+    jobType:    f['Property Type'] || '',
+  };
+}
+
 export function useLeads() {
   const [leads,        setLeads]        = useState([]);
   const [deletedLeads, setDeletedLeads] = useState([]);
   const [calBookings,  setCalBookings]  = useState([]);
+  const [clients,      setClients]      = useState([]);
   const [isLoading,    setIsLoading]    = useState(true);
   // Track in-flight Airtable writes so silent polls don't overwrite optimistic UI
   const pendingWrites = useRef(0);
@@ -206,6 +223,11 @@ export function useLeads() {
       // ── Fetch cal bookings (in parallel, non-blocking) ───────────────────────
       fetchRecords(AT_TABLES.calendar).then(recs => {
         setCalBookings(recs.map(r => normaliseCalBooking(r)));
+      });
+
+      // ── Fetch clients (in parallel, non-blocking) ─────────────────────────────
+      fetchRecords(AT_TABLES.clients).then(recs => {
+        setClients(recs.map(r => normaliseClient(r)));
       });
     } catch (err) {
       console.error('Failed to load from Airtable:', err);
@@ -491,6 +513,46 @@ export function useLeads() {
     }
   }, []);
 
+  // ─── Sync a lead's field update to the matching Clients table record ─────────
+  // phone: the lead's phone number (used for matching)
+  // atFields: Airtable field names + values to patch (e.g. { 'Client Name': 'John' })
+  // localFields: local client object keys to update (e.g. { name: 'John' })
+  const syncToClients = useCallback((phone, atFields, localFields = {}) => {
+    if (!phone) return;
+    const normalPhone = (phone || '').replace(/\s/g, '').toLowerCase();
+    const client = clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone);
+    if (client?.airtableId) {
+      updateRecord(AT_TABLES.clients, client.airtableId, atFields);
+      if (Object.keys(localFields).length) {
+        setClients(prev => prev.map(c => c.airtableId === client.airtableId ? { ...c, ...localFields } : c));
+      }
+    }
+  }, [clients]);
+
+  // ─── Create a new client record in the Clients table ─────────────────────────
+  const upsertClient = useCallback(async (lead) => {
+    if (!lead?.name || !lead?.phone) return;
+    const normalPhone = (lead.phone || '').replace(/\s/g, '').toLowerCase();
+    const exists = clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone);
+    if (exists) return; // already in Clients table
+    const newId = await createRecord(AT_TABLES.clients, {
+      'Client Name': lead.name,
+      'Phone':       lead.phone || '',
+      'Email':       lead.email || '',
+      'Address':     lead.address || '',
+      'City':        lead.city || '',
+      'Notes':       lead.notes || '',
+    });
+    if (newId) {
+      setClients(prev => [...prev, {
+        id: newId, airtableId: newId,
+        name: lead.name, phone: lead.phone || '',
+        email: lead.email || '', address: lead.address || '',
+        city: lead.city || '', notes: lead.notes || '', jobType: '',
+      }]);
+    }
+  }, [clients]);
+
   // ─── Calendar booking operations ─────────────────────────────────────────────
 
   const addCalBooking = useCallback(async (data) => {
@@ -595,12 +657,12 @@ export function useLeads() {
   }, [patchAirtable]);
 
   return {
-    leads, deletedLeads, calBookings, isLoading, fetchLeads,
+    leads, deletedLeads, calBookings, clients, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
     savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount, clearQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    deletePayment,
+    deletePayment, syncToClients, upsertClient,
   };
 }

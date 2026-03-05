@@ -1,46 +1,111 @@
 import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { formatDate } from '../../utils/dateUtils';
+import ClientDetailModal from '../ClientDetailModal';
 
 const PAGE_SIZE = 10;
 
 export default function ClientsPage() {
-  const { leads, openPanel, setCurrentPage, searchTerm } = useLeadsContext();
-  const [lpFilter, setLpFilter] = useState('all');
-  const [page,     setPage]     = useState(1);
+  const { leads, clients, searchTerm } = useLeadsContext();
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [page, setPage] = useState(1);
 
-  const formLeads = leads.filter(l => !l.hasCall && l.name !== 'Unknown');
-  const counts = {
-    all: formLeads.length,
-    LP1: formLeads.filter(l => l.lp === 'LP1').length,
-    LP2: formLeads.filter(l => l.lp === 'LP2').length,
-  };
+  // ── Merge Clients table with Leads ───────────────────────────────────────────
+  // Primary source: Clients table records
+  // Supplement: leads that don't match any client (by phone) — show them too
+  const mergedClients = useMemo(() => {
+    const result = [];
+    const seenPhones = new Set();
+    const seenNames  = new Set();
 
-  // Apply LP filter then search
+    // 1. Start with Clients table records (authoritative)
+    clients.forEach(c => {
+      const normalPhone = (c.phone || '').replace(/\s/g, '').toLowerCase();
+      const normalName  = (c.name  || '').toLowerCase().trim();
+
+      // Enrich with latest lead data (status, date, value)
+      const matchingLeads = leads.filter(l => {
+        if (normalPhone) {
+          const lp = (l.phone || '').replace(/\s/g, '').toLowerCase();
+          if (lp && lp === normalPhone) return true;
+        }
+        return l.name?.toLowerCase().trim() === normalName;
+      }).sort((a, b) => b.dateObj - a.dateObj);
+
+      const latestLead = matchingLeads[0];
+      result.push({
+        ...c,
+        // Prefer latest lead date if available
+        date:       latestLead?.date || '',
+        dateObj:    latestLead?.dateObj || new Date(0),
+        leadCount:  matchingLeads.length,
+        latestStatus: latestLead?.status || null,
+        latestValue:  latestLead?.value  || 0,
+        fromClients: true,
+      });
+
+      if (normalPhone) seenPhones.add(normalPhone);
+      if (normalName)  seenNames.add(normalName);
+    });
+
+    // 2. Add leads not matched to any Clients record (so nothing is hidden)
+    leads
+      .filter(l => !l.hasCall && l.name !== 'Unknown' && l.name !== 'Unknown Caller')
+      .forEach(l => {
+        const normalPhone = (l.phone || '').replace(/\s/g, '').toLowerCase();
+        const normalName  = (l.name  || '').toLowerCase().trim();
+        if (normalPhone && seenPhones.has(normalPhone)) return;
+        if (!normalPhone && seenNames.has(normalName))  return;
+        // Dedup among supplemental leads themselves
+        if (normalPhone) { if (seenPhones.has(normalPhone)) return; seenPhones.add(normalPhone); }
+        else             { if (seenNames.has(normalName))   return; seenNames.add(normalName);  }
+
+        result.push({
+          id:          l.id,
+          airtableId:  null,
+          name:        l.name,
+          phone:       l.phone  || '',
+          email:       l.email  || '',
+          address:     l.address || '',
+          city:        l.city   || '',
+          notes:       l.notes  || '',
+          jobType:     l.jobType || '',
+          date:        l.date,
+          dateObj:     l.dateObj,
+          leadCount:   1,
+          latestStatus: l.status,
+          latestValue:  l.value || 0,
+          fromClients:  false,
+        });
+      });
+
+    // Sort by most recent
+    return result.sort((a, b) => b.dateObj - a.dateObj);
+  }, [clients, leads]);
+
+  // Apply search filter
   const filtered = useMemo(() => {
-    let list = lpFilter === 'all' ? formLeads : formLeads.filter(l => l.lp === lpFilter);
-    if (searchTerm.trim()) {
-      const term = searchTerm.trim().toLowerCase();
-      list = list.filter(l =>
-        l.name.toLowerCase().includes(term) ||
-        (l.email  || '').toLowerCase().includes(term) ||
-        (l.phone  || '').toLowerCase().includes(term)
-      );
-    }
-    return list;
-  }, [leads, lpFilter, searchTerm]);
+    if (!searchTerm.trim()) return mergedClients;
+    const term = searchTerm.trim().toLowerCase();
+    return mergedClients.filter(c =>
+      c.name.toLowerCase().includes(term) ||
+      (c.email  || '').toLowerCase().includes(term) ||
+      (c.phone  || '').toLowerCase().includes(term) ||
+      (c.city   || '').toLowerCase().includes(term)
+    );
+  }, [mergedClients, searchTerm]);
 
-  // Reset to page 1 when filter/search changes
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  function changeFilter(key) { setLpFilter(key); setPage(1); }
-
-  function goToLead(id) {
-    setCurrentPage('leads');
-    setTimeout(() => openPanel(id), 100);
-  }
+  const STATUS_DOT = {
+    new:         '#2563eb',
+    in_progress: '#d97706',
+    quote_sent:  '#7c3aed',
+    job_done:    '#16a34a',
+    refused:     '#dc2626',
+  };
 
   function pageNumbers() {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -48,36 +113,11 @@ export default function ClientsPage() {
     return [...pages].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b);
   }
 
-  const tabs = [
-    { key: 'all', label: 'All' },
-    { key: 'LP1', label: 'Crystal Pro' },
-    { key: 'LP2', label: 'Pearl View' },
-  ];
-
   return (
     <div className="page">
       <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '2px' }}>Clients</div>
       <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>
-        All unique clients from form submissions
-      </div>
-
-      {/* LP tabs */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => changeFilter(t.key)}
-            style={{
-              padding: '5px 14px', borderRadius: '20px', border: '1px solid',
-              fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-              borderColor: lpFilter === t.key ? 'var(--primary)' : 'var(--gray-200)',
-              background:  lpFilter === t.key ? 'var(--primary)' : '#fff',
-              color:       lpFilter === t.key ? '#fff' : 'var(--gray-600)',
-            }}
-          >
-            {t.label} <span style={{ opacity: 0.75, fontWeight: 400 }}>({counts[t.key]})</span>
-          </button>
-        ))}
+        {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''} · sourced from Clients table + leads
       </div>
 
       {/* Results summary */}
@@ -94,10 +134,10 @@ export default function ClientsPage() {
             {searchTerm ? `No clients match "${searchTerm}"` : 'No clients found'}
           </div>
         ) : (
-          paged.map(l => (
+          paged.map(c => (
             <div
-              key={l.id}
-              onClick={() => goToLead(l.id)}
+              key={c.id}
+              onClick={() => setSelectedClient(c)}
               style={{
                 background: '#fff', border: '1px solid var(--gray-200)', borderRadius: '10px',
                 padding: '14px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center',
@@ -106,27 +146,51 @@ export default function ClientsPage() {
               onMouseOver={e => e.currentTarget.style.borderColor = 'var(--blue-200)'}
               onMouseOut={e  => e.currentTarget.style.borderColor = 'var(--gray-200)'}
             >
+              {/* Avatar */}
               <div style={{
-                width: '38px', height: '38px', borderRadius: '50%', background: 'var(--blue-100)',
+                width: '40px', height: '40px', borderRadius: '50%', background: 'var(--blue-100)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '14px', fontWeight: 700, color: 'var(--primary)', flexShrink: 0,
+                fontSize: '15px', fontWeight: 700, color: 'var(--primary)', flexShrink: 0, position: 'relative',
               }}>
-                {l.name.charAt(0).toUpperCase()}
+                {(c.name || '?').charAt(0).toUpperCase()}
+                {/* Status dot */}
+                {c.latestStatus && (
+                  <span style={{
+                    position: 'absolute', bottom: 0, right: 0,
+                    width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #fff',
+                    background: STATUS_DOT[c.latestStatus] || '#9ca3af',
+                  }} />
+                )}
               </div>
+
+              {/* Main info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)' }}>
-                  {/* Highlight matching text */}
-                  {searchTerm ? highlightMatch(l.name, searchTerm) : l.name}
+                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--gray-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {searchTerm ? highlightMatch(c.name, searchTerm) : c.name}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>
-                  {l.email || l.phone || '—'}
+                <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '1px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {c.phone && <span>{c.phone}</span>}
+                  {c.city  && <span>· {c.city}</span>}
+                  {!c.phone && !c.city && c.email && <span>{c.email}</span>}
                 </div>
               </div>
+
+              {/* Right side */}
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{formatDate(l.date)}</div>
-                <span className={`tag tag-form${l.lp === 'LP2' ? '2' : '1'}`} style={{ marginTop: '4px', display: 'inline-block' }}>
-                  Form · {l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                  {c.latestValue > 0 && (
+                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0d9488' }}>${c.latestValue.toLocaleString()}</span>
+                  )}
+                  {c.leadCount > 0 && (
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', borderRadius: '20px', padding: '1px 7px' }}>
+                      {c.leadCount} lead{c.leadCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{c.date ? formatDate(c.date) : '—'}</div>
+                {!c.fromClients && (
+                  <div style={{ fontSize: '10px', color: 'var(--gray-300)', marginTop: '2px' }}>from leads</div>
+                )}
               </div>
             </div>
           ))
@@ -155,11 +219,18 @@ export default function ClientsPage() {
           </div>
         </div>
       )}
+
+      {/* Client detail modal */}
+      {selectedClient && (
+        <ClientDetailModal
+          client={selectedClient}
+          onClose={() => setSelectedClient(null)}
+        />
+      )}
     </div>
   );
 }
 
-// Bold-highlight the matched portion of text
 function highlightMatch(text, term) {
   const idx = text.toLowerCase().indexOf(term.toLowerCase());
   if (idx === -1) return text;

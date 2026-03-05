@@ -5,13 +5,13 @@ const LeadsContext = createContext(null);
 
 export function LeadsProvider({ children }) {
   const {
-    leads, deletedLeads, calBookings, isLoading, fetchLeads,
+    leads, deletedLeads, calBookings, clients, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
     savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount, clearQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    deletePayment,
+    deletePayment, syncToClients, upsertClient,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -58,6 +58,7 @@ export function LeadsProvider({ children }) {
   // 1. 'refused'        → show RefuseModal first
   // 2. job_done + paid  → block (must delete payment first)
   // 3. quote_sent → in_progress/new → show QuoteTransferModal
+  // 4. refused → other → clear Refusal Reason first
   const handleChangeStatus = useCallback(async (id, status) => {
     const lead = leads.find(l => l.id === id);
     if (!lead) return;
@@ -86,10 +87,15 @@ export function LeadsProvider({ children }) {
       return;
     }
 
+    // Clear Refusal Reason when moving away from refused
+    if (lead.status === 'refused') {
+      await setRefuseReason(id, '');
+    }
+
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') showToast('Status updated ✓');
-  }, [changeStatus, showToast, leads]);
+  }, [changeStatus, showToast, leads, setRefuseReason]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
@@ -131,11 +137,17 @@ export function LeadsProvider({ children }) {
 
   const handleSaveNote = useCallback((id, note) => {
     saveNote(id, note);
-  }, [saveNote]);
+    // Sync to Clients table
+    const lead = leads.find(l => l.id === id);
+    if (lead?.phone) syncToClients(lead.phone, { 'Notes': note }, { notes: note });
+  }, [saveNote, leads, syncToClients]);
 
   const handleSaveJobType = useCallback((id, jobType) => {
     saveJobType(id, jobType);
-  }, [saveJobType]);
+    // Sync to Clients table
+    const lead = leads.find(l => l.id === id);
+    if (lead?.phone) syncToClients(lead.phone, { 'Property Type': jobType }, { jobType });
+  }, [saveJobType, leads, syncToClients]);
 
   const handleSavePaidInfo = useCallback(async (id, paid, paidAmount, paymentMethod) => {
     const result = await savePaidInfo(id, paid, paidAmount, paymentMethod);
@@ -168,7 +180,10 @@ export function LeadsProvider({ children }) {
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);
-  }, [saveCity]);
+    // Sync to Clients table
+    const lead = leads.find(l => l.id === id);
+    if (lead?.phone) syncToClients(lead.phone, { 'City': city }, { city });
+  }, [saveCity, leads, syncToClients]);
 
   const handleSaveJobDate = useCallback((id, jobDate) => {
     saveJobDate(id, jobDate);
@@ -176,12 +191,18 @@ export function LeadsProvider({ children }) {
 
   const handleSaveEmail = useCallback((id, email) => {
     saveEmail(id, email);
-  }, [saveEmail]);
+    // Sync to Clients table
+    const lead = leads.find(l => l.id === id);
+    if (lead?.phone) syncToClients(lead.phone, { 'Email': email }, { email });
+  }, [saveEmail, leads, syncToClients]);
 
   const handleRename = useCallback((id, newName) => {
     renameLead(id, newName);
     showToast('Name updated ✓');
-  }, [renameLead, showToast]);
+    // Sync to Clients table
+    const lead = leads.find(l => l.id === id);
+    if (lead?.phone) syncToClients(lead.phone, { 'Client Name': newName }, { name: newName });
+  }, [renameLead, showToast, leads, syncToClients]);
 
   const handleSetRefuseReason = useCallback((id, reason) => {
     setRefuseReason(id, reason);
@@ -248,6 +269,7 @@ export function LeadsProvider({ children }) {
       leads,
       deletedLeads,
       calBookings,
+      clients,
       filteredLeads,
       isLoading,
       activeId,
@@ -297,6 +319,7 @@ export function LeadsProvider({ children }) {
       updateCalBooking,
       recordBookingPayment,
       scheduleBooking,
+      upsertClient,
       refetch: fetchLeads,
     }}>
       {children}
