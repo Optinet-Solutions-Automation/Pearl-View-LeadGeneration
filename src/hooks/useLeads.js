@@ -126,11 +126,15 @@ export function useLeads() {
         });
     return req
       .then(r => {
-        if (!r.ok) return r.json().then(e => { console.error('Airtable patch failed:', logFields, e); return null; });
+        if (!r.ok) return r.json().then(e => {
+          const msg = e?.error?.message || e?.message || e?.error || `HTTP ${r.status}`;
+          console.error('Airtable patch failed:', logFields, e);
+          return { __patchFailed: true, error: msg };
+        });
         console.log('Airtable synced:', logFields);
         return r.json();
       })
-      .catch(err => { console.error('Airtable sync error:', err); return null; })
+      .catch(err => { console.error('Airtable sync error:', err); return { __patchFailed: true, error: err.message }; })
       .finally(() => { pendingWrites.current--; });
   }, []);
 
@@ -245,16 +249,18 @@ export function useLeads() {
     if (!updatedLead?.airtableId) return 'Status updated';
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status, ...extraFields };
     const result = await patchAirtable(updatedLead.airtableId, atFields);
-    if (!result && status !== 'refused') {
+    const patchFailed = !result || result.__patchFailed;
+    if (patchFailed && status !== 'refused') {
       // PATCH failed — revert optimistic update (not for refused: Refused table is source of truth)
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
     // Only re-confirm status/progress from Airtable response — do NOT overwrite other
     // fields (quote amount, notes, etc.) that may have separate in-flight PATCHes
+    const confirmedResult = patchFailed ? null : result;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      const confirmed = result ? normaliseRecord(result) : null;
+      const confirmed = confirmedResult ? normaliseRecord(confirmedResult) : null;
       const confirmedStatus   = confirmed?.status   ?? status;
       const confirmedProgress = confirmed?.progress ?? (PROG_MAP[status] || 10);
       return { ...l, status: confirmedStatus, progress: confirmedProgress };
@@ -270,6 +276,12 @@ export function useLeads() {
         });
         if (match) updateRecord(AT_TABLES.revenue, match.id, { 'Status': 'Job Done' });
       });
+    }
+    // For 'refused': if the Lead Status PATCH failed, propagate the error so the
+    // caller (confirmRefuse) can show a diagnostic toast. The app still shows the
+    // lead as refused (Refused table is the source of truth).
+    if (patchFailed && status === 'refused') {
+      return `patchErr:${result?.error || 'Lead Status field rejected "Refused" — check Airtable field options'}`;
     }
     return 'ok';
   }, [patchAirtable]);

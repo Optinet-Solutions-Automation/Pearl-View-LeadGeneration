@@ -114,10 +114,14 @@ export function LeadsProvider({ children }) {
     await setRefuseReason(refuseModalId, reason);
     await addRefusedRecord(lead, reason);
     const result = await changeStatus(refuseModalId, 'refused');
-    if (result === 'error') {
-      // Lead Status field may not have 'Refused' option — still show success since Refused table was updated
-      showToast('Status updated ✓');
-    } else if (result === 'ok') {
+    if (typeof result === 'string' && result.startsWith('patchErr:')) {
+      // The Refused table was updated successfully but the Lead Status PATCH failed.
+      // Most likely cause: "Refused" is not a valid option in the Airtable Lead Status
+      // singleSelect field. Go to Airtable → Lead Status field → add "Refused" option.
+      const errDetail = result.slice('patchErr:'.length);
+      console.warn('Lead Status PATCH failed for refused:', errDetail);
+      showToast('Refused ✓ — Note: Lead Status not updated in Airtable (see console)');
+    } else {
       showToast('Status updated ✓');
     }
     setRefuseModalId(null);
