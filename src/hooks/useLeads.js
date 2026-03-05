@@ -43,7 +43,7 @@ function normaliseRecord(rec) {
     details: f['Property Details'] || '',
     status, progress: PROG_MAP[status] || 10,
     starred: false, notes: f['Notes'] || '', hasCall: isCall, tag: '',
-    refuseReason: f['Refuse Reason'] || '',
+    refuseReason: f['Refusal Reason'] || '',
     paidAmount: parseFloat(f['Amount Paid'] || 0),
     paid: !!(f['Paid'] || parseFloat(f['Amount Paid'] || 0) > 0),
     paymentMethod: f['Payment Method'] || '',
@@ -117,12 +117,12 @@ export function useLeads() {
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fields }),
+          body: JSON.stringify({ fields, typecast: true }),
         })
       : fetch('/api/update-lead', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ airtableId, fields }),
+          body: JSON.stringify({ airtableId, fields, typecast: true }),
         });
     return req
       .then(r => {
@@ -162,8 +162,11 @@ export function useLeads() {
         if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
         allRecords = data.records;
       }
-      // ── Fetch revenue to derive paid status (Leads table has no payment fields) ──
-      const revenueRecs = await fetchRecords(AT_TABLES.revenue);
+      // ── Fetch revenue + refused in parallel ──────────────────────────────────
+      const [revenueRecs, refusedRecs] = await Promise.all([
+        fetchRecords(AT_TABLES.revenue),
+        fetchRecords(AT_TABLES.refused),
+      ]);
       // Build phone → payment lookup (highest amount wins per phone)
       const paymentByPhone = {};
       revenueRecs.forEach(r => {
@@ -176,16 +179,31 @@ export function useLeads() {
               paid: true,
               paidAmount: amount,
               paymentMethod: r.fields?.['Payment_Method'] || '',
+              revenueRecordId: r.id,
             };
           }
         }
+      });
+      // Build phone → refused record ID lookup
+      const refusedByPhone = {};
+      refusedRecs.forEach(r => {
+        const phone = (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase();
+        if (phone) refusedByPhone[phone] = r.id;
       });
 
       const all = allRecords.map(r => {
         const lead = normaliseRecord(r);
         const phoneKey = (lead.phone || '').replace(/\s/g, '').toLowerCase();
         const payment = phoneKey ? (paymentByPhone[phoneKey] || {}) : {};
-        return { ...lead, ...payment };
+        // Cross-reference with Refused table — overrides Lead Status field
+        const refusedRecordId = phoneKey ? (refusedByPhone[phoneKey] || null) : null;
+        const merged = { ...lead, ...payment };
+        if (refusedRecordId && merged.status !== 'archived') {
+          merged.status = 'refused';
+          merged.progress = PROG_MAP['refused'] || 100;
+          merged.refusedRecordId = refusedRecordId;
+        }
+        return merged;
       });
       const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
       const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
@@ -223,8 +241,8 @@ export function useLeads() {
     if (!updatedLead?.airtableId) return 'Status updated';
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
     const result = await patchAirtable(updatedLead.airtableId, atFields);
-    if (!result) {
-      // PATCH failed — revert optimistic update
+    if (!result && status !== 'refused') {
+      // PATCH failed — revert optimistic update (but not for refused: Refused table is source of truth)
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
@@ -272,9 +290,12 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const setRefuseReason = useCallback((id, reason) => {
-    // Refuse Reason field doesn't exist in Leads table — in-memory only
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, refuseReason: reason } : l));
-  }, []);
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Refusal Reason': REFUSED_REASON_MAP[reason] || reason });
+      return { ...l, refuseReason: reason };
+    }));
+  }, [patchAirtable]);
 
   // ─── Save payment info ─────────────────────────────────────────────────────────
   // Revenue logic:
@@ -343,6 +364,45 @@ export function useLeads() {
     }));
   }, [patchAirtable]);
 
+  const saveQuoteAmount = useCallback((id, amount) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': amount });
+      return { ...l, value: amount };
+    }));
+  }, [patchAirtable]);
+
+  const clearQuoteAmount = useCallback((id) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': 0 });
+      return { ...l, value: 0 };
+    }));
+  }, [patchAirtable]);
+
+  // ─── Delete payment: remove Revenue record from Airtable + clear local state ──
+  const deletePayment = useCallback((id) => {
+    setLeads(prev => {
+      const lead = prev.find(l => l.id === id);
+      if (!lead) return prev;
+      if (lead.revenueRecordId) {
+        deleteRecord(AT_TABLES.revenue, lead.revenueRecordId);
+      } else if (lead.phone) {
+        const phone = (lead.phone || '').replace(/\s/g, '').toLowerCase();
+        fetchRecords(AT_TABLES.revenue).then(recs => {
+          const match = recs.find(r =>
+            (r.fields?.['Phone'] || '').replace(/\s/g, '').toLowerCase() === phone
+          );
+          if (match) deleteRecord(AT_TABLES.revenue, match.id);
+        });
+      }
+      return prev.map(l => l.id === id
+        ? { ...l, paid: false, paidAmount: 0, paymentMethod: '', revenueRecordId: null }
+        : l
+      );
+    });
+  }, []);
+
   // Move lead to deleted history (soft delete) + sync to Airtable
   const archiveLead = useCallback((id) => {
     setLeads(prev => {
@@ -405,7 +465,7 @@ export function useLeads() {
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fields }),
+          body: JSON.stringify({ fields, typecast: true }),
         })
       : fetch('/api/create-lead', {
           method: 'POST',
@@ -431,6 +491,7 @@ export function useLeads() {
     }
   }, []);
 
+<<<<<<< HEAD
   // ─── Delete the Refused table record for a given phone number ────────────────
   // Called when a refused lead's status changes to something else
   const deleteRefusedRecord = useCallback(async (phone) => {
@@ -456,6 +517,12 @@ export function useLeads() {
     const lead = leads.find(l => l.id === id);
     if (!lead) return;
     createRecord(AT_TABLES.refused, {
+=======
+  // ─── Write lead data to the Refused table (awaitable) ────────────────────────
+  const addRefusedRecord = useCallback(async (lead, reason) => {
+    if (!lead) return null;
+    return createRecord(AT_TABLES.refused, {
+>>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
       'Client Name':              lead.name || '',
       'Phone Number':             lead.phone || '',
       'Email':                    lead.email || '',
@@ -466,7 +533,30 @@ export function useLeads() {
       'Lead Status':              'Refused',
       'Refusal Reason':           REFUSED_REASON_MAP[reason] || '',
     });
-  }, [leads]);
+  }, []);
+
+  // ─── Remove lead from Refused table — async so callers can await the delete ──
+  const deleteFromRefusedTable = useCallback(async (id) => {
+    let refusedRecordId = null;
+    let phone = null;
+    // Read lead info synchronously via functional setter
+    setLeads(prev => {
+      const lead = prev.find(l => l.id === id);
+      refusedRecordId = lead?.refusedRecordId || null;
+      phone = lead?.phone || null;
+      return prev.map(l => l.id === id ? { ...l, refusedRecordId: null } : l);
+    });
+    if (refusedRecordId) {
+      await deleteRecord(AT_TABLES.refused, refusedRecordId);
+    } else if (phone) {
+      const pn = phone.replace(/\s/g, '').toLowerCase();
+      const recs = await fetchRecords(AT_TABLES.refused);
+      const match = recs.find(r =>
+        (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase() === pn
+      );
+      if (match) await deleteRecord(AT_TABLES.refused, match.id);
+    }
+  }, []);
 
   // ─── Calendar booking operations ─────────────────────────────────────────────
 
@@ -574,10 +664,14 @@ export function useLeads() {
   return {
     leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
-    savePaidInfo, saveCity, saveJobDate, saveEmail,
+    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount, clearQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
+<<<<<<< HEAD
     addRefusedRecord, deleteRefusedRecord, clearQuoteAmount,
+=======
+    addRefusedRecord, deleteFromRefusedTable, deletePayment,
+>>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
   };
 }

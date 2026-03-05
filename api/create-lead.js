@@ -54,7 +54,7 @@ export default async (req, res) => {
     if (!fields) return res.status(400).json({ error: 'Missing fields' });
 
     const url = `https://api.airtable.com/v0/${BASE}/${TABLE}`;
-    const { status, data } = await airtablePost(url, TOKEN, { fields });
+    const { status, data } = await airtablePost(url, TOKEN, { fields, typecast: true });
 
     if (status !== 200 && status !== 201) return res.status(status).json(data);
     return res.status(200).json(data);

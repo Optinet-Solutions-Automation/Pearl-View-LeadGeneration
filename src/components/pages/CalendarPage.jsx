@@ -72,7 +72,21 @@ function CalPaymentModal({ booking, onClose, onConfirm }) {
 }
 
 // ── Shared appointment form fields ───────────────────────────────────────────
-function AppointmentFormFields({ form, setField }) {
+function AppointmentFormFields({ form, setField, leads = [] }) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const suggestions = form.clientName.trim().length >= 1
+    ? leads.filter(l =>
+        l.name && l.name.toLowerCase().includes(form.clientName.toLowerCase())
+      ).slice(0, 6)
+    : [];
+
+  function selectSuggestion(lead) {
+    setField('clientName', lead.name);
+    setField('phone', lead.phone || '');
+    setShowSuggestions(false);
+  }
+
   return (
     <>
       <label style={fLbl}>Service</label>
@@ -80,7 +94,40 @@ function AppointmentFormFields({ form, setField }) {
         {SERVICES.map(s => <option key={s}>{s}</option>)}
       </select>
       <label style={fLbl}>Client Name <span style={{ color: '#dc2626' }}>*</span></label>
-      <input value={form.clientName} onChange={e => setField('clientName', e.target.value)} placeholder="Full name…" style={fInput} />
+      <div style={{ position: 'relative', marginBottom: '10px' }}>
+        <input
+          value={form.clientName}
+          onChange={e => { setField('clientName', e.target.value); setShowSuggestions(true); }}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          placeholder="Full name…"
+          style={{ ...fInput, marginBottom: 0 }}
+          autoComplete="off"
+        />
+        {showSuggestions && suggestions.length > 0 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+            background: '#fff', border: '1.5px solid var(--gray-200)', borderRadius: '8px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginTop: '2px', overflow: 'hidden',
+          }}>
+            {suggestions.map(l => (
+              <div
+                key={l.id}
+                onMouseDown={() => selectSuggestion(l)}
+                style={{
+                  padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)',
+                  display: 'flex', flexDirection: 'column', gap: '2px',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--gray-50)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</span>
+                {l.phone && <span style={{ fontSize: '11.5px', color: 'var(--gray-500)' }}>{l.phone}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <label style={fLbl}>Phone</label>
       <input value={form.phone} onChange={e => setField('phone', e.target.value)} placeholder="e.g. 0400 000 000" style={fInput} />
       <label style={fLbl}>City / Location</label>
@@ -90,7 +137,7 @@ function AppointmentFormFields({ form, setField }) {
 }
 
 // ── Edit booking modal ────────────────────────────────────────────────────────
-function EditBookingModal({ booking, onSave, onClose }) {
+function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [] }) {
   const [form, setForm] = useState({
     clientName: booking.clientName || '',
     phone:      booking.phone      || '',
@@ -115,11 +162,16 @@ function EditBookingModal({ booking, onSave, onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
         </div>
         <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
-          <AppointmentFormFields form={form} setField={setField} />
+          <AppointmentFormFields form={form} setField={setField} leads={leads} />
           {err && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
           <button onClick={handleSave} style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}>
             Save Changes
           </button>
+          {onCancel && (
+            <button onClick={onCancel} style={{ width: '100%', padding: '10px', background: '#fff', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '8px' }}>
+              Cancel Booking
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -127,164 +179,44 @@ function EditBookingModal({ booking, onSave, onClose }) {
 }
 
 // ── Booking modal (click a day on the calendar) ───────────────────────────────
-function BookingModal({ year, month, day, leads, saveJobDate, calBookings, addCalBooking, removeCalBooking, onClose, onPayCal }) {
-  const [tab,     setTab]     = useState('book');
-  const [search,  setSearch]  = useState('');
+function BookingModal({ year, month, day, leads, addCalBooking, onClose }) {
   const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', service: 'Window Cleaning' });
   const [formErr, setFormErr] = useState('');
-  const [payFor,  setPayFor]  = useState(null);
 
   const targetDate  = mkDate(year, month, day);
   const displayDate = `${MONTHS[month]} ${day}, ${year}`;
 
-  const bookedLeads = leads.filter(l => l.jobDate === targetDate);
-  const bookedCal   = (calBookings || []).filter(b => b.date === targetDate);
-  const totalBooked = bookedLeads.length + bookedCal.length;
-
-  const unbookedAll = leads.filter(l => l.jobDate !== targetDate);
-  const filtered = unbookedAll.filter(l =>
-    !search ||
-    l.name.toLowerCase().includes(search.toLowerCase()) ||
-    (l.phone || '').includes(search)
-  );
-
-  function book(id)   { saveJobDate(id, targetDate); }
-  function unbook(id) { saveJobDate(id, ''); }
   function setField(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
   function handleSubmitNew() {
     if (!form.clientName.trim()) { setFormErr('Client name is required'); return; }
     setFormErr('');
     addCalBooking({ ...form, date: targetDate });
-    setForm({ clientName: '', phone: '', city: '', service: 'Window Cleaning' });
+    onClose();
   }
 
-  const tabStyle = (active) => ({
-    flex: 1, padding: '10px 0', fontSize: '12.5px', fontWeight: 700,
-    background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-    color: active ? 'var(--primary)' : 'var(--gray-500)',
-    borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent',
-  });
-
   return (
-    <>
-      <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-        <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 0', flexShrink: 0 }}>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Book Appointment</div>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{displayDate}</div>
-            </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
+    <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>New Appointment</div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{displayDate}</div>
           </div>
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--gray-100)', marginTop: '10px', flexShrink: 0 }}>
-            <button style={tabStyle(tab === 'book')} onClick={() => setTab('book')}>Book Lead</button>
-            <button style={tabStyle(tab === 'new')}  onClick={() => setTab('new')}>+ New Appointment</button>
-          </div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {tab === 'book' && (
-              <>
-                {totalBooked > 0 && (
-                  <div style={{ padding: '14px 20px 0' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#15803d', marginBottom: '8px' }}>Booked on this day</div>
-                    {bookedLeads.map(l => (
-                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', marginBottom: '6px' }}>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
-                          <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', marginTop: '1px' }}>{l.phone || '—'}{l.jobType ? ` · ${l.jobType}` : ''}</div>
-                        </div>
-                        <button onClick={() => unbook(l.id)} style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, marginLeft: '10px' }}>Remove</button>
-                      </div>
-                    ))}
-                    {bookedCal.map(b => (
-                      <div key={b.id} style={{ padding: '10px 12px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '10px', marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-900)' }}>{b.clientName}</div>
-                            <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                              {b.phone || '—'}{b.service ? ` · ${b.service}` : ''}{b.city ? ` · ${b.city}` : ''}
-                            </div>
-                            {b.bookingStatus === 'Completed' && (
-                              <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#15803d', marginTop: '3px' }}>
-                                ✓ Paid ${(b.amount || 0).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => removeCalBooking(b.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: '14px', padding: '2px 4px', lineHeight: 1, flexShrink: 0, marginLeft: '6px' }}
-                          >✕</button>
-                        </div>
-                        {b.bookingStatus !== 'Completed' && (
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                            <button
-                              onClick={() => setPayFor({ booking: b, method: 'Cash' })}
-                              style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: '1.5px solid #16a34a', background: '#f0fdf4', color: '#15803d' }}
-                            >$ CASH</button>
-                            <button
-                              onClick={() => setPayFor({ booking: b, method: 'Bank' })}
-                              style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: '1.5px solid #2563eb', background: '#eff6ff', color: '#2563eb' }}
-                            >🏦 BANK</button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{ padding: '14px 20px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--gray-500)', marginBottom: '8px' }}>Book a lead</div>
-                  <input
-                    value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Search by name or phone…"
-                    style={{ width: '100%', padding: '9px 12px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', marginBottom: '10px', boxSizing: 'border-box' }}
-                  />
-                  {filtered.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-400)', fontSize: '13px' }}>
-                      {unbookedAll.length === 0 ? 'All leads are already booked on this day' : 'No leads match your search'}
-                    </div>
-                  ) : filtered.map(l => (
-                    <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', border: '1px solid var(--gray-200)', borderRadius: '10px', marginBottom: '6px' }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
-                        <div style={{ fontSize: '11.5px', color: 'var(--gray-500)', marginTop: '1px' }}>
-                          {l.phone || '—'}{l.jobType ? ` · ${l.jobType}` : ''}
-                          {l.jobDate ? <span style={{ color: '#d97706', marginLeft: '6px' }}>· booked {l.jobDate}</span> : ''}
-                        </div>
-                      </div>
-                      <button onClick={() => book(l.id)} style={{ fontSize: '11px', fontWeight: 700, color: '#fff', background: 'var(--primary)', border: 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, marginLeft: '10px' }}>
-                        Book
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {tab === 'new' && (
-              <div style={{ padding: '16px 20px' }}>
-                <AppointmentFormFields form={form} setField={setField} />
-                {formErr && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{formErr}</div>}
-                <button
-                  onClick={handleSubmitNew}
-                  style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}
-                >
-                  Add Appointment
-                </button>
-              </div>
-            )}
-          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
+          <AppointmentFormFields form={form} setField={setField} leads={leads} />
+          {formErr && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{formErr}</div>}
+          <button
+            onClick={handleSubmitNew}
+            style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}
+          >
+            Add Appointment
+          </button>
         </div>
       </div>
-      {payFor && (
-        <CalPaymentModal
-          booking={payFor.booking}
-          onClose={() => setPayFor(null)}
-          onConfirm={(amt, method) => {
-            onPayCal(payFor.booking.id, amt, method);
-            setPayFor(null);
-          }}
-        />
-      )}
-    </>
+    </div>
   );
 }
 
@@ -547,18 +479,17 @@ export default function CalendarPage() {
       {modalDay !== null && (
         <BookingModal
           year={year} month={month} day={modalDay}
-          leads={leads} saveJobDate={saveJobDate}
-          calBookings={calBookings}
+          leads={leads}
           addCalBooking={addCalBooking}
-          removeCalBooking={removeCalBooking}
-          onPayCal={recordBookingPayment}
           onClose={() => setModalDay(null)}
         />
       )}
       {editBooking && (
         <EditBookingModal
           booking={editBooking}
+          leads={leads}
           onSave={data => { updateCalBooking(editBooking.id, data); setEditBooking(null); }}
+          onCancel={() => { removeCalBooking(editBooking.id); setEditBooking(null); }}
           onClose={() => setEditBooking(null)}
         />
       )}
