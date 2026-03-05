@@ -210,29 +210,32 @@ export function useLeads() {
     }
   }, [patchAirtable]);
 
-  // ─── Awaits the PATCH so refreshing after a status change shows the new value ─
+  // ─── Awaits the PATCH — uses the returned Airtable record to confirm local state ─
   const changeStatus = useCallback(async (id, status) => {
     let prevLead = null;
     let updatedLead = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
       prevLead = l;
-      const updated = { ...l, status, progress: PROG_MAP[status] || 10 };
-      if (status === 'completed' && !l.invoice && l.value > 0) updated.invoice = l.value;
-      updatedLead = updated;
-      return updated;
+      updatedLead = l;
+      return { ...l, status, progress: PROG_MAP[status] || 10 };
     }));
     if (!updatedLead?.airtableId) return 'Status updated';
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
-    if (status === 'completed' && updatedLead.invoice > 0) atFields['Final Invoice Amount'] = updatedLead.invoice;
     const result = await patchAirtable(updatedLead.airtableId, atFields);
     if (!result) {
       // PATCH failed — revert optimistic update
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
-    // Re-confirm status in case a background fetch ran mid-PATCH and overwrote it
-    setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, status, progress: PROG_MAP[status] || 10 }));
+    // Use Airtable's confirmed record to lock in local state — prevents any
+    // background fetch from overwriting with stale data
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      const confirmed = normaliseRecord(result);
+      // Preserve Revenue-enriched payment data (not stored on Leads table)
+      return { ...confirmed, paid: l.paid, paidAmount: l.paidAmount, paymentMethod: l.paymentMethod, starred: l.starred };
+    }));
     // Scenario 3 → Scenario 1: lead already had payment but wasn't job_done yet — now it is
     // Update the Revenue record Status to 'Job Done' so it counts as income in Reports
     if (status === 'job_done' && updatedLead?.paid && updatedLead?.paidAmount > 0) {
@@ -428,6 +431,26 @@ export function useLeads() {
     }
   }, []);
 
+  // ─── Delete the Refused table record for a given phone number ────────────────
+  // Called when a refused lead's status changes to something else
+  const deleteRefusedRecord = useCallback(async (phone) => {
+    if (!phone) return;
+    const normalised = phone.replace(/\s/g, '').toLowerCase();
+    const recs = await fetchRecords(AT_TABLES.refused);
+    const match = recs.find(r => {
+      const p = (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase();
+      return p === normalised;
+    });
+    if (match) deleteRecord(AT_TABLES.refused, match.id);
+  }, []);
+
+  // ─── Clear the Quote Amount on a lead (called when changing away from Quote Sent) ─
+  const clearQuoteAmount = useCallback((id) => {
+    setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, value: 0 }));
+    const lead = leads.find(l => l.id === id);
+    if (lead?.airtableId) patchAirtable(lead.airtableId, { 'Quote Amount': 0 });
+  }, [leads, patchAirtable]);
+
   // ─── Write current lead data to the Refused table ────────────────────────────
   const addRefusedRecord = useCallback((id, reason) => {
     const lead = leads.find(l => l.id === id);
@@ -555,6 +578,6 @@ export function useLeads() {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord,
+    addRefusedRecord, deleteRefusedRecord, clearQuoteAmount,
   };
 }

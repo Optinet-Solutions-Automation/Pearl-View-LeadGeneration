@@ -11,7 +11,7 @@ export function LeadsProvider({ children }) {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord,
+    addRefusedRecord, deleteRefusedRecord, clearQuoteAmount,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -25,6 +25,10 @@ export function LeadsProvider({ children }) {
   // Refuse modal state
   const [refuseModalId, setRefuseModalId]             = useState(null);
   const [refuseModalPrevStatus, setRefuseModalPrevStatus] = useState(null);
+
+  // Quote change modal state (fires when changing away from Quote Sent with a quote amount)
+  const [quoteModalId, setQuoteModalId]                   = useState(null);
+  const [quoteModalPendingStatus, setQuoteModalPendingStatus] = useState(null);
 
   useEffect(() => {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
@@ -59,22 +63,43 @@ export function LeadsProvider({ children }) {
   const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
   const closeSidebar  = useCallback(() => setSidebarOpen(false), []);
 
-  // Intercepts 'refused' to show reason modal first
+  // Central status change handler — enforces all business rules before committing
   const handleChangeStatus = useCallback(async (id, status) => {
+    const lead = leads.find(l => l.id === id);
+    if (!lead) return;
+
+    // No-op: same status
+    if (lead.status === status) return;
+
+    // Rule: Job Done is locked once a payment is recorded
+    if (lead.status === 'job_done' && lead.paid) {
+      showToast('Status locked — payment already recorded');
+      return;
+    }
+
+    // Rule: 'refused' always shows the reason modal first
     if (status === 'refused') {
-      const lead = leads.find(l => l.id === id);
-      setRefuseModalPrevStatus(lead?.status || 'new');
+      setRefuseModalPrevStatus(lead.status);
       setRefuseModalId(id);
       return;
     }
+
+    // Rule: leaving Quote Sent when a quote amount exists → ask keep or clear
+    if (lead.status === 'quote_sent' && lead.value > 0) {
+      setQuoteModalId(id);
+      setQuoteModalPendingStatus(status);
+      return;
+    }
+
+    // Rule: leaving Refused → delete the record from the Refused table
+    if (lead.status === 'refused') {
+      deleteRefusedRecord(lead.phone).catch(() => {});
+    }
+
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
-    else if (result === 'ok') {
-      showToast('Status updated ✓');
-      // Verify the change persisted in Airtable — re-sync after a short delay
-      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
-    }
-  }, [changeStatus, showToast, leads, fetchLeads]);
+    else if (result === 'ok') showToast('Status updated ✓');
+  }, [changeStatus, showToast, leads, deleteRefusedRecord]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
@@ -83,16 +108,41 @@ export function LeadsProvider({ children }) {
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') {
       showToast('Status updated ✓');
-      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
       addRefusedRecord(refuseModalId, reason);
     }
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-  }, [refuseModalId, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
+  }, [refuseModalId, changeStatus, setRefuseReason, showToast, addRefusedRecord]);
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
+  }, []);
+
+  // Quote change modal: user picks keep or clear when leaving Quote Sent status
+  const confirmQuoteChange = useCallback(async (keepQuote) => {
+    const id = quoteModalId;
+    const status = quoteModalPendingStatus;
+    setQuoteModalId(null);
+    setQuoteModalPendingStatus(null);
+    if (!id || !status) return;
+
+    // If leaving Refused (edge case) also clean up the refused record
+    const lead = leads.find(l => l.id === id);
+    if (lead?.status === 'refused') deleteRefusedRecord(lead.phone).catch(() => {});
+
+    const result = await changeStatus(id, status);
+    if (result === 'error') {
+      showToast('Failed to save — check your connection');
+      return;
+    }
+    if (!keepQuote) clearQuoteAmount(id);
+    showToast('Status updated ✓');
+  }, [quoteModalId, quoteModalPendingStatus, changeStatus, clearQuoteAmount, showToast, leads, deleteRefusedRecord]);
+
+  const closeQuoteModal = useCallback(() => {
+    setQuoteModalId(null);
+    setQuoteModalPendingStatus(null);
   }, []);
 
   const handleToggleStar = useCallback((id) => toggleStar(id), [toggleStar]);
@@ -234,6 +284,10 @@ export function LeadsProvider({ children }) {
       refuseModalPrevStatus,
       confirmRefuse,
       closeRefuseModal,
+      quoteModalId,
+      quoteModalPendingStatus,
+      confirmQuoteChange,
+      closeQuoteModal,
       changeStatus: handleChangeStatus,
       toggleStar: handleToggleStar,
       saveNote: handleSaveNote,

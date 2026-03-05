@@ -4,6 +4,7 @@ import TopBar from './components/TopBar';
 import DetailPanel from './components/DetailPanel';
 import NewLeadModal from './components/NewLeadModal';
 import RefuseModal from './components/RefuseModal';
+import QuoteChangeModal from './components/QuoteChangeModal';
 import Toast from './components/Toast';
 import LoadingOverlay from './components/LoadingOverlay';
 import LeadsPage from './components/pages/LeadsPage';
@@ -43,6 +44,7 @@ function Dashboard() {
       <DetailPanel />
       <NewLeadModal />
       <RefuseModal />
+      <QuoteChangeModal />
       <Toast />
     </div>
   );
