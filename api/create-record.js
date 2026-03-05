@@ -47,11 +47,11 @@ export default async (req, res) => {
   await new Promise(r => req.on('end', r));
 
   try {
-    const { tableId, fields } = JSON.parse(body);
+    const { tableId, fields, typecast } = JSON.parse(body);
     if (!tableId || !fields) return res.status(400).json({ error: 'Missing tableId or fields' });
 
     const url = `https://api.airtable.com/v0/${BASE}/${tableId}`;
-    const { status, data } = await airtablePost(url, TOKEN, { fields });
+    const { status, data } = await airtablePost(url, TOKEN, { fields, typecast: typecast !== false });
 
     if (status !== 200 && status !== 201) return res.status(status).json(data);
     return res.status(200).json(data);

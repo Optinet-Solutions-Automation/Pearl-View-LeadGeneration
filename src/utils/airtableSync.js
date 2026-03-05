@@ -60,7 +60,7 @@ export async function createRecord(tableId, fields) {
       const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(tableId)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields }),
+        body: JSON.stringify({ fields, typecast: true }),
       });
       if (!res.ok) { console.error('createRecord failed', await res.json()); return null; }
       const data = await res.json();
@@ -69,7 +69,7 @@ export async function createRecord(tableId, fields) {
       const res = await fetch('/api/create-record', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tableId, fields }),
+        body: JSON.stringify({ tableId, fields, typecast: true }),
       });
       if (!res.ok) { console.error('createRecord API failed', await res.json()); return null; }
       const data = await res.json();

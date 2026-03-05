@@ -462,7 +462,7 @@ export function useLeads() {
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fields }),
+          body: JSON.stringify({ fields, typecast: true }),
         })
       : fetch('/api/create-lead', {
           method: 'POST',
