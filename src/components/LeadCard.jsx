@@ -103,7 +103,7 @@ export default function LeadCard({ lead }) {
     setSwipeX(0);
   }
 
-  function handleCardClick(e) {
+  function handleCardClick() {
     // Block click if it ended a swipe gesture
     if (touchRef.current.didSwipe) return;
     openPanel(lead.id);
@@ -173,7 +173,7 @@ export default function LeadCard({ lead }) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ position: 'relative' }}>
 
       {/* ── Swipe-right action background (Move Forward) ── */}
       {swipeX > 10 && (

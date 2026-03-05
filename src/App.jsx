@@ -1,4 +1,5 @@
 import { LeadsProvider, useLeadsContext } from './context/LeadsContext';
+import { useEffect } from 'react';
 import Sidebar, { MobileBottomNav } from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DetailPanel from './components/DetailPanel';
@@ -32,6 +33,30 @@ function PageBody() {
 
 function Dashboard() {
   const { isLoading, setModalOpen } = useLeadsContext();
+
+  // Hide bottom nav + FAB when mobile keyboard is open (input focused)
+  useEffect(() => {
+    function onFocusIn(e) {
+      if (e.target.matches('input, textarea, select')) {
+        document.body.classList.add('keyboard-open');
+      }
+    }
+    function onFocusOut(e) {
+      if (e.target.matches('input, textarea, select')) {
+        setTimeout(() => {
+          if (!document.querySelector('input:focus, textarea:focus, select:focus')) {
+            document.body.classList.remove('keyboard-open');
+          }
+        }, 100);
+      }
+    }
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    };
+  }, []);
 
   return (
     <div className="shell">
