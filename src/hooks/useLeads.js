@@ -217,33 +217,30 @@ export function useLeads() {
 
   // ─── Awaits the PATCH — confirms status from Airtable response without overwriting
   //     other fields that may have their own in-flight PATCHes (e.g. Quote Amount)
+  //
+  // NOTE: reads `leads` directly (not via setLeads extraction) because React 18
+  // automatic batching does not execute setLeads callbacks synchronously when called
+  // in async continuations (after await). Adding `leads` to deps ensures we always
+  // have the current snapshot.
   const changeStatus = useCallback(async (id, status, extraFields = {}) => {
-    console.log('changeStatus called:', id, status);
-    let prevLead = null;
-    let updatedLead = null;
+    const currentLead = leads.find(l => l.id === id);
+    if (!currentLead?.airtableId) return 'Status updated';
+    const prevLead = currentLead;
+    // Optimistic update
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      prevLead = l;
-      updatedLead = l;
-      // Apply extraFields optimistically to local state too
       const extra = {};
       if (extraFields['Quote Amount'] !== undefined) extra.value = extraFields['Quote Amount'];
       return { ...l, status, progress: PROG_MAP[status] || 10, ...extra };
     }));
-    if (!updatedLead?.airtableId) {
-      console.warn('changeStatus: no lead/airtableId found for id:', id, '| updatedLead:', updatedLead);
-      return 'Status updated';
-    }
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status, ...extraFields };
-    const result = await patchAirtable(updatedLead.airtableId, atFields);
+    const result = await patchAirtable(currentLead.airtableId, atFields);
     const patchFailed = !result || result.__patchFailed;
     if (patchFailed) {
-      // PATCH failed — revert optimistic update
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
-    // Only re-confirm status/progress from Airtable response — do NOT overwrite other
-    // fields (quote amount, notes, etc.) that may have separate in-flight PATCHes
+    // Confirm status/progress from Airtable response only — don't overwrite other fields
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
       const confirmed = normaliseRecord(result);
@@ -251,11 +248,10 @@ export function useLeads() {
       const confirmedProgress = confirmed?.progress ?? (PROG_MAP[status] || 10);
       return { ...l, status: confirmedStatus, progress: confirmedProgress };
     }));
-    // Scenario 3 → Scenario 1: lead already had payment but wasn't job_done yet — now it is
-    // Update the Revenue record Status to 'Job Done' so it counts as income in Reports
-    if (status === 'job_done' && updatedLead?.paid && updatedLead?.paidAmount > 0) {
+    // Scenario 3 → Scenario 1: lead had payment but wasn't job_done yet — update Revenue
+    if (status === 'job_done' && currentLead?.paid && currentLead?.paidAmount > 0) {
       fetchRecords(AT_TABLES.revenue).then(revRecs => {
-        const phone = (updatedLead.phone || '').replace(/\s/g, '').toLowerCase();
+        const phone = (currentLead.phone || '').replace(/\s/g, '').toLowerCase();
         const match = revRecs.find(r => {
           const rPhone = (r.fields?.['Phone'] || '').replace(/\s/g, '').toLowerCase();
           return rPhone === phone && parseFloat(r.fields?.['Amount'] || 0) > 0;
@@ -264,7 +260,7 @@ export function useLeads() {
       });
     }
     return 'ok';
-  }, [patchAirtable]);
+  }, [patchAirtable, leads]);
 
   const toggleStar = useCallback((id) => {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, starred: !l.starred } : l));
