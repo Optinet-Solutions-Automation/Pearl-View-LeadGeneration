@@ -111,6 +111,10 @@ export default function ClientsPage() {
       const normalPhone = (c.phone || '').replace(/\s/g, '').toLowerCase();
       const normalName  = (c.name  || '').toLowerCase().trim();
 
+      // Skip duplicate Clients table records with the same phone/name
+      if (normalPhone && seenPhones.has(normalPhone)) return;
+      if (!normalPhone && normalName && seenNames.has(normalName)) return;
+
       const matchingLeads = leads.filter(l => {
         if (normalPhone) {
           const lp = (l.phone || '').replace(/\s/g, '').toLowerCase();
