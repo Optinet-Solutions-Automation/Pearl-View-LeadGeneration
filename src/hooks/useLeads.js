@@ -228,31 +228,36 @@ export function useLeads() {
     }
   }, [patchAirtable]);
 
-  // ─── Awaits the PATCH — uses the returned Airtable record to confirm local state ─
-  const changeStatus = useCallback(async (id, status) => {
+  // ─── Awaits the PATCH — confirms status from Airtable response without overwriting
+  //     other fields that may have their own in-flight PATCHes (e.g. Quote Amount)
+  const changeStatus = useCallback(async (id, status, extraFields = {}) => {
     let prevLead = null;
     let updatedLead = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
       prevLead = l;
       updatedLead = l;
-      return { ...l, status, progress: PROG_MAP[status] || 10 };
+      // Apply extraFields optimistically to local state too
+      const extra = {};
+      if (extraFields['Quote Amount'] !== undefined) extra.value = extraFields['Quote Amount'];
+      return { ...l, status, progress: PROG_MAP[status] || 10, ...extra };
     }));
     if (!updatedLead?.airtableId) return 'Status updated';
-    const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
+    const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status, ...extraFields };
     const result = await patchAirtable(updatedLead.airtableId, atFields);
     if (!result && status !== 'refused') {
-      // PATCH failed — revert optimistic update (but not for refused: Refused table is source of truth)
+      // PATCH failed — revert optimistic update (not for refused: Refused table is source of truth)
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
-    // Use Airtable's confirmed record to lock in local state — prevents any
-    // background fetch from overwriting with stale data
+    // Only re-confirm status/progress from Airtable response — do NOT overwrite other
+    // fields (quote amount, notes, etc.) that may have separate in-flight PATCHes
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      const confirmed = normaliseRecord(result);
-      // Preserve Revenue-enriched payment data (not stored on Leads table)
-      return { ...confirmed, paid: l.paid, paidAmount: l.paidAmount, paymentMethod: l.paymentMethod, starred: l.starred };
+      const confirmed = result ? normaliseRecord(result) : null;
+      const confirmedStatus   = confirmed?.status   ?? status;
+      const confirmedProgress = confirmed?.progress ?? (PROG_MAP[status] || 10);
+      return { ...l, status: confirmedStatus, progress: confirmedProgress };
     }));
     // Scenario 3 → Scenario 1: lead already had payment but wasn't job_done yet — now it is
     // Update the Revenue record Status to 'Job Done' so it counts as income in Reports
