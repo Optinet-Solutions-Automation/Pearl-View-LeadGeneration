@@ -11,7 +11,7 @@ export function LeadsProvider({ children }) {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord, deleteFromRefusedTable, deletePayment,
+    deletePayment,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -34,16 +34,6 @@ export function LeadsProvider({ children }) {
   useEffect(() => {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
   }, [fetchLeads]);
-
-  // One-time backfill: push any existing refused leads to the Refused table
-  useEffect(() => {
-    if (!isLoading && leads.length > 0 && !localStorage.getItem('pv_refused_synced')) {
-      leads.filter(l => l.status === 'refused').forEach(lead => {
-        addRefusedRecord(lead, lead.refuseReason || '');
-      });
-      localStorage.setItem('pv_refused_synced', '1');
-    }
-  }, [isLoading, leads, addRefusedRecord]);
 
   // Poll Airtable every 30s to pick up status changes made directly in Airtable
   useEffect(() => {
@@ -96,37 +86,21 @@ export function LeadsProvider({ children }) {
       return;
     }
 
-    // If lead was refused and is now moving to another status, AWAIT the delete
-    // so the Refused record is gone before the refetch runs (prevents status revert)
-    if (lead.status === 'refused') {
-      await deleteFromRefusedTable(id);
-    }
-
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') showToast('Status updated ✓');
-  }, [changeStatus, showToast, leads, deleteFromRefusedTable]);
+  }, [changeStatus, showToast, leads]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
-    const lead = leads.find(l => l.id === refuseModalId);
-    // Sequential: patch Refusal Reason first, then create Refused record, then patch Lead Status
+    // Sequential: patch Refusal Reason first, then patch Lead Status
     await setRefuseReason(refuseModalId, reason);
-    await addRefusedRecord(lead, reason);
     const result = await changeStatus(refuseModalId, 'refused');
-    if (typeof result === 'string' && result.startsWith('patchErr:')) {
-      // The Refused table was updated successfully but the Lead Status PATCH failed.
-      // Most likely cause: "Refused" is not a valid option in the Airtable Lead Status
-      // singleSelect field. Go to Airtable → Lead Status field → add "Refused" option.
-      const errDetail = result.slice('patchErr:'.length);
-      console.warn('Lead Status PATCH failed for refused:', errDetail);
-      showToast('Refused ✓ — Note: Lead Status not updated in Airtable (see console)');
-    } else {
-      showToast('Status updated ✓');
-    }
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else showToast('Status updated ✓');
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-  }, [refuseModalId, leads, changeStatus, setRefuseReason, showToast, addRefusedRecord]);
+  }, [refuseModalId, changeStatus, setRefuseReason, showToast]);
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);

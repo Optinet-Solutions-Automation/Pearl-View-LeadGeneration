@@ -166,11 +166,8 @@ export function useLeads() {
         if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
         allRecords = data.records;
       }
-      // ── Fetch revenue + refused in parallel ──────────────────────────────────
-      const [revenueRecs, refusedRecs] = await Promise.all([
-        fetchRecords(AT_TABLES.revenue),
-        fetchRecords(AT_TABLES.refused),
-      ]);
+      // ── Fetch revenue in parallel ─────────────────────────────────────────────
+      const revenueRecs = await fetchRecords(AT_TABLES.revenue);
       // Build phone → payment lookup (highest amount wins per phone)
       const paymentByPhone = {};
       revenueRecs.forEach(r => {
@@ -188,26 +185,12 @@ export function useLeads() {
           }
         }
       });
-      // Build phone → refused record ID lookup
-      const refusedByPhone = {};
-      refusedRecs.forEach(r => {
-        const phone = (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase();
-        if (phone) refusedByPhone[phone] = r.id;
-      });
 
       const all = allRecords.map(r => {
         const lead = normaliseRecord(r);
         const phoneKey = (lead.phone || '').replace(/\s/g, '').toLowerCase();
         const payment = phoneKey ? (paymentByPhone[phoneKey] || {}) : {};
-        // Cross-reference with Refused table — overrides Lead Status field
-        const refusedRecordId = phoneKey ? (refusedByPhone[phoneKey] || null) : null;
-        const merged = { ...lead, ...payment };
-        if (refusedRecordId && merged.status !== 'archived') {
-          merged.status = 'refused';
-          merged.progress = PROG_MAP['refused'] || 100;
-          merged.refusedRecordId = refusedRecordId;
-        }
-        return merged;
+        return { ...lead, ...payment };
       });
       const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
       const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
@@ -250,17 +233,16 @@ export function useLeads() {
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status, ...extraFields };
     const result = await patchAirtable(updatedLead.airtableId, atFields);
     const patchFailed = !result || result.__patchFailed;
-    if (patchFailed && status !== 'refused') {
-      // PATCH failed — revert optimistic update (not for refused: Refused table is source of truth)
+    if (patchFailed) {
+      // PATCH failed — revert optimistic update
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
     // Only re-confirm status/progress from Airtable response — do NOT overwrite other
     // fields (quote amount, notes, etc.) that may have separate in-flight PATCHes
-    const confirmedResult = patchFailed ? null : result;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      const confirmed = confirmedResult ? normaliseRecord(confirmedResult) : null;
+      const confirmed = normaliseRecord(result);
       const confirmedStatus   = confirmed?.status   ?? status;
       const confirmedProgress = confirmed?.progress ?? (PROG_MAP[status] || 10);
       return { ...l, status: confirmedStatus, progress: confirmedProgress };
@@ -276,12 +258,6 @@ export function useLeads() {
         });
         if (match) updateRecord(AT_TABLES.revenue, match.id, { 'Status': 'Job Done' });
       });
-    }
-    // For 'refused': if the Lead Status PATCH failed, propagate the error so the
-    // caller (confirmRefuse) can show a diagnostic toast. The app still shows the
-    // lead as refused (Refused table is the source of truth).
-    if (patchFailed && status === 'refused') {
-      return `patchErr:${result?.error || 'Lead Status field rejected "Refused" — check Airtable field options'}`;
     }
     return 'ok';
   }, [patchAirtable]);
@@ -515,45 +491,6 @@ export function useLeads() {
     }
   }, []);
 
-  // ─── Write lead data to the Refused table (awaitable) ────────────────────────
-  const addRefusedRecord = useCallback(async (lead, reason) => {
-    if (!lead) return null;
-    return createRecord(AT_TABLES.refused, {
-      'Client Name':              lead.name || '',
-      'Phone Number':             lead.phone || '',
-      'Email':                    lead.email || '',
-      'Inquiry Subject/Reason':   lead.subject || '',
-      'Inquiry Date':             lead.date || '',
-      'Adress':                   lead.address || '',
-      'Notes':                    lead.notes || '',
-      'Lead Status':              'Refused',
-      'Refusal Reason':           REFUSED_REASON_MAP[reason] || '',
-    });
-  }, []);
-
-  // ─── Remove lead from Refused table — async so callers can await the delete ──
-  const deleteFromRefusedTable = useCallback(async (id) => {
-    let refusedRecordId = null;
-    let phone = null;
-    // Read lead info synchronously via functional setter
-    setLeads(prev => {
-      const lead = prev.find(l => l.id === id);
-      refusedRecordId = lead?.refusedRecordId || null;
-      phone = lead?.phone || null;
-      return prev.map(l => l.id === id ? { ...l, refusedRecordId: null } : l);
-    });
-    if (refusedRecordId) {
-      await deleteRecord(AT_TABLES.refused, refusedRecordId);
-    } else if (phone) {
-      const pn = phone.replace(/\s/g, '').toLowerCase();
-      const recs = await fetchRecords(AT_TABLES.refused);
-      const match = recs.find(r =>
-        (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase() === pn
-      );
-      if (match) await deleteRecord(AT_TABLES.refused, match.id);
-    }
-  }, []);
-
   // ─── Calendar booking operations ─────────────────────────────────────────────
 
   const addCalBooking = useCallback(async (data) => {
@@ -664,6 +601,6 @@ export function useLeads() {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord, deleteFromRefusedTable, deletePayment,
+    deletePayment,
   };
 }
