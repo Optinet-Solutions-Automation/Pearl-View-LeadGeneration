@@ -278,7 +278,7 @@ function ScheduleModal({ lead, onSubmit, onClose }) {
 export default function DetailPanel() {
   const {
     activeLead: l, closePanel, changeStatus,
-    saveNote, saveJobType, savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
+    saveNote, saveJobType, savePaidInfo, deletePayment, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
     archiveLead, showToast, renameLead, setRefuseReason, scheduleBooking,
   } = useLeadsContext();
 
@@ -353,7 +353,8 @@ export default function DetailPanel() {
     setQuoteModalOpen(false);
     showToast('Quote sent ✓');
   }
-  function handleJobDone()   { changeStatus(l.id, 'job_done'); }
+  function handleJobDone()         { changeStatus(l.id, 'job_done'); }
+  function handleDeletePayment()   { deletePayment(l.id); }
 
   function startEditName() { setEditNameVal(l.name); setEditingName(true); }
   function saveName() { const t = editNameVal.trim() || l.name; renameLead(l.id, t); setEditingName(false); }
@@ -450,13 +451,24 @@ export default function DetailPanel() {
         {/* Status */}
         <div className="psec">
           <div className="psec-title">Status</div>
-          <select className="status-sel" value={l.status} onChange={e => changeStatus(l.id, e.target.value)}>
+          <select
+            className="status-sel"
+            value={l.status}
+            onChange={e => changeStatus(l.id, e.target.value)}
+            disabled={l.status === 'job_done' && l.paid && l.paidAmount > 0}
+            title={l.status === 'job_done' && l.paid && l.paidAmount > 0 ? 'Remove payment record to change status' : undefined}
+          >
             <option value="new">🔵 New Lead</option>
             <option value="in_progress">🟡 In Progress</option>
             <option value="quote_sent">🟣 Quote Sent</option>
             <option value="refused">🚫 Refused</option>
             <option value="job_done">✅ Job Done</option>
           </select>
+          {l.status === 'job_done' && l.paid && l.paidAmount > 0 && (
+            <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '5px' }}>
+              Remove payment to change status
+            </div>
+          )}
         </div>
 
         {/* Refuse reason buttons */}
@@ -556,10 +568,18 @@ export default function DetailPanel() {
             </div>
           </div>
           {l.jobDate && <div className="jrow"><span className="jlbl">Job Date</span><span className="jval">{l.jobDate}</span></div>}
-          <div className="jrow">
-            <span className="jlbl">Est. Value</span>
-            <span className="jval" style={{ color: 'var(--primary)' }}>{l.value > 0 ? '$' + l.value.toLocaleString() : '—'}</span>
-          </div>
+          {/* Est. Value: show for quote_sent; for job_done show payment if recorded, else estimate */}
+          {l.status === 'job_done' && l.paid && l.paidAmount > 0 ? (
+            <div className="jrow">
+              <span className="jlbl">Amount Paid</span>
+              <span className="jval" style={{ color: '#16a34a' }}>{'$' + l.paidAmount.toLocaleString()}</span>
+            </div>
+          ) : (l.status === 'quote_sent' || l.status === 'job_done') && l.value > 0 ? (
+            <div className="jrow">
+              <span className="jlbl">Est. Value</span>
+              <span className="jval" style={{ color: 'var(--primary)' }}>{'$' + l.value.toLocaleString()}</span>
+            </div>
+          ) : null}
           <div className="jrow"><span className="jlbl">Lead Source</span>{srcTag}</div>
         </div>
 
@@ -567,19 +587,27 @@ export default function DetailPanel() {
         <div className="psec">
           <div className="psec-title">Payment</div>
           {l.paid ? (
-            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>✓ Payment Recorded</div>
-                <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '3px' }}>
-                  ${(l.paidAmount || 0).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
-                  {l.paymentMethod ? ` · ${l.paymentMethod.toUpperCase()}` : ''}
+            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>✓ Payment Recorded</div>
+                  <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '3px' }}>
+                    ${(l.paidAmount || 0).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                    {l.paymentMethod ? ` · ${l.paymentMethod.toUpperCase()}` : ''}
+                  </div>
                 </div>
+                <button
+                  onClick={handleSubmitPayment}
+                  style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d', background: '#fff', border: '1px solid #86efac', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                >
+                  Edit
+                </button>
               </div>
               <button
-                onClick={handleSubmitPayment}
-                style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d', background: '#fff', border: '1px solid #86efac', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                onClick={handleDeletePayment}
+                style={{ width: '100%', padding: '7px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
               >
-                Edit
+                Delete Payment &amp; Revenue Record
               </button>
             </div>
           ) : (

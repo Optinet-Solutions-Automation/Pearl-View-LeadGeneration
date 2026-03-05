@@ -179,6 +179,7 @@ export function useLeads() {
               paid: true,
               paidAmount: amount,
               paymentMethod: r.fields?.['Payment_Method'] || '',
+              revenueRecordId: r.id,
             };
           }
         }
@@ -368,6 +369,37 @@ export function useLeads() {
     }));
   }, [patchAirtable]);
 
+  const clearQuoteAmount = useCallback((id) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': 0 });
+      return { ...l, value: 0 };
+    }));
+  }, [patchAirtable]);
+
+  // ─── Delete payment: remove Revenue record from Airtable + clear local state ──
+  const deletePayment = useCallback((id) => {
+    setLeads(prev => {
+      const lead = prev.find(l => l.id === id);
+      if (!lead) return prev;
+      if (lead.revenueRecordId) {
+        deleteRecord(AT_TABLES.revenue, lead.revenueRecordId);
+      } else if (lead.phone) {
+        const phone = (lead.phone || '').replace(/\s/g, '').toLowerCase();
+        fetchRecords(AT_TABLES.revenue).then(recs => {
+          const match = recs.find(r =>
+            (r.fields?.['Phone'] || '').replace(/\s/g, '').toLowerCase() === phone
+          );
+          if (match) deleteRecord(AT_TABLES.revenue, match.id);
+        });
+      }
+      return prev.map(l => l.id === id
+        ? { ...l, paid: false, paidAmount: 0, paymentMethod: '', revenueRecordId: null }
+        : l
+      );
+    });
+  }, []);
+
   // Move lead to deleted history (soft delete) + sync to Airtable
   const archiveLead = useCallback((id) => {
     setLeads(prev => {
@@ -456,25 +488,19 @@ export function useLeads() {
     }
   }, []);
 
-  // ─── Write current lead data to the Refused table ────────────────────────────
-  const addRefusedRecord = useCallback((id, reason) => {
-    // Use functional setter to always read latest leads (avoids stale closure)
-    setLeads(prev => {
-      const lead = prev.find(l => l.id === id);
-      if (lead) {
-        createRecord(AT_TABLES.refused, {
-          'Client Name':              lead.name || '',
-          'Phone Number':             lead.phone || '',
-          'Email':                    lead.email || '',
-          'Inquiry Subject/Reason':   lead.subject || '',
-          'Inquiry Date':             lead.date || '',
-          'Adress':                   lead.address || '',
-          'Notes':                    lead.notes || '',
-          'Lead Status':              'Refused',
-          'Refusal Reason':           REFUSED_REASON_MAP[reason] || '',
-        });
-      }
-      return prev; // no state change, just side-effect
+  // ─── Write lead data to the Refused table (awaitable) ────────────────────────
+  const addRefusedRecord = useCallback(async (lead, reason) => {
+    if (!lead) return null;
+    return createRecord(AT_TABLES.refused, {
+      'Client Name':              lead.name || '',
+      'Phone Number':             lead.phone || '',
+      'Email':                    lead.email || '',
+      'Inquiry Subject/Reason':   lead.subject || '',
+      'Inquiry Date':             lead.date || '',
+      'Adress':                   lead.address || '',
+      'Notes':                    lead.notes || '',
+      'Lead Status':              'Refused',
+      'Refusal Reason':           REFUSED_REASON_MAP[reason] || '',
     });
   }, []);
 
@@ -604,10 +630,10 @@ export function useLeads() {
   return {
     leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
-    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
+    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount, clearQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord, deleteFromRefusedTable,
+    addRefusedRecord, deleteFromRefusedTable, deletePayment,
   };
 }

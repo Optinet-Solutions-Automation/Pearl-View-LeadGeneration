@@ -7,11 +7,11 @@ export function LeadsProvider({ children }) {
   const {
     leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
-    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
+    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount, clearQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord, deleteFromRefusedTable,
+    addRefusedRecord, deleteFromRefusedTable, deletePayment,
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -26,6 +26,11 @@ export function LeadsProvider({ children }) {
   const [refuseModalId, setRefuseModalId]             = useState(null);
   const [refuseModalPrevStatus, setRefuseModalPrevStatus] = useState(null);
 
+  // Quote-transfer modal state (when moving away from quote_sent)
+  const [quoteTransferModalId,     setQuoteTransferModalId]     = useState(null);
+  const [quoteTransferTargetStatus, setQuoteTransferTargetStatus] = useState(null);
+  const [quoteTransferLeadValue,   setQuoteTransferLeadValue]   = useState(0);
+
   useEffect(() => {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
   }, [fetchLeads]);
@@ -34,7 +39,7 @@ export function LeadsProvider({ children }) {
   useEffect(() => {
     if (!isLoading && leads.length > 0 && !localStorage.getItem('pv_refused_synced')) {
       leads.filter(l => l.status === 'refused').forEach(lead => {
-        addRefusedRecord(lead.id, lead.refuseReason || '');
+        addRefusedRecord(lead, lead.refuseReason || '');
       });
       localStorage.setItem('pv_refused_synced', '1');
     }
@@ -59,7 +64,10 @@ export function LeadsProvider({ children }) {
   const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
   const closeSidebar  = useCallback(() => setSidebarOpen(false), []);
 
-  // Intercepts 'refused' to show reason modal first
+  // Intercepts status changes with special rules:
+  // 1. 'refused'    → show RefuseModal
+  // 2. job_done+paid → block (must delete payment first)
+  // 3. quote_sent → in_progress/new → show QuoteTransferModal
   const handleChangeStatus = useCallback(async (id, status) => {
     if (status === 'refused') {
       const lead = leads.find(l => l.id === id);
@@ -67,11 +75,28 @@ export function LeadsProvider({ children }) {
       setRefuseModalId(id);
       return;
     }
-    // If lead was refused and is now moving to another status, remove from Refused table
+
     const lead = leads.find(l => l.id === id);
+
+    // Block status change on job_done leads that have a payment record
+    if (lead?.status === 'job_done' && lead?.paid && lead?.paidAmount > 0) {
+      showToast('Remove payment record first to change status');
+      return;
+    }
+
+    // Intercept quote_sent → in_progress or new: ask about the estimation
+    if (lead?.status === 'quote_sent' && (status === 'in_progress' || status === 'new')) {
+      setQuoteTransferModalId(id);
+      setQuoteTransferTargetStatus(status);
+      setQuoteTransferLeadValue(lead.value || 0);
+      return;
+    }
+
+    // If lead was refused and is now moving to another status, remove from Refused table
     if (lead?.status === 'refused') {
       deleteFromRefusedTable(id);
     }
+
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
     else if (result === 'ok') {
@@ -82,9 +107,10 @@ export function LeadsProvider({ children }) {
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
+    const lead = leads.find(l => l.id === refuseModalId);
     setRefuseReason(refuseModalId, reason);
-    // Always add to Refused table — source of truth regardless of Lead Status patch result
-    addRefusedRecord(refuseModalId, reason);
+    // Await so Refused record is definitely created before the re-fetch
+    await addRefusedRecord(lead, reason);
     const result = await changeStatus(refuseModalId, 'refused');
     if (result === 'error') {
       // Lead Status field may not have 'Refused' option — still show success since Refused table was updated
@@ -92,14 +118,39 @@ export function LeadsProvider({ children }) {
     } else if (result === 'ok') {
       showToast('Status updated ✓');
     }
-    setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
+    setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-  }, [refuseModalId, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
+  }, [refuseModalId, leads, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
+  }, []);
+
+  // Confirm moving a quote_sent lead back — optionally deleting the estimation
+  const confirmQuoteTransfer = useCallback(async (shouldDeleteQuote) => {
+    if (!quoteTransferModalId) return;
+    const id = quoteTransferModalId;
+    const targetStatus = quoteTransferTargetStatus;
+    if (shouldDeleteQuote) {
+      clearQuoteAmount(id);
+    }
+    const result = await changeStatus(id, targetStatus);
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else if (result === 'ok') {
+      showToast('Status updated ✓');
+      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
+    }
+    setQuoteTransferModalId(null);
+    setQuoteTransferTargetStatus(null);
+    setQuoteTransferLeadValue(0);
+  }, [quoteTransferModalId, quoteTransferTargetStatus, changeStatus, clearQuoteAmount, showToast, fetchLeads]);
+
+  const closeQuoteTransferModal = useCallback(() => {
+    setQuoteTransferModalId(null);
+    setQuoteTransferTargetStatus(null);
+    setQuoteTransferLeadValue(0);
   }, []);
 
   const handleToggleStar = useCallback((id) => toggleStar(id), [toggleStar]);
@@ -135,6 +186,11 @@ export function LeadsProvider({ children }) {
     setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
     return result;
   }, [savePaidInfo, changeStatus, showToast, fetchLeads, leads]);
+
+  const handleDeletePayment = useCallback((id) => {
+    deletePayment(id);
+    showToast('Payment record removed ✓');
+  }, [deletePayment, showToast]);
 
   const handleSaveCity = useCallback((id, city) => {
     saveCity(id, city);
@@ -241,11 +297,17 @@ export function LeadsProvider({ children }) {
       refuseModalPrevStatus,
       confirmRefuse,
       closeRefuseModal,
+      quoteTransferModalId,
+      quoteTransferTargetStatus,
+      quoteTransferLeadValue,
+      confirmQuoteTransfer,
+      closeQuoteTransferModal,
       changeStatus: handleChangeStatus,
       toggleStar: handleToggleStar,
       saveNote: handleSaveNote,
       saveJobType: handleSaveJobType,
       savePaidInfo: handleSavePaidInfo,
+      deletePayment: handleDeletePayment,
       saveCity: handleSaveCity,
       saveJobDate: handleSaveJobDate,
       saveEmail: handleSaveEmail,
