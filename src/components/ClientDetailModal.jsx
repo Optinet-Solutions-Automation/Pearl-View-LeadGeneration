@@ -13,7 +13,7 @@ const STATUS_LABELS = {
 const iLbl = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-400)', marginBottom: '4px', display: 'block' };
 const iInput = { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#fff' };
 
-export default function ClientDetailModal({ client, onClose }) {
+export default function ClientDetailModal({ client, onClose, onArchive }) {
   const { leads, setCurrentPage, openPanel, updateClient } = useLeadsContext();
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -92,6 +92,14 @@ export default function ClientDetailModal({ client, onClose }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
+            {client.airtableId && !editing && onArchive && (
+              <button
+                onClick={() => { if (window.confirm('Archive this client?')) onArchive(client.airtableId); }}
+                style={{ background: 'var(--gray-100)', border: 'none', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#dc2626' }}
+              >
+                Archive
+              </button>
+            )}
             {client.airtableId && (
               <button
                 onClick={() => { setEditing(e => !e); setEditForm({ name: client.name||'', phone: client.phone||'', email: client.email||'', city: client.city||'', address: client.address||'', notes: client.notes||'' }); }}
@@ -152,6 +160,11 @@ export default function ClientDetailModal({ client, onClose }) {
                 <InfoCard icon="✉️" label="Email" value={client.email || '—'} href={client.email ? `mailto:${client.email}` : null} />
                 <InfoCard icon="📍" label="City" value={client.city || '—'} />
                 <InfoCard icon="🏠" label="Property" value={client.address || client.jobType || '—'} />
+                {client.leadSource && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <InfoCard icon="🌐" label="Lead Source" value={client.leadSource} />
+                  </div>
+                )}
               </div>
 
               {/* Notes */}

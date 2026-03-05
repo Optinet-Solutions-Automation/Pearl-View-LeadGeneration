@@ -110,6 +110,8 @@ function normaliseClient(rec) {
     city:       f['City']          || '',
     notes:      f['Notes']         || '',
     jobType:    f['Property Type'] || '',
+    leadSource: f['Lead Source']   || '',
+    status:     f['Status']        || '',
   };
 }
 
@@ -117,7 +119,8 @@ export function useLeads() {
   const [leads,        setLeads]        = useState([]);
   const [deletedLeads, setDeletedLeads] = useState([]);
   const [calBookings,  setCalBookings]  = useState([]);
-  const [clients,      setClients]      = useState([]);
+  const [clients,         setClients]         = useState([]);
+  const [archivedClients, setArchivedClients] = useState([]);
   const [isLoading,    setIsLoading]    = useState(true);
   // Track in-flight Airtable writes so silent polls don't overwrite optimistic UI
   const pendingWrites = useRef(0);
@@ -231,7 +234,9 @@ export function useLeads() {
 
       // ── Fetch clients (in parallel, non-blocking) ─────────────────────────────
       fetchRecords(AT_TABLES.clients).then(recs => {
-        setClients(recs.map(r => normaliseClient(r)));
+        const all = recs.map(r => normaliseClient(r));
+        setClients(all.filter(c => c.status !== 'Archived'));
+        setArchivedClients(all.filter(c => c.status === 'Archived'));
       });
     } catch (err) {
       console.error('Failed to load from Airtable:', err);
@@ -548,6 +553,7 @@ export function useLeads() {
       : clients.find(c => (c.name || '').toLowerCase().trim() === (lead.name || '').toLowerCase().trim());
     if (exists) return; // already in Clients table
     // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
+    const src = lead.leadSource || (lead.lp === 'LP2' ? 'Pearl View' : lead.lp === 'LP1' ? 'Crystal Pro' : '');
     const newId = await createRecord(AT_TABLES.clients, {
       'Client Name':   lead.name,
       'Phone Number':  lead.phone   || '',
@@ -556,6 +562,7 @@ export function useLeads() {
       'City':          lead.city    || '',
       'Notes':         lead.notes   || '',
       'Property Type': lead.jobType || '',
+      'Lead Source':   src,
     });
     if (newId) {
       setClients(prev => [...prev, {
@@ -563,6 +570,7 @@ export function useLeads() {
         name: lead.name, phone: lead.phone || '',
         email: lead.email || '', address: lead.address || '',
         city: lead.city || '', notes: lead.notes || '', jobType: lead.jobType || '',
+        leadSource: src, status: '',
       }]);
     }
   }, [clients]);
@@ -606,6 +614,7 @@ export function useLeads() {
 
     const newClients = [];
     for (const l of toCreate) {
+      const lpSrc = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
       // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
       const id = await createRecord(AT_TABLES.clients, {
         'Client Name':   l.name,
@@ -615,6 +624,7 @@ export function useLeads() {
         'City':          l.city    || '',
         'Notes':         l.notes   || '',
         'Property Type': l.jobType || '',
+        'Lead Source':   lpSrc,
       });
       if (id) {
         newClients.push({
@@ -622,6 +632,7 @@ export function useLeads() {
           name: l.name, phone: l.phone || '',
           email: l.email || '', address: l.address || '',
           city: l.city || '', notes: l.notes || '', jobType: l.jobType || '',
+          leadSource: lpSrc, status: '',
         });
       }
       // Respect Airtable rate limit (5 req/s)
@@ -745,6 +756,39 @@ export function useLeads() {
     });
   }, [patchAirtable]);
 
+  // ─── Archive a client (Status = 'Archived' in Airtable, moves to archivedClients) ──
+  const archiveClient = useCallback((airtableId) => {
+    if (!airtableId) return;
+    updateRecord(AT_TABLES.clients, airtableId, { 'Status': 'Archived' });
+    setClients(prev => {
+      const client = prev.find(c => c.airtableId === airtableId);
+      if (client) setArchivedClients(d => [{ ...client, status: 'Archived' }, ...d]);
+      return prev.filter(c => c.airtableId !== airtableId);
+    });
+  }, []);
+
+  // ─── Restore an archived client back to active ────────────────────────────────
+  const restoreClient = useCallback((airtableId) => {
+    if (!airtableId) return;
+    updateRecord(AT_TABLES.clients, airtableId, { 'Status': '' });
+    setArchivedClients(prev => {
+      const client = prev.find(c => c.airtableId === airtableId);
+      if (client) setClients(d => [{ ...client, status: '' }, ...d]);
+      return prev.filter(c => c.airtableId !== airtableId);
+    });
+  }, []);
+
+  // ─── Permanently delete a client from Airtable ───────────────────────────────
+  const permanentDeleteClient = useCallback((airtableId, fromArchived = false) => {
+    if (!airtableId) return;
+    deleteRecord(AT_TABLES.clients, airtableId);
+    if (fromArchived) {
+      setArchivedClients(prev => prev.filter(c => c.airtableId !== airtableId));
+    } else {
+      setClients(prev => prev.filter(c => c.airtableId !== airtableId));
+    }
+  }, []);
+
   return {
     leads, deletedLeads, calBookings, clients, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
@@ -753,5 +797,6 @@ export function useLeads() {
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
     deletePayment, syncToClients, upsertClient, syncClientsFromLeads, updateClient,
+    archivedClients, archiveClient, restoreClient, permanentDeleteClient,
   };
 }

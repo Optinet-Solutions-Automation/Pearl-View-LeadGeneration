@@ -8,9 +8,15 @@ const PAGE_SIZE = 10;
 const iLbl   = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-500)', marginBottom: '5px', display: 'block' };
 const iInput = { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#fff' };
 
+const LP_SOURCE_OPTIONS = [
+  { value: '',            label: 'Unknown' },
+  { value: 'Crystal Pro', label: 'Crystal Pro (LP1)' },
+  { value: 'Pearl View',  label: 'Pearl View (LP2)' },
+];
+
 // ── Add Client modal ──────────────────────────────────────────────────────────
 function AddClientModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', city: '', address: '', notes: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', city: '', address: '', notes: '', leadSource: '' });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -23,6 +29,7 @@ function AddClientModal({ onClose, onSave }) {
     await onSave({
       name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(),
       city: form.city.trim(), address: form.address.trim(), notes: form.notes.trim(),
+      leadSource: form.leadSource,
     });
     setSaving(false);
     onClose();
@@ -61,6 +68,12 @@ function AddClientModal({ onClose, onSave }) {
               <input value={form.address} onChange={e => setF('address', e.target.value)} style={iInput} placeholder="e.g. Residential" />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
+              <label style={iLbl}>Lead Source</label>
+              <select value={form.leadSource} onChange={e => setF('leadSource', e.target.value)} style={{ ...iInput, cursor: 'pointer' }}>
+                {LP_SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
               <label style={iLbl}>Notes</label>
               <textarea value={form.notes} onChange={e => setF('notes', e.target.value)} style={{ ...iInput, minHeight: '60px', resize: 'vertical' }} placeholder="Internal notes…" />
             </div>
@@ -80,7 +93,7 @@ function AddClientModal({ onClose, onSave }) {
 }
 
 export default function ClientsPage() {
-  const { leads, clients, syncClientsFromLeads, upsertClient, showToast } = useLeadsContext();
+  const { leads, clients, archivedClients, archiveClient, restoreClient, permanentDeleteClient, syncClientsFromLeads, upsertClient, showToast } = useLeadsContext();
   const [selectedClient, setSelectedClient] = useState(null);
   const [page, setPage] = useState(1);
   const [lpFilter, setLpFilter] = useState('all');
@@ -183,18 +196,18 @@ export default function ClientsPage() {
 
   // Apply search + LP filter
   const filtered = useMemo(() => {
-    let result = mergedClients;
+    let result = lpFilter === 'archived' ? (archivedClients || []) : mergedClients;
     if (lpFilter === 'LP1') result = result.filter(c => c.lp === 'LP1');
     else if (lpFilter === 'LP2') result = result.filter(c => c.lp === 'LP2');
     const term = localSearch.trim().toLowerCase();
     if (!term) return result;
     return result.filter(c =>
-      c.name.toLowerCase().includes(term) ||
-      (c.email  || '').toLowerCase().includes(term) ||
-      (c.phone  || '').toLowerCase().includes(term) ||
-      (c.city   || '').toLowerCase().includes(term)
+      (c.name  || '').toLowerCase().includes(term) ||
+      (c.email || '').toLowerCase().includes(term) ||
+      (c.phone || '').toLowerCase().includes(term) ||
+      (c.city  || '').toLowerCase().includes(term)
     );
-  }, [mergedClients, localSearch, lpFilter]);
+  }, [mergedClients, archivedClients, localSearch, lpFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -227,14 +240,21 @@ export default function ClientsPage() {
   }
 
   async function handleAddClient(data) {
-    await upsertClient({ name: data.name, phone: data.phone, email: data.email, city: data.city, address: data.address, notes: data.notes });
+    await upsertClient({ name: data.name, phone: data.phone, email: data.email, city: data.city, address: data.address, notes: data.notes, leadSource: data.leadSource });
     showToast('Client added ✓');
   }
 
+  function handleArchiveClient(airtableId) {
+    archiveClient(airtableId);
+    showToast('Client archived ✓');
+    setSelectedClient(null);
+  }
+
   const LP_TABS = [
-    { key: 'all', label: `All (${mergedClients.length})` },
-    { key: 'LP1', label: `LP1 (${lp1Count})` },
-    { key: 'LP2', label: `LP2 (${lp2Count})` },
+    { key: 'all',      label: `All (${mergedClients.length})` },
+    { key: 'LP1',      label: `Crystal Pro (${lp1Count})` },
+    { key: 'LP2',      label: `Pearl View (${lp2Count})` },
+    { key: 'archived', label: `Archived (${(archivedClients || []).length})` },
   ];
 
   return (
@@ -323,15 +343,16 @@ export default function ClientsPage() {
         ) : (
           paged.map(c => (
             <div
-              key={c.id}
-              onClick={() => setSelectedClient(c)}
+              key={c.airtableId || c.id}
+              onClick={lpFilter !== 'archived' ? () => setSelectedClient(c) : undefined}
               style={{
                 background: '#fff', border: '1px solid var(--gray-200)', borderRadius: '10px',
                 padding: '14px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center',
-                gap: '14px', cursor: 'pointer', transition: 'border-color .15s',
+                gap: '14px', cursor: lpFilter !== 'archived' ? 'pointer' : 'default',
+                transition: 'border-color .15s', opacity: lpFilter === 'archived' ? 0.8 : 1,
               }}
-              onMouseOver={e => e.currentTarget.style.borderColor = 'var(--blue-200)'}
-              onMouseOut={e  => e.currentTarget.style.borderColor = 'var(--gray-200)'}
+              onMouseOver={lpFilter !== 'archived' ? (e => e.currentTarget.style.borderColor = 'var(--blue-200)') : undefined}
+              onMouseOut={lpFilter !== 'archived'  ? (e => e.currentTarget.style.borderColor = 'var(--gray-200)') : undefined}
             >
               {/* Avatar */}
               <div style={{
@@ -359,7 +380,7 @@ export default function ClientsPage() {
                     <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '6px', flexShrink: 0,
                       background: c.lp === 'LP1' ? '#eff6ff' : '#fdf4ff',
                       color:      c.lp === 'LP1' ? 'var(--primary)' : '#7c3aed',
-                    }}>{c.lp}</span>
+                    }}>{c.lp === 'LP1' ? 'Crystal Pro' : 'Pearl View'}</span>
                   )}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--gray-500)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -370,22 +391,39 @@ export default function ClientsPage() {
               </div>
 
               {/* Right side */}
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginBottom: '4px' }}>
-                  {c.latestValue > 0 && (
-                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0d9488' }}>${c.latestValue.toLocaleString()}</span>
-                  )}
-                  {c.leadCount > 0 && (
-                    <span style={{ fontSize: '10.5px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', borderRadius: '20px', padding: '1px 7px' }}>
-                      {c.leadCount} lead{c.leadCount !== 1 ? 's' : ''}
-                    </span>
+              {lpFilter === 'archived' ? (
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); restoreClient(c.airtableId); showToast('Client restored ✓'); }}
+                    style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, borderRadius: '6px', border: '1.5px solid #16a34a', background: '#f0fdf4', color: '#16a34a', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Restore
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); if (window.confirm('Permanently delete this client? This cannot be undone.')) { permanentDeleteClient(c.airtableId, true); showToast('Client permanently deleted'); } }}
+                    style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, borderRadius: '6px', border: '1.5px solid #dc2626', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                    {c.latestValue > 0 && (
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0d9488' }}>${c.latestValue.toLocaleString()}</span>
+                    )}
+                    {c.leadCount > 0 && (
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', borderRadius: '20px', padding: '1px 7px' }}>
+                        {c.leadCount} lead{c.leadCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{c.date ? formatDate(c.date) : '—'}</div>
+                  {!c.fromClients && (
+                    <div style={{ fontSize: '10px', color: 'var(--gray-300)', marginTop: '2px' }}>from leads</div>
                   )}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{c.date ? formatDate(c.date) : '—'}</div>
-                {!c.fromClients && (
-                  <div style={{ fontSize: '10px', color: 'var(--gray-300)', marginTop: '2px' }}>from leads</div>
-                )}
-              </div>
+              )}
             </div>
           ))
         )}
@@ -425,6 +463,7 @@ export default function ClientsPage() {
         <ClientDetailModal
           client={selectedClient}
           onClose={() => setSelectedClient(null)}
+          onArchive={handleArchiveClient}
         />
       )}
     </div>
