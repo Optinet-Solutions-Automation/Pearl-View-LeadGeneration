@@ -16,6 +16,7 @@ const AT_TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN || '';
 const AT_BASE  = import.meta.env.VITE_AIRTABLE_BASE_ID || '';
 
 export const AT_TABLES = {
+  leads:    import.meta.env.VITE_AIRTABLE_TABLE_ID          || 'Leads',
   expenses: import.meta.env.VITE_AIRTABLE_EXPENSES_TABLE_ID || 'Expenses',
   calendar: import.meta.env.VITE_AIRTABLE_CALENDAR_TABLE_ID || 'Bookings',
   revenue:  import.meta.env.VITE_AIRTABLE_REVENUE_TABLE_ID  || 'Revenue',

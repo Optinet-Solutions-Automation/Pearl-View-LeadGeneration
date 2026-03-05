@@ -122,32 +122,54 @@ export default function ClientsPage() {
       if (normalName)  seenNames.add(normalName);
     });
 
+    // Include ALL leads (form + call) not already covered by Clients table
+    // For call leads with no real name ("Unknown Caller"), use phone number as display name
     leads
-      .filter(l => !l.hasCall && l.name !== 'Unknown' && l.name !== 'Unknown Caller')
+      .filter(l => {
+        const realName = l.name !== 'Unknown' && l.name !== 'Unknown Caller';
+        // Include if has a real name, OR if it's a call lead with a phone number (display phone as name)
+        return realName || !!l.phone;
+      })
       .forEach(l => {
+        const displayName = (l.name === 'Unknown' || l.name === 'Unknown Caller')
+          ? l.phone  // fallback to phone number as display name
+          : l.name;
+        if (!displayName) return;
+
         const normalPhone = (l.phone || '').replace(/\s/g, '').toLowerCase();
-        const normalName  = (l.name  || '').toLowerCase().trim();
+        const normalName  = displayName.toLowerCase().trim();
+
+        // Skip if already seen (dedup form + call leads with same phone)
         if (normalPhone && seenPhones.has(normalPhone)) return;
         if (!normalPhone && seenNames.has(normalName))  return;
-        if (normalPhone) { if (seenPhones.has(normalPhone)) return; seenPhones.add(normalPhone); }
-        else             { if (seenNames.has(normalName))   return; seenNames.add(normalName);  }
+        if (normalPhone) seenPhones.add(normalPhone);
+        else             seenNames.add(normalName);
+
+        // Count ALL leads (form + call) sharing the same phone
+        const allMatchingLeads = normalPhone
+          ? leads.filter(x => (x.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone)
+          : leads.filter(x => x.id === l.id);
+
+        // Use the latest lead for status/value/date
+        const sortedMatches = allMatchingLeads.sort((a, b) => b.dateObj - a.dateObj);
+        const latestLead = sortedMatches[0];
 
         result.push({
           id:          l.id,
           airtableId:  null,
-          name:        l.name,
+          name:        displayName,
           phone:       l.phone  || '',
-          email:       l.email  || '',
-          address:     l.address || '',
-          city:        l.city   || '',
-          notes:       l.notes  || '',
-          jobType:     l.jobType || '',
-          date:        l.date,
-          dateObj:     l.dateObj,
-          leadCount:   1,
-          latestStatus: l.status,
-          latestValue:  l.value || 0,
-          lp:          l.lp || null,
+          email:       latestLead.email  || '',
+          address:     latestLead.address || '',
+          city:        latestLead.city   || '',
+          notes:       latestLead.notes  || '',
+          jobType:     latestLead.jobType || '',
+          date:        latestLead.date,
+          dateObj:     latestLead.dateObj,
+          leadCount:   allMatchingLeads.length,
+          latestStatus: latestLead.status,
+          latestValue:  latestLead.value || 0,
+          lp:          latestLead.lp || null,
           fromClients:  false,
         });
       });

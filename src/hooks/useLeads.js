@@ -448,7 +448,8 @@ export function useLeads() {
       if (lead?.airtableId) {
         // Register ID immediately so fetchLeads polls don't bring it back before delete completes
         permanentlyDeletedIds.current.add(lead.airtableId);
-        deleteRecord(AT_TABLE, lead.airtableId);
+        // Use AT_TABLES.leads (has fallback name) instead of AT_TABLE which may be '' in production
+        deleteRecord(AT_TABLES.leads, lead.airtableId);
       }
       return prev.filter(l => l.id !== id);
     });
@@ -546,20 +547,19 @@ export function useLeads() {
       ? clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone)
       : clients.find(c => (c.name || '').toLowerCase().trim() === (lead.name || '').toLowerCase().trim());
     if (exists) return; // already in Clients table
+    // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
     const newId = await createRecord(AT_TABLES.clients, {
-      'Client Name': lead.name,
-      'Phone':       lead.phone || '',
-      'Email':       lead.email || '',
-      'Address':     lead.address || '',
-      'City':        lead.city || '',
-      'Notes':       lead.notes || '',
+      'Client Name':  lead.name,
+      'Phone Number': lead.phone || '',
+      'Email':        lead.email || '',
+      'Adress':       lead.address || '',
     });
     if (newId) {
       setClients(prev => [...prev, {
         id: newId, airtableId: newId,
         name: lead.name, phone: lead.phone || '',
         email: lead.email || '', address: lead.address || '',
-        city: lead.city || '', notes: lead.notes || '', jobType: '',
+        city: '', notes: '', jobType: '',
       }]);
     }
   }, [clients]);
@@ -603,13 +603,12 @@ export function useLeads() {
 
     const newClients = [];
     for (const l of toCreate) {
+      // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
       const id = await createRecord(AT_TABLES.clients, {
-        'Client Name': l.name,
-        'Phone':       l.phone   || '',
-        'Email':       l.email   || '',
-        'Address':     l.address || '',
-        'City':        l.city    || '',
-        'Notes':       l.notes   || '',
+        'Client Name':  l.name,
+        'Phone Number': l.phone   || '',
+        'Email':        l.email   || '',
+        'Adress':       l.address || '',
       });
       if (id) {
         newClients.push({

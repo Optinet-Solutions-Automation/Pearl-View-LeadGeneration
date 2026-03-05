@@ -229,7 +229,8 @@ export function LeadsProvider({ children }) {
     showToast('New lead added ✓');
     const airtableId = await addLead(data);
     if (!airtableId) showToast('Failed to save to Airtable — check connection');
-  }, [addLead, showToast]);
+    else upsertClient({ name: data.name, phone: data.phone, email: data.email, address: data.address });
+  }, [addLead, showToast, upsertClient]);
 
   const toggleStatFilter = useCallback((type) => {
     setStatFilter(prev => (prev === type ? null : type));

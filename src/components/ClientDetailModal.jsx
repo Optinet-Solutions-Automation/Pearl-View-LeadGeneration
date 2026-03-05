@@ -47,16 +47,23 @@ export default function ClientDetailModal({ client, onClose }) {
   function handleSave() {
     if (!editForm.name.trim()) return;
     setSaving(true);
+    // atFields: ONLY fields that exist in the Airtable Clients table
+    // (unknown fields cause the entire PATCH to fail)
+    // Clients table default schema: Client Name, Phone Number, Email, Adress (sic)
     const atFields = {};
     const localFields = {};
-    if (editForm.name    !== client.name)    { atFields['Client Name'] = editForm.name;    localFields.name    = editForm.name;    }
-    if (editForm.phone   !== client.phone)   { atFields['Phone']        = editForm.phone;   localFields.phone   = editForm.phone;   }
+    if (editForm.name    !== client.name)    { atFields['Client Name']  = editForm.name;    localFields.name    = editForm.name;    }
+    if (editForm.phone   !== client.phone)   { atFields['Phone Number'] = editForm.phone;   localFields.phone   = editForm.phone;   }
     if (editForm.email   !== client.email)   { atFields['Email']        = editForm.email;   localFields.email   = editForm.email;   }
-    if (editForm.city    !== client.city)    { atFields['City']         = editForm.city;    localFields.city    = editForm.city;    }
-    if (editForm.address !== client.address) { atFields['Address']      = editForm.address; localFields.address = editForm.address; }
-    if (editForm.notes   !== client.notes)   { atFields['Notes']        = editForm.notes;   localFields.notes   = editForm.notes;   }
+    if (editForm.address !== client.address) { atFields['Adress']       = editForm.address; localFields.address = editForm.address; }
+    // City and Notes: local-only (add "City" and "Notes" columns to your Clients table in Airtable to persist these)
+    if (editForm.city    !== client.city)    { localFields.city  = editForm.city;  }
+    if (editForm.notes   !== client.notes)   { localFields.notes = editForm.notes; }
     if (client.airtableId && Object.keys(atFields).length) {
       updateClient(client.airtableId, atFields, localFields);
+    } else if (Object.keys(localFields).length) {
+      // No Airtable fields changed but local fields did — update local state only
+      updateClient(client.airtableId, {}, localFields);
     }
     setSaving(false);
     setEditing(false);
