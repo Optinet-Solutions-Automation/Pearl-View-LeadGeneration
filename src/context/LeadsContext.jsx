@@ -7,7 +7,7 @@ export function LeadsProvider({ children }) {
   const {
     leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
-    savePaidInfo, saveCity, saveJobDate, saveEmail,
+    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
@@ -249,6 +249,7 @@ export function LeadsProvider({ children }) {
       saveCity: handleSaveCity,
       saveJobDate: handleSaveJobDate,
       saveEmail: handleSaveEmail,
+      saveQuoteAmount,
       renameLead: handleRename,
       setRefuseReason: handleSetRefuseReason,
       archiveLead: handleArchive,

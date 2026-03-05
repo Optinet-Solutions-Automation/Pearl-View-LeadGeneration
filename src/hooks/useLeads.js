@@ -360,6 +360,14 @@ export function useLeads() {
     }));
   }, [patchAirtable]);
 
+  const saveQuoteAmount = useCallback((id, amount) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': amount });
+      return { ...l, value: amount };
+    }));
+  }, [patchAirtable]);
+
   // Move lead to deleted history (soft delete) + sync to Airtable
   const archiveLead = useCallback((id) => {
     setLeads(prev => {
@@ -596,7 +604,7 @@ export function useLeads() {
   return {
     leads, deletedLeads, calBookings, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
-    savePaidInfo, saveCity, saveJobDate, saveEmail,
+    savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
