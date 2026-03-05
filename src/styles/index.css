@@ -837,28 +837,8 @@ body {
 .refresh-btn:hover { background: var(--gray-200); color: var(--gray-800); }
 .refresh-btn svg { width: 15px; height: 15px; }
 
-/* ── Hide bottom nav + FAB when mobile keyboard is open ─ */
+/* ── Hide bottom nav when mobile keyboard is open ─ */
 body.keyboard-open .mobile-bottom-nav { display: none !important; }
-body.keyboard-open .fab              { display: none !important; }
-
-/* ── FAB (Floating Action Button) ───────── */
-.fab {
-  display: none;
-  position: fixed;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  right: 20px;
-  width: 52px; height: 52px;
-  background: var(--primary);
-  color: #fff;
-  border: none; border-radius: 50%;
-  box-shadow: 0 4px 18px rgba(13,148,136,.45);
-  cursor: pointer;
-  align-items: center; justify-content: center;
-  z-index: 115;
-  transition: transform .15s ease, box-shadow .15s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.fab:active { transform: scale(.92); box-shadow: 0 2px 8px rgba(13,148,136,.3); }
 
 /* ── Pull-to-refresh ─────────────────────── */
 .ptr-indicator {
@@ -908,7 +888,6 @@ body.keyboard-open .fab              { display: none !important; }
   /* Burger hidden — navigation handled by bottom nav "More" tab */
   .burger-btn { display: none; }
   .mobile-bottom-nav { display: flex; }
-  .fab { display: flex; }
 
   /* Prevent iOS Safari from auto-zooming when inputs are focused.
      iOS zooms in when font-size < 16px — override to 16px on mobile. */

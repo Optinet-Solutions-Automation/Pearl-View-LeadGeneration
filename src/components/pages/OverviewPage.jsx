@@ -136,29 +136,23 @@ export default function OverviewPage() {
 
   return (
     <div className="page">
-      {/* ── Header ── */}
-      <div style={{ marginBottom: '4px' }}>
-        <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)' }}>Overview</div>
-        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Summary of your Pearl View lead activity</div>
-      </div>
-
       {/* ── Today's Snapshot ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-        <div style={{ background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '12px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#0f766e', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>New Today</div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#134e4a', lineHeight: 1 }}>{newToday}</div>
-          <div style={{ fontSize: '10.5px', color: '#0d9488', marginTop: '4px' }}>leads received</div>
+        <div style={{ background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '12px', padding: '12px 10px' }}>
+          <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#0f766e', marginBottom: '5px' }}>New Today</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: '#134e4a', lineHeight: 1 }}>{newToday}</div>
+          <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '4px' }}>received</div>
         </div>
-        <div style={{ background: followUpsDue.length > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue.length > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 14px', cursor: followUpsDue.length > 0 ? 'pointer' : 'default' }}
+        <div style={{ background: followUpsDue.length > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue.length > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: followUpsDue.length > 0 ? 'pointer' : 'default' }}
           onClick={() => followUpsDue.length > 0 && setCurrentPage('leads')}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>Follow-ups</div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-400)', lineHeight: 1 }}>{followUpsDue.length}</div>
-          <div style={{ fontSize: '10.5px', color: followUpsDue.length > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>overdue</div>
+          <div style={{ fontSize: '9.5px', fontWeight: 700, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-500)', marginBottom: '5px' }}>Follow-ups</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-400)', lineHeight: 1 }}>{followUpsDue.length}</div>
+          <div style={{ fontSize: '10px', color: followUpsDue.length > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>overdue</div>
         </div>
-        <div style={{ background: jobsToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${jobsToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: jobsToday > 0 ? '#d97706' : 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>Scheduled</div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: jobsToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{jobsToday}</div>
-          <div style={{ fontSize: '10.5px', color: jobsToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>jobs today</div>
+        <div style={{ background: jobsToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${jobsToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px' }}>
+          <div style={{ fontSize: '9.5px', fontWeight: 700, color: jobsToday > 0 ? '#d97706' : 'var(--gray-500)', marginBottom: '5px' }}>Scheduled</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: jobsToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{jobsToday}</div>
+          <div style={{ fontSize: '10px', color: jobsToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>jobs today</div>
         </div>
       </div>
 
@@ -167,11 +161,11 @@ export default function OverviewPage() {
         <SectionHeader title="Pipeline" />
         <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch', marginBottom: '10px' }}>
           {[
-            { label: 'New',        count: newLeads.length,   color: '#0d9488', bg: '#f0fdfa'  },
-            { label: 'In Progress',count: inProgress.length, color: '#2563eb', bg: '#eff6ff'  },
-            { label: 'Quoted',     count: quoteSent.length,  color: '#7c3aed', bg: '#ede9fe'  },
-            { label: 'Job Done',   count: jobDone.length,    color: '#16a34a', bg: '#f0fdf4'  },
-            { label: 'Refused',    count: refused.length,    color: '#dc2626', bg: '#fef2f2'  },
+            { label: 'New',      count: newLeads.length,   color: '#0d9488', bg: '#f0fdfa'  },
+            { label: 'Progress', count: inProgress.length, color: '#2563eb', bg: '#eff6ff'  },
+            { label: 'Quoted',   count: quoteSent.length,  color: '#7c3aed', bg: '#ede9fe'  },
+            { label: 'Done',     count: jobDone.length,    color: '#16a34a', bg: '#f0fdf4'  },
+            { label: 'Refused',  count: refused.length,    color: '#dc2626', bg: '#fef2f2'  },
           ].map((s, i, arr) => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}>
               <div style={{ flex: 1, background: s.bg, border: `1px solid ${s.color}22`, borderRadius: '8px', padding: '9px 6px', textAlign: 'center' }}>
@@ -215,15 +209,15 @@ export default function OverviewPage() {
 
       {/* ── Revenue Snapshot ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 16px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>Revenue Collected</div>
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 14px' }}>
+          <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#15803d', marginBottom: '5px' }}>Revenue Collected</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#14532d', lineHeight: 1 }}>{totalRevenue > 0 ? fmt$(totalRevenue) : '—'}</div>
-          <div style={{ fontSize: '10.5px', color: '#16a34a', marginTop: '4px' }}>{leads.filter(l => l.paid).length} paid jobs</div>
+          <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '4px' }}>{leads.filter(l => l.paid).length} paid jobs</div>
         </div>
-        <div style={{ background: pendingRevenue > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${pendingRevenue > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 16px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, color: pendingRevenue > 0 ? '#92400e' : 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>Pending (Quoted)</div>
+        <div style={{ background: pendingRevenue > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${pendingRevenue > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 14px' }}>
+          <div style={{ fontSize: '9.5px', fontWeight: 700, color: pendingRevenue > 0 ? '#92400e' : 'var(--gray-500)', marginBottom: '5px' }}>Quoted Pipeline</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: pendingRevenue > 0 ? '#b45309' : 'var(--gray-400)', lineHeight: 1 }}>{pendingRevenue > 0 ? fmt$(pendingRevenue) : '—'}</div>
-          <div style={{ fontSize: '10.5px', color: pendingRevenue > 0 ? '#d97706' : 'var(--gray-400)', marginTop: '4px' }}>{quoteSent.length} quotes open</div>
+          <div style={{ fontSize: '10px', color: pendingRevenue > 0 ? '#d97706' : 'var(--gray-400)', marginTop: '4px' }}>{quoteSent.length} quotes open</div>
         </div>
       </div>
 
