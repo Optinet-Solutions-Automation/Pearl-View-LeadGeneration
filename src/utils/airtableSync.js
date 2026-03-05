@@ -8,6 +8,7 @@
  *   VITE_AIRTABLE_EXPENSES_TABLE_ID  — Table ID/name for Expenses
  *   VITE_AIRTABLE_CALENDAR_TABLE_ID  — Table ID/name for Bookings
  *   VITE_AIRTABLE_REVENUE_TABLE_ID   — Table ID/name for Revenue
+ *   VITE_AIRTABLE_REFUSED_TABLE_ID   — Table ID/name for Refused
  */
 
 const IS_LOCAL = import.meta.env.DEV;
@@ -18,6 +19,7 @@ export const AT_TABLES = {
   expenses: import.meta.env.VITE_AIRTABLE_EXPENSES_TABLE_ID || 'Expenses',
   calendar: import.meta.env.VITE_AIRTABLE_CALENDAR_TABLE_ID || 'Bookings',
   revenue:  import.meta.env.VITE_AIRTABLE_REVENUE_TABLE_ID  || 'Revenue',
+  refused:  import.meta.env.VITE_AIRTABLE_REFUSED_TABLE_ID  || 'Refused',
 };
 
 // ─── Fetch all records from a table (handles Airtable pagination) ─────────────

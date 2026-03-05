@@ -72,6 +72,14 @@ function normaliseCalBooking(rec) {
   };
 }
 
+// ─── Refusal reason → Refused table singleSelect label ───────────────────────
+const REFUSED_REASON_MAP = {
+  too_expensive: '💰 Too Expensive',
+  competition:   '🏆 Went with Competition',
+  no_answer:     '📵 No Answer / Ghosted',
+  other:         '❓ Other',
+};
+
 // ─── Write a Revenue record when payment is recorded ─────────────────────────
 // status: 'Job Done' counts as income in Reports; anything else is In Progress
 function writeRevenue(lead, paidAmount, paymentMethod, status) {
@@ -420,6 +428,23 @@ export function useLeads() {
     }
   }, []);
 
+  // ─── Write current lead data to the Refused table ────────────────────────────
+  const addRefusedRecord = useCallback((id, reason) => {
+    const lead = leads.find(l => l.id === id);
+    if (!lead) return;
+    createRecord(AT_TABLES.refused, {
+      'Client Name':              lead.name || '',
+      'Phone Number':             lead.phone || '',
+      'Email':                    lead.email || '',
+      'Inquiry Subject/Reason':   lead.subject || '',
+      'Inquiry Date':             lead.date || '',
+      'Adress':                   lead.address || '',
+      'Notes':                    lead.notes || '',
+      'Lead Status':              'Refused',
+      'Refusal Reason':           REFUSED_REASON_MAP[reason] || '',
+    });
+  }, [leads]);
+
   // ─── Calendar booking operations ─────────────────────────────────────────────
 
   const addCalBooking = useCallback(async (data) => {
@@ -530,5 +555,6 @@ export function useLeads() {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
+    addRefusedRecord,
   };
 }
