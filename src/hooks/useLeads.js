@@ -295,11 +295,14 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const setRefuseReason = useCallback((id, reason) => {
+    let airtableId = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Refusal Reason': REFUSED_REASON_MAP[reason] || reason });
+      airtableId = l.airtableId;
       return { ...l, refuseReason: reason };
     }));
+    const mapped = REFUSED_REASON_MAP[reason] || reason;
+    return airtableId ? patchAirtable(airtableId, { 'Refusal Reason': mapped }) : Promise.resolve(null);
   }, [patchAirtable]);
 
   // ─── Save payment info ─────────────────────────────────────────────────────────

@@ -110,8 +110,8 @@ export function LeadsProvider({ children }) {
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
     const lead = leads.find(l => l.id === refuseModalId);
-    setRefuseReason(refuseModalId, reason);
-    // Await so Refused record is definitely created before the re-fetch
+    // Sequential: patch Refusal Reason first, then create Refused record, then patch Lead Status
+    await setRefuseReason(refuseModalId, reason);
     await addRefusedRecord(lead, reason);
     const result = await changeStatus(refuseModalId, 'refused');
     if (result === 'error') {
