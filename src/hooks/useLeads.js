@@ -117,12 +117,12 @@ export function useLeads() {
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}/${airtableId}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${AT_TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fields }),
+          body: JSON.stringify({ fields, typecast: true }),
         })
       : fetch('/api/update-lead', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ airtableId, fields }),
+          body: JSON.stringify({ airtableId, fields, typecast: true }),
         });
     return req
       .then(r => {

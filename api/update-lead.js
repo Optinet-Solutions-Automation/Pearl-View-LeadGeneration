@@ -51,11 +51,11 @@ export default async (req, res) => {
   await new Promise(r => req.on('end', r));
 
   try {
-    const { airtableId, fields } = JSON.parse(body);
+    const { airtableId, fields, typecast } = JSON.parse(body);
     if (!airtableId || !fields) return res.status(400).json({ error: 'Missing airtableId or fields' });
 
     const url = `https://api.airtable.com/v0/${BASE}/${TABLE}/${airtableId}`;
-    const { status, data } = await patch(url, TOKEN, { fields });
+    const { status, data } = await patch(url, TOKEN, { fields, typecast: typecast !== false });
     if (status !== 200) return res.status(status).json(data);
     res.json(data);
   } catch (err) {
