@@ -218,6 +218,7 @@ export function useLeads() {
   // ─── Awaits the PATCH — confirms status from Airtable response without overwriting
   //     other fields that may have their own in-flight PATCHes (e.g. Quote Amount)
   const changeStatus = useCallback(async (id, status, extraFields = {}) => {
+    console.log('changeStatus called:', id, status);
     let prevLead = null;
     let updatedLead = null;
     setLeads(prev => prev.map(l => {
@@ -229,7 +230,10 @@ export function useLeads() {
       if (extraFields['Quote Amount'] !== undefined) extra.value = extraFields['Quote Amount'];
       return { ...l, status, progress: PROG_MAP[status] || 10, ...extra };
     }));
-    if (!updatedLead?.airtableId) return 'Status updated';
+    if (!updatedLead?.airtableId) {
+      console.warn('changeStatus: no lead/airtableId found for id:', id, '| updatedLead:', updatedLead);
+      return 'Status updated';
+    }
     const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status, ...extraFields };
     const result = await patchAirtable(updatedLead.airtableId, atFields);
     const patchFailed = !result || result.__patchFailed;
