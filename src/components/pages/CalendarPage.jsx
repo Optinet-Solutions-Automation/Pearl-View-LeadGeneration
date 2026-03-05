@@ -272,12 +272,13 @@ export default function CalendarPage() {
   const [tablePage,   setTablePage]   = useState(0);
 
   const monthLeadBookings = leads
-    .filter(l => l.jobDate)
+    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'archived')
     .map(l => ({ ...l, parsedDate: new Date(l.jobDate), isCalBooking: false }))
     .filter(b => b.parsedDate.getFullYear() === year && b.parsedDate.getMonth() === month);
 
   const monthCalBookings = calBookings
     .filter(b => { const d = new Date(b.date); return d.getFullYear() === year && d.getMonth() === month; })
+    .filter(b => b.bookingStatus !== 'Cancelled')
     .map(b => ({ ...b, parsedDate: new Date(b.date), name: b.clientName, isCalBooking: true, jobType: b.service }));
 
   const allMonthBookings = [...monthLeadBookings, ...monthCalBookings];
