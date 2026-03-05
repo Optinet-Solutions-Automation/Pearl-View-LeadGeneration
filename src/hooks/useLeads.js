@@ -370,11 +370,13 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const saveQuoteAmount = useCallback((id, amount) => {
+    let airtableId = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': amount });
+      airtableId = l.airtableId;
       return { ...l, value: amount };
     }));
+    return airtableId ? patchAirtable(airtableId, { 'Quote Amount': amount }) : Promise.resolve(null);
   }, [patchAirtable]);
 
   const clearQuoteAmount = useCallback((id) => {

@@ -348,8 +348,9 @@ export default function DetailPanel() {
   function handleSendQuote() { setQuoteModalOpen(true); }
 
   async function onQuoteSubmit(amount) {
-    // Combine quote amount + status change into ONE Airtable PATCH to avoid race conditions
-    await changeStatus(l.id, 'quote_sent', { 'Quote Amount': amount });
+    // Sequential: save quote amount first, then change status
+    await saveQuoteAmount(l.id, amount);
+    await changeStatus(l.id, 'quote_sent');
     setQuoteModalOpen(false);
     showToast('Quote sent ✓');
   }

@@ -120,10 +120,9 @@ export function LeadsProvider({ children }) {
     } else if (result === 'ok') {
       showToast('Status updated ✓');
     }
-    setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-  }, [refuseModalId, leads, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
+  }, [refuseModalId, leads, changeStatus, setRefuseReason, showToast, addRefusedRecord]);
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);
