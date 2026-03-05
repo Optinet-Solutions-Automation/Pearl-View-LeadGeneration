@@ -575,47 +575,71 @@ export function useLeads() {
     }
   }, [clients]);
 
-  // ─── Populate Clients table from leads (one-time sync, skips existing) ───────
-  // Returns count of newly created records.
+  // ─── Populate Clients table from leads ───────────────────────────────────────
+  // - Creates new Clients records for leads not already in the table
+  // - Updates Lead Source for existing clients that have it blank
+  // Returns count of records created or updated.
   const syncClientsFromLeads = useCallback(async () => {
-    const seenPhones = new Set();
-    const seenNames  = new Set();
+    // Build a phone → client map for quick lookup
+    const phoneToClient = {};
+    const nameToClient  = {};
     clients.forEach(c => {
       const p = (c.phone || '').replace(/\s/g, '').toLowerCase();
-      if (p) seenPhones.add(p);
-      else   seenNames.add((c.name || '').toLowerCase().trim());
+      if (p) phoneToClient[p] = c;
+      else   nameToClient[(c.name || '').toLowerCase().trim()] = c;
     });
 
     const toCreate = [];
+    const toUpdate = []; // existing clients missing Lead Source
     const batchPhones = new Set();
     const batchNames  = new Set();
 
     leads.forEach(l => {
       const rawName = (l.name || '').trim();
-      // Use phone as display name if real name is missing/unknown
       const displayName = (rawName && rawName !== 'Unknown' && rawName !== 'Unknown Caller')
         ? rawName : (l.phone || null);
       if (!displayName) return;
 
-      const phone  = (l.phone || '').replace(/\s/g, '').toLowerCase();
-      const lname  = displayName.toLowerCase();
+      const phone = (l.phone || '').replace(/\s/g, '').toLowerCase();
+      const lname = displayName.toLowerCase();
+      const lpSrc = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
 
+      // Check if already exists
+      const existing = phone ? phoneToClient[phone] : nameToClient[lname];
+      if (existing) {
+        // Update Lead Source if blank
+        if (!existing.leadSource && existing.airtableId) {
+          toUpdate.push({ client: existing, lpSrc });
+        }
+        return;
+      }
+
+      // Not in Clients table — queue for creation (dedup within batch)
       if (phone) {
-        if (seenPhones.has(phone) || batchPhones.has(phone)) return;
+        if (batchPhones.has(phone)) return;
         batchPhones.add(phone);
       } else {
-        if (seenNames.has(lname) || batchNames.has(lname)) return;
+        if (batchNames.has(lname)) return;
         batchNames.add(lname);
       }
-      toCreate.push({ ...l, name: displayName });
+      toCreate.push({ ...l, name: displayName, lpSrc });
     });
 
-    if (toCreate.length === 0) return 0;
+    let count = 0;
 
+    // Update existing clients missing Lead Source
+    for (const { client, lpSrc } of toUpdate) {
+      updateRecord(AT_TABLES.clients, client.airtableId, { 'Lead Source': lpSrc });
+      setClients(prev => prev.map(c =>
+        c.airtableId === client.airtableId ? { ...c, leadSource: lpSrc } : c
+      ));
+      count++;
+      await new Promise(r => setTimeout(r, 220));
+    }
+
+    // Create new client records
     const newClients = [];
     for (const l of toCreate) {
-      const lpSrc = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
-      // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
       const id = await createRecord(AT_TABLES.clients, {
         'Client Name':   l.name,
         'Phone Number':  l.phone   || '',
@@ -624,7 +648,7 @@ export function useLeads() {
         'City':          l.city    || '',
         'Notes':         l.notes   || '',
         'Property Type': l.jobType || '',
-        'Lead Source':   lpSrc,
+        'Lead Source':   l.lpSrc,
       });
       if (id) {
         newClients.push({
@@ -632,14 +656,14 @@ export function useLeads() {
           name: l.name, phone: l.phone || '',
           email: l.email || '', address: l.address || '',
           city: l.city || '', notes: l.notes || '', jobType: l.jobType || '',
-          leadSource: lpSrc, status: '',
+          leadSource: l.lpSrc, status: '',
         });
+        count++;
       }
-      // Respect Airtable rate limit (5 req/s)
       await new Promise(r => setTimeout(r, 220));
     }
     if (newClients.length > 0) setClients(prev => [...prev, ...newClients]);
-    return newClients.length;
+    return count;
   }, [clients, leads]);
 
   // ─── Update a client record in Airtable + local state ────────────────────────
