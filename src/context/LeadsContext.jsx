@@ -11,11 +11,7 @@ export function LeadsProvider({ children }) {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-<<<<<<< HEAD
-    addRefusedRecord, deleteRefusedRecord, clearQuoteAmount,
-=======
     addRefusedRecord, deleteFromRefusedTable, deletePayment,
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
   } = useLeads();
 
   const [activeId, setActiveId]       = useState(null);
@@ -30,16 +26,10 @@ export function LeadsProvider({ children }) {
   const [refuseModalId, setRefuseModalId]             = useState(null);
   const [refuseModalPrevStatus, setRefuseModalPrevStatus] = useState(null);
 
-<<<<<<< HEAD
-  // Quote change modal state (fires when changing away from Quote Sent with a quote amount)
-  const [quoteModalId, setQuoteModalId]                   = useState(null);
-  const [quoteModalPendingStatus, setQuoteModalPendingStatus] = useState(null);
-=======
   // Quote-transfer modal state (when moving away from quote_sent)
-  const [quoteTransferModalId,     setQuoteTransferModalId]     = useState(null);
+  const [quoteTransferModalId,      setQuoteTransferModalId]      = useState(null);
   const [quoteTransferTargetStatus, setQuoteTransferTargetStatus] = useState(null);
-  const [quoteTransferLeadValue,   setQuoteTransferLeadValue]   = useState(0);
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
+  const [quoteTransferLeadValue,    setQuoteTransferLeadValue]    = useState(0);
 
   useEffect(() => {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
@@ -74,14 +64,10 @@ export function LeadsProvider({ children }) {
   const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), []);
   const closeSidebar  = useCallback(() => setSidebarOpen(false), []);
 
-<<<<<<< HEAD
-  // Central status change handler — enforces all business rules before committing
-=======
-  // Intercepts status changes with special rules:
-  // 1. 'refused'    → show RefuseModal
-  // 2. job_done+paid → block (must delete payment first)
+  // Central status change handler — enforces all business rules:
+  // 1. 'refused'        → show RefuseModal first
+  // 2. job_done + paid  → block (must delete payment first)
   // 3. quote_sent → in_progress/new → show QuoteTransferModal
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
   const handleChangeStatus = useCallback(async (id, status) => {
     const lead = leads.find(l => l.id === id);
     if (!lead) return;
@@ -102,28 +88,8 @@ export function LeadsProvider({ children }) {
       return;
     }
 
-<<<<<<< HEAD
-    // Rule: leaving Quote Sent when a quote amount exists → ask keep or clear
-    if (lead.status === 'quote_sent' && lead.value > 0) {
-      setQuoteModalId(id);
-      setQuoteModalPendingStatus(status);
-      return;
-    }
-
-    // Rule: leaving Refused → delete the record from the Refused table
-    if (lead.status === 'refused') {
-      deleteRefusedRecord(lead.phone).catch(() => {});
-=======
-    const lead = leads.find(l => l.id === id);
-
-    // Block status change on job_done leads that have a payment record
-    if (lead?.status === 'job_done' && lead?.paid && lead?.paidAmount > 0) {
-      showToast('Remove payment record first to change status');
-      return;
-    }
-
     // Intercept quote_sent → in_progress or new: ask about the estimation
-    if (lead?.status === 'quote_sent' && (status === 'in_progress' || status === 'new')) {
+    if (lead.status === 'quote_sent' && (status === 'in_progress' || status === 'new')) {
       setQuoteTransferModalId(id);
       setQuoteTransferTargetStatus(status);
       setQuoteTransferLeadValue(lead.value || 0);
@@ -132,23 +98,14 @@ export function LeadsProvider({ children }) {
 
     // If lead was refused and is now moving to another status, AWAIT the delete
     // so the Refused record is gone before the refetch runs (prevents status revert)
-    if (lead?.status === 'refused') {
+    if (lead.status === 'refused') {
       await deleteFromRefusedTable(id);
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
     }
 
     const result = await changeStatus(id, status);
     if (result === 'error') showToast('Failed to save — check your connection');
-<<<<<<< HEAD
     else if (result === 'ok') showToast('Status updated ✓');
-  }, [changeStatus, showToast, leads, deleteRefusedRecord]);
-=======
-    else if (result === 'ok') {
-      showToast('Status updated ✓');
-      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
-    }
-  }, [changeStatus, showToast, leads, fetchLeads, deleteFromRefusedTable]);
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
+  }, [changeStatus, showToast, leads, deleteFromRefusedTable]);
 
   const confirmRefuse = useCallback(async (reason) => {
     if (!refuseModalId) return;
@@ -162,51 +119,17 @@ export function LeadsProvider({ children }) {
       showToast('Status updated ✓');
     } else if (result === 'ok') {
       showToast('Status updated ✓');
-<<<<<<< HEAD
-      addRefusedRecord(refuseModalId, reason);
-=======
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
     }
     setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 1500);
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
-<<<<<<< HEAD
-  }, [refuseModalId, changeStatus, setRefuseReason, showToast, addRefusedRecord]);
-=======
   }, [refuseModalId, leads, changeStatus, setRefuseReason, showToast, fetchLeads, addRefusedRecord]);
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
 
   const closeRefuseModal = useCallback(() => {
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
   }, []);
 
-<<<<<<< HEAD
-  // Quote change modal: user picks keep or clear when leaving Quote Sent status
-  const confirmQuoteChange = useCallback(async (keepQuote) => {
-    const id = quoteModalId;
-    const status = quoteModalPendingStatus;
-    setQuoteModalId(null);
-    setQuoteModalPendingStatus(null);
-    if (!id || !status) return;
-
-    // If leaving Refused (edge case) also clean up the refused record
-    const lead = leads.find(l => l.id === id);
-    if (lead?.status === 'refused') deleteRefusedRecord(lead.phone).catch(() => {});
-
-    const result = await changeStatus(id, status);
-    if (result === 'error') {
-      showToast('Failed to save — check your connection');
-      return;
-    }
-    if (!keepQuote) clearQuoteAmount(id);
-    showToast('Status updated ✓');
-  }, [quoteModalId, quoteModalPendingStatus, changeStatus, clearQuoteAmount, showToast, leads, deleteRefusedRecord]);
-
-  const closeQuoteModal = useCallback(() => {
-    setQuoteModalId(null);
-    setQuoteModalPendingStatus(null);
-=======
   // Confirm moving a quote_sent lead back — optionally deleting the estimation
   const confirmQuoteTransfer = useCallback(async (shouldDeleteQuote) => {
     if (!quoteTransferModalId) return;
@@ -215,24 +138,16 @@ export function LeadsProvider({ children }) {
     setQuoteTransferModalId(null);
     setQuoteTransferTargetStatus(null);
     setQuoteTransferLeadValue(0);
-    if (shouldDeleteQuote) {
-      clearQuoteAmount(id);
-    }
-    // Always clean up any lingering Refused record (lead may have previously been refused)
-    await deleteFromRefusedTable(id);
+    if (shouldDeleteQuote) clearQuoteAmount(id);
     const result = await changeStatus(id, targetStatus);
     if (result === 'error') showToast('Failed to save — check your connection');
-    else if (result === 'ok') {
-      showToast('Status updated ✓');
-      setTimeout(() => fetchLeads({ silent: true }).catch(() => {}), 2000);
-    }
-  }, [quoteTransferModalId, quoteTransferTargetStatus, changeStatus, clearQuoteAmount, deleteFromRefusedTable, showToast, fetchLeads]);
+    else if (result === 'ok') showToast('Status updated ✓');
+  }, [quoteTransferModalId, quoteTransferTargetStatus, changeStatus, clearQuoteAmount, showToast]);
 
   const closeQuoteTransferModal = useCallback(() => {
     setQuoteTransferModalId(null);
     setQuoteTransferTargetStatus(null);
     setQuoteTransferLeadValue(0);
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
   }, []);
 
   const handleToggleStar = useCallback((id) => toggleStar(id), [toggleStar]);
@@ -379,18 +294,11 @@ export function LeadsProvider({ children }) {
       refuseModalPrevStatus,
       confirmRefuse,
       closeRefuseModal,
-<<<<<<< HEAD
-      quoteModalId,
-      quoteModalPendingStatus,
-      confirmQuoteChange,
-      closeQuoteModal,
-=======
       quoteTransferModalId,
       quoteTransferTargetStatus,
       quoteTransferLeadValue,
       confirmQuoteTransfer,
       closeQuoteTransferModal,
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
       changeStatus: handleChangeStatus,
       toggleStar: handleToggleStar,
       saveNote: handleSaveNote,

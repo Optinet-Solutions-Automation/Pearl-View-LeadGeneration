@@ -491,38 +491,10 @@ export function useLeads() {
     }
   }, []);
 
-<<<<<<< HEAD
-  // ─── Delete the Refused table record for a given phone number ────────────────
-  // Called when a refused lead's status changes to something else
-  const deleteRefusedRecord = useCallback(async (phone) => {
-    if (!phone) return;
-    const normalised = phone.replace(/\s/g, '').toLowerCase();
-    const recs = await fetchRecords(AT_TABLES.refused);
-    const match = recs.find(r => {
-      const p = (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase();
-      return p === normalised;
-    });
-    if (match) deleteRecord(AT_TABLES.refused, match.id);
-  }, []);
-
-  // ─── Clear the Quote Amount on a lead (called when changing away from Quote Sent) ─
-  const clearQuoteAmount = useCallback((id) => {
-    setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, value: 0 }));
-    const lead = leads.find(l => l.id === id);
-    if (lead?.airtableId) patchAirtable(lead.airtableId, { 'Quote Amount': 0 });
-  }, [leads, patchAirtable]);
-
-  // ─── Write current lead data to the Refused table ────────────────────────────
-  const addRefusedRecord = useCallback((id, reason) => {
-    const lead = leads.find(l => l.id === id);
-    if (!lead) return;
-    createRecord(AT_TABLES.refused, {
-=======
   // ─── Write lead data to the Refused table (awaitable) ────────────────────────
   const addRefusedRecord = useCallback(async (lead, reason) => {
     if (!lead) return null;
     return createRecord(AT_TABLES.refused, {
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
       'Client Name':              lead.name || '',
       'Phone Number':             lead.phone || '',
       'Email':                    lead.email || '',
@@ -668,10 +640,6 @@ export function useLeads() {
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-<<<<<<< HEAD
-    addRefusedRecord, deleteRefusedRecord, clearQuoteAmount,
-=======
     addRefusedRecord, deleteFromRefusedTable, deletePayment,
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
   };
 }

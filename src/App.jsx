@@ -4,11 +4,7 @@ import TopBar from './components/TopBar';
 import DetailPanel from './components/DetailPanel';
 import NewLeadModal from './components/NewLeadModal';
 import RefuseModal from './components/RefuseModal';
-<<<<<<< HEAD
-import QuoteChangeModal from './components/QuoteChangeModal';
-=======
 import QuoteTransferModal from './components/QuoteTransferModal';
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
 import Toast from './components/Toast';
 import LoadingOverlay from './components/LoadingOverlay';
 import LeadsPage from './components/pages/LeadsPage';
@@ -48,11 +44,7 @@ function Dashboard() {
       <DetailPanel />
       <NewLeadModal />
       <RefuseModal />
-<<<<<<< HEAD
-      <QuoteChangeModal />
-=======
       <QuoteTransferModal />
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
       <Toast />
     </div>
   );

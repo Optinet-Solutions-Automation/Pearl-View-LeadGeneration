@@ -455,13 +455,8 @@ export default function DetailPanel() {
             className="status-sel"
             value={l.status}
             onChange={e => changeStatus(l.id, e.target.value)}
-<<<<<<< HEAD
-            disabled={l.status === 'job_done' && l.paid}
-            style={l.status === 'job_done' && l.paid ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-=======
             disabled={l.status === 'job_done' && l.paid && l.paidAmount > 0}
             title={l.status === 'job_done' && l.paid && l.paidAmount > 0 ? 'Remove payment record to change status' : undefined}
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
           >
             <option value="new">🔵 New Lead</option>
             <option value="in_progress">🟡 In Progress</option>
@@ -469,17 +464,10 @@ export default function DetailPanel() {
             <option value="refused">🚫 Refused</option>
             <option value="job_done">✅ Job Done</option>
           </select>
-<<<<<<< HEAD
-          {l.status === 'job_done' && l.paid && (
-            <p style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '4px' }}>
-              Status locked — payment of ${l.paidAmount} already recorded
-            </p>
-=======
           {l.status === 'job_done' && l.paid && l.paidAmount > 0 && (
             <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '5px' }}>
               Remove payment to change status
             </div>
->>>>>>> b6ea2ea9b79157ebd1d47bc5569ba1eca8acddd3
           )}
         </div>
 
