@@ -457,7 +457,7 @@ export default function CalendarPage() {
               if (!hasBooked) { circleColor = 'var(--primary)'; fontWeight = 700; }
             }
             return (
-              <div key={day} onClick={() => { if (hasBooked) setSelectedDay(isSelected ? null : day); setModalDay(day); }} className="cal-day-cell">
+              <div key={day} onClick={() => { if (hasBooked) setSelectedDay(isSelected ? null : day); else setModalDay(day); }} className="cal-day-cell">
                 <div className="cal-circle" style={{ background: circleBg, border: circleBorder }} title={`${MONTHS[month]} ${day}`}>
                   <span style={{ fontWeight, color: circleColor, lineHeight: 1 }}>{day}</span>
                   {hasBooked && !isSelected && <span className="cal-count-badge">{count}</span>}

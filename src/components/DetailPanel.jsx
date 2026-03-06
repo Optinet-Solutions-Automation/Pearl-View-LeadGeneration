@@ -180,106 +180,11 @@ function SendQuoteModal({ leadName, onSubmit, onClose }) {
   );
 }
 
-function ScheduleModal({ lead, onSubmit, onClose }) {
-  const [date,    setDate]    = useState(lead.jobDate || new Date().toISOString().slice(0, 10));
-  const [service, setService] = useState(lead.jobType || 'Window Cleaning');
-  const [amount,  setAmount]  = useState(lead.paidAmount ? String(lead.paidAmount) : '');
-  const [city,    setCity]    = useState(lead.city || '');
-  const [err,     setErr]     = useState('');
-
-  function handleSubmit() {
-    if (!date) { setErr('Please select a date'); return; }
-    setErr('');
-    onSubmit({
-      date,
-      service,
-      amount:     parseFloat(amount) || 0,
-      city:       city.trim(),
-      clientName: lead.name,
-      phone:      lead.phone || '',
-    });
-  }
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: '16px' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)' }}>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Schedule Appointment</div>
-            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{lead.name}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
-        </div>
-        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div>
-            <label style={mlbl}>Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="finput"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
-          <div>
-            <label style={mlbl}>Service</label>
-            <select
-              value={service}
-              onChange={e => setService(e.target.value)}
-              className="fselect"
-              style={{ width: '100%' }}
-            >
-              <option value="Window Cleaning">Window Cleaning</option>
-              <option value="Pressure Washing">Pressure Washing</option>
-              <option value="Solar Panel">Solar Panel</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div>
-            <label style={mlbl}>City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={e => setCity(e.target.value)}
-              placeholder="e.g. Sydney"
-              className="finput"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
-          <div>
-            <label style={mlbl}>Estimated Amount ($)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="finput"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
-          {err && (
-            <div style={{ fontSize: '12px', color: '#dc2626', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>
-          )}
-          <button
-            onClick={handleSubmit}
-            style={{ width: '100%', padding: '11px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Schedule Appointment
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function DetailPanel() {
   const {
     activeLead: l, closePanel, changeStatus,
     saveNote, saveJobType, savePaidInfo, deletePayment, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
-    archiveLead, showToast, renameLead, setRefuseReason, scheduleBooking,
+    archiveLead, showToast, renameLead, setRefuseReason,
   } = useLeadsContext();
 
   const [noteText,     setNoteText]     = useState('');
@@ -292,7 +197,6 @@ export default function DetailPanel() {
   const [paidAmount,   setPaidAmount]   = useState('');
   const [payMethod,    setPayMethod]    = useState('');
   const [payModalOpen,       setPayModalOpen]       = useState(false);
-  const [scheduleModalOpen,  setScheduleModalOpen]  = useState(false);
   const [quoteModalOpen,     setQuoteModalOpen]     = useState(false);
   const [paymentSaving,     setPaymentSaving]     = useState(false);
   const nameInputRef  = useRef(null);
@@ -390,11 +294,6 @@ export default function DetailPanel() {
     setPayMethod(method);
     setPayModalOpen(false);
     showToast('Payment saved ✓');
-  }
-
-  async function onScheduleSubmit(bookingData) {
-    await scheduleBooking(l.id, bookingData);
-    setScheduleModalOpen(false);
   }
 
   function handlePaidToggle(checked) {
@@ -681,19 +580,21 @@ export default function DetailPanel() {
                 Job Done
               </button>
             </div>
-            {/* Row 2: Schedule Appointment (full width) */}
-            <button
-              className="action-btn"
-              style={{ background: '#7c3aed', borderColor: '#7c3aed', color: '#fff', minHeight: '44px' }}
-              onClick={() => setScheduleModalOpen(true)}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              Schedule Appointment
-            </button>
+            {/* Row 2: Book (full width) — hidden once booked or job done */}
+            {l.status !== 'booked' && l.status !== 'job_done' && (
+              <button
+                className="action-btn"
+                style={{ background: '#2563eb', borderColor: '#2563eb', color: '#fff', minHeight: '44px' }}
+                onClick={() => changeStatus(l.id, 'booked')}
+              >
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                Book
+              </button>
+            )}
             {/* Row 3: Archive (full width, subtle) */}
             <button className="action-btn btn-red" onClick={handleArchive} style={{ minHeight: '44px' }}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
@@ -715,13 +616,6 @@ export default function DetailPanel() {
           onSubmit={onPaymentSubmit}
           onClose={() => { if (!paymentSaving) setPayModalOpen(false); }}
           saving={paymentSaving}
-        />
-      )}
-      {scheduleModalOpen && (
-        <ScheduleModal
-          lead={l}
-          onSubmit={onScheduleSubmit}
-          onClose={() => setScheduleModalOpen(false)}
         />
       )}
       {quoteModalOpen && (
