@@ -134,7 +134,7 @@ export default function LeadCard({ lead }) {
   let valText = '';
   if (lead.status === 'job_done' && lead.paid && lead.paidAmount > 0) {
     valText = `Paid $${lead.paidAmount.toLocaleString()}`;
-  } else if ((lead.status === 'quote_sent' || lead.status === 'job_done') && lead.value > 0) {
+  } else if (lead.value > 0) {
     valText = `Est. $${lead.value.toLocaleString()}`;
   }
 

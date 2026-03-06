@@ -282,17 +282,6 @@ export default function OverviewPage() {
                 </div>
               );
             })}
-          {/* Website links */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--gray-100)' }}>
-            <a href="https://crystalpro.com.au/" target="_blank" rel="noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '7px', background: '#eff6ff', borderRadius: '8px', fontSize: '11px', fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '11px', height: '11px' }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-              Crystal Pro
-            </a>
-            <a href="https://pearlview.com.au/" target="_blank" rel="noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '7px', background: '#fdf4ff', borderRadius: '8px', fontSize: '11px', fontWeight: 700, color: '#7c3aed', textDecoration: 'none' }}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '11px', height: '11px' }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-              Pearl View
-            </a>
-          </div>
         </div>
       )}
 
