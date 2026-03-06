@@ -234,29 +234,28 @@ export default function ReportsPage() {
       </div>
       {range === 'custom' && (
         <div style={{ background: '#fff', border: '1px solid var(--gray-200)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div>
               <label style={lbl}>From</label>
               <input
                 type="date"
                 value={customStart}
                 onChange={e => setCustomStart(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#f9fafb' }}
+                style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#f9fafb' }}
               />
             </div>
-            <div style={{ color: 'var(--gray-400)', fontSize: '13px', fontWeight: 600, paddingTop: '18px', flexShrink: 0 }}>→</div>
-            <div style={{ flex: 1 }}>
+            <div>
               <label style={lbl}>To</label>
               <input
                 type="date"
                 value={customEnd}
                 onChange={e => setCustomEnd(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#f9fafb' }}
+                style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#f9fafb' }}
               />
             </div>
           </div>
           {customStart && customEnd && (
-            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--gray-500)', textAlign: 'center' }}>
+            <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--gray-500)', textAlign: 'center' }}>
               Showing {new Date(customStart).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {new Date(customEnd).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
             </div>
           )}
