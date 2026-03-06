@@ -106,12 +106,9 @@ export default function OverviewPage() {
   const { leads, calBookings, openPanel, setCurrentPage } = useLeadsContext();
 
   // Status buckets
-  const newLeads   = leads.filter(l => l.status === 'new');
-  const inProgress = leads.filter(l => l.status === 'in_progress');
-  const quoteSent  = leads.filter(l => l.status === 'quote_sent');
-  const booked     = leads.filter(l => l.status === 'booked');
-  const jobDone    = leads.filter(l => l.status === 'job_done');
-  const refused    = leads.filter(l => l.status === 'refused');
+  const newLeads  = leads.filter(l => l.status === 'new');
+  const quoteSent = leads.filter(l => l.status === 'quote_sent');
+  const jobDone = leads.filter(l => l.status === 'job_done');
 
   // Today's snapshot
   const newToday     = newLeads.filter(l => isToday(l.dateObj)).length;
@@ -121,10 +118,6 @@ export default function OverviewPage() {
   // Revenue
   const totalRevenue   = leads.filter(l => l.paid).reduce((sum, l) => sum + (l.paidAmount || 0), 0);
   const pendingRevenue = quoteSent.reduce((sum, l) => sum + (l.value || 0), 0);
-
-  // Win rate
-  const outcomes = jobDone.length + refused.length;
-  const winRate  = outcomes > 0 ? Math.round((jobDone.length / outcomes) * 100) : null;
 
   // Action items
   const agingNew    = newLeads.filter(l => l.dateObj && (Date.now() - l.dateObj.getTime()) > 24 * 3600000);
@@ -174,58 +167,6 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* ── Pipeline Funnel ── */}
-      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '16px 18px' }}>
-        <SectionHeader title="Pipeline" />
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch', marginBottom: '10px' }}>
-          {[
-            { label: 'New',      count: newLeads.length,   color: '#0d9488', bg: '#f0fdfa'  },
-            { label: 'Progress', count: inProgress.length, color: '#d97706', bg: '#fffbeb'  },
-            { label: 'Quoted',   count: quoteSent.length,  color: '#7c3aed', bg: '#ede9fe'  },
-            { label: 'Booked',   count: booked.length,     color: '#2563eb', bg: '#dbeafe'  },
-            { label: 'Done',     count: jobDone.length,    color: '#16a34a', bg: '#f0fdf4'  },
-            { label: 'Refused',  count: refused.length,    color: '#dc2626', bg: '#fef2f2'  },
-          ].map((s, i, arr) => (
-            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}>
-              <div style={{ flex: 1, background: s.bg, border: `1px solid ${s.color}22`, borderRadius: '8px', padding: '9px 6px', textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.count}</div>
-                <div style={{ fontSize: '9px', fontWeight: 600, color: s.color, marginTop: '3px', opacity: .8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</div>
-              </div>
-              {i < arr.length - 1 && (
-                <svg viewBox="0 0 8 14" fill="none" style={{ width: '8px', flexShrink: 0, opacity: .3 }}>
-                  <path d="M1 1l6 6-6 6" stroke="var(--gray-500)" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Conversion bar */}
-        {leads.length > 0 && (
-          <div>
-            <div style={{ height: '6px', borderRadius: '20px', background: 'var(--gray-100)', overflow: 'hidden', display: 'flex' }}>
-              {[
-                { count: newLeads.length,   color: '#0d9488' },
-                { count: inProgress.length, color: '#d97706' },
-                { count: quoteSent.length,  color: '#7c3aed' },
-                { count: booked.length,     color: '#2563eb' },
-                { count: jobDone.length,    color: '#16a34a' },
-                { count: refused.length,    color: '#dc2626' },
-              ].map((s, i) => (
-                <div key={i} style={{ width: `${(s.count / leads.length) * 100}%`, background: s.color, transition: 'width .4s ease' }} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>{leads.length} total leads</span>
-              {winRate !== null && (
-                <span style={{ fontSize: '11px', fontWeight: 700, color: winRate >= 50 ? '#16a34a' : '#d97706' }}>
-                  {winRate}% win rate
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* ── Revenue Snapshot ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>

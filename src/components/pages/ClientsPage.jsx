@@ -158,13 +158,14 @@ function ClientCard({ c, onSelect, onArchive, onRestore, onPermDelete, isArchive
   const srcMeta = SOURCE_BADGE[c.leadSource] || null;
 
   return (
-    <div style={{ position: 'relative', marginBottom: '8px', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', marginBottom: '8px' }}>
       {/* Swipe-left archive background */}
       {swipeX < -10 && (
         <div style={{
           position: 'absolute', right: 0, top: 0, bottom: 0, width: '80px',
           background: '#dc2626', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '3px', borderRadius: '0 10px 10px 0',
+          alignItems: 'center', justifyContent: 'center', gap: '3px',
+          borderRadius: '0 10px 10px 0',
         }}>
           <svg fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
             <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -181,6 +182,7 @@ function ClientCard({ c, onSelect, onArchive, onRestore, onPermDelete, isArchive
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         style={{
+          position: 'relative', zIndex: 1,
           background: '#fff', border: '1px solid var(--gray-200)', borderRadius: '10px',
           padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px',
           cursor: isArchived ? 'default' : 'pointer',

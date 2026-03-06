@@ -219,7 +219,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Range selector (below tabs, always visible) ── */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', overflowX: 'auto', paddingBottom: '2px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
         {RANGES.map(r => (
           <button key={r.id} onClick={() => setRange(r.id)} style={{
             padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,

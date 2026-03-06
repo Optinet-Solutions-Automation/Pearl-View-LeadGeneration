@@ -22,13 +22,14 @@ function ageStyle(ms) {
   return       { bg: '#fef2f2', color: '#dc2626' };
 }
 
-// ── Next status in pipeline (for swipe-right Move Forward) ───────────────────
+// ── Pipeline navigation maps ──────────────────────────────────────────────────
 const NEXT_STATUS = { new: 'in_progress', in_progress: 'quote_sent', quote_sent: 'booked', booked: 'job_done' };
+const PREV_STATUS = { in_progress: 'new', quote_sent: 'in_progress', booked: 'quote_sent', job_done: 'booked' };
 
 export default function LeadCard({ lead }) {
   const {
     activeId, openPanel, toggleStar, changeStatus,
-    renameLead, showToast, clients,
+    renameLead, showToast,
   } = useLeadsContext();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -51,20 +52,14 @@ export default function LeadCard({ lead }) {
   const lpName = lead.lp === 'LP2' ? 'Pearl View' : lead.lp === 'LP1' ? 'Crystal Pro' : null;
 
   // Aging timer — only for New Lead status
-  const age       = lead.status === 'new' ? getAge(lead.dateObj) : null;
-  const ageSty    = age ? ageStyle(age.ms) : null;
+  const age    = lead.status === 'new' ? getAge(lead.dateObj) : null;
+  const ageSty = age ? ageStyle(age.ms) : null;
 
   // Overdue follow-up
   const isOverdue = lead.followUp && new Date(lead.followUp) < new Date();
 
-  // Returning client — phone matches someone in Clients table
-  const isReturning = !!(lead.phone && clients?.some(c => {
-    const cp = (c.phone || '').replace(/\s/g, '').toLowerCase();
-    const lp = (lead.phone || '').replace(/\s/g, '').toLowerCase();
-    return cp && lp && cp === lp;
-  }));
-
   const canMoveForward = !!NEXT_STATUS[lead.status];
+  const canMoveBack    = !!PREV_STATUS[lead.status];
 
   // ── Swipe handlers ──────────────────────────────────────────────────────────
   function onTouchStart(e) {
@@ -80,28 +75,31 @@ export default function LeadCard({ lead }) {
     const dy = Math.abs(e.touches[0].clientY - touchRef.current.startY);
     // Ignore vertical scrolls
     if (!touchRef.current.didSwipe && dy > 8 && dy > Math.abs(dx)) return;
-    // Ignore direction if action not available
+    // Block direction if action not available
     if (dx > 0 && !canMoveForward) return;
-    if (dx < 0) return; // left swipe disabled
+    if (dx < 0 && !canMoveBack)    return;
     touchRef.current.didSwipe = true;
-    setSwipeX(Math.min(THRESHOLD + 15, dx));
+    if (dx > 0) setSwipeX(Math.min(THRESHOLD + 15, dx));
+    else        setSwipeX(Math.max(-(THRESHOLD + 15), dx));
   }
 
   function onTouchEnd() {
-    if (Math.abs(swipeX) >= THRESHOLD) {
-      if (swipeX > 0 && canMoveForward) {
-        const next = NEXT_STATUS[lead.status];
-        changeStatus(lead.id, next);
-        const nextLabel = COLS.find(c => c.id === next)?.label || next;
-        showToast(`Moved to ${nextLabel}`);
-      }
+    if (swipeX >= THRESHOLD && canMoveForward) {
+      const next = NEXT_STATUS[lead.status];
+      changeStatus(lead.id, next);
+      const label = COLS.find(c => c.id === next)?.label || next;
+      showToast(`Moved to ${label}`);
+    } else if (swipeX <= -THRESHOLD && canMoveBack) {
+      const prev = PREV_STATUS[lead.status];
+      changeStatus(lead.id, prev);
+      const label = COLS.find(c => c.id === prev)?.label || prev;
+      showToast(`Moved back to ${label}`);
     }
     touchRef.current.didSwipe = false;
     setSwipeX(0);
   }
 
   function handleCardClick() {
-    // Block click if it ended a swipe gesture
     if (touchRef.current.didSwipe) return;
     openPanel(lead.id);
   }
@@ -174,7 +172,7 @@ export default function LeadCard({ lead }) {
   return (
     <div style={{ position: 'relative' }}>
 
-      {/* ── Swipe-right action background (Move Forward) ── */}
+      {/* ── Swipe-right: Move Forward (green, left side) ── */}
       {swipeX > 10 && (
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0, width: '80px',
@@ -186,6 +184,22 @@ export default function LeadCard({ lead }) {
           </svg>
           <span style={{ color: '#fff', fontSize: '9px', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>
             Move Up
+          </span>
+        </div>
+      )}
+
+      {/* ── Swipe-left: Move Back (amber, right side) ── */}
+      {swipeX < -10 && (
+        <div style={{
+          position: 'absolute', right: 0, top: 0, bottom: 0, width: '80px',
+          background: '#d97706', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 3,
+        }}>
+          <svg fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2.5" style={{ width: '18px', height: '18px' }}>
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          <span style={{ color: '#fff', fontSize: '9px', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>
+            Move Back
           </span>
         </div>
       )}
@@ -234,8 +248,8 @@ export default function LeadCard({ lead }) {
           {refuseTag}
         </div>
 
-        {/* Smart badges row: aging, overdue, returning */}
-        {(age || isOverdue || isReturning) && (
+        {/* Smart badges: aging, overdue */}
+        {(age || isOverdue) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '5px' }}>
             {age && (
               <span style={{ fontSize: '9.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ageSty.bg, color: ageSty.color }}>
@@ -245,11 +259,6 @@ export default function LeadCard({ lead }) {
             {isOverdue && (
               <span style={{ fontSize: '9.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: '#fef2f2', color: '#dc2626' }}>
                 📅 Follow Up Due
-              </span>
-            )}
-            {isReturning && (
-              <span style={{ fontSize: '9.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: '#f0fdf4', color: '#16a34a' }}>
-                🔁 Returning
               </span>
             )}
           </div>
@@ -270,7 +279,6 @@ export default function LeadCard({ lead }) {
           )}
         </div>
 
-        {/* Tap-to-call — visible for new/in_progress leads that have a phone */}
         {showView && lead.phone && (
           <a
             href={`tel:${lead.phone}`}
