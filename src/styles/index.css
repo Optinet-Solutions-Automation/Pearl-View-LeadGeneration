@@ -971,9 +971,9 @@ body.keyboard-open .fab              { display: none !important; }
   .pg-info { width: 100%; text-align: center; }
   .pg-controls { width: 100%; justify-content: center; }
 
-  /* Padding so content isn't hidden behind bottom nav. max() ensures a 24px
-     minimum even when env(safe-area-inset-bottom) returns 0 on Android. */
-  .page { padding-bottom: max(calc(24px + 58px + env(safe-area-inset-bottom, 0px)), 82px); }
+  /* Padding so content isn't hidden behind bottom nav + Android gesture bar.
+     20px fallback covers Android devices that report env()=0 but still have a gesture nav bar. */
+  .page { padding-bottom: max(calc(36px + 58px + env(safe-area-inset-bottom, 20px)), 120px); }
 
   /* Toast above bottom nav */
   .toast { bottom: calc(16px + 58px + env(safe-area-inset-bottom, 0px)); }
@@ -999,7 +999,7 @@ body.keyboard-open .fab              { display: none !important; }
   .stat-lbl  { font-size: 10px; }
 
   /* Tighter page padding to maximise content width (preserve bottom padding for nav bar + safe area) */
-  .page { padding: 12px 14px max(calc(24px + 58px + env(safe-area-inset-bottom, 0px)), 82px); gap: 12px; }
+  .page { padding: 12px 14px max(calc(36px + 58px + env(safe-area-inset-bottom, 20px)), 120px); gap: 12px; }
 
   /* Board header */
   .board-title { font-size: 13.5px; }
