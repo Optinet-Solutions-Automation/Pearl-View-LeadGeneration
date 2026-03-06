@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { createRecord, AT_TABLES } from '../../utils/airtableSync';
 
@@ -109,6 +109,57 @@ function CompleteJobModal({ booking, onClose, onConfirm }) {
   );
 }
 
+// ── Time picker (hour + minute selects + AM/PM toggle) ───────────────────────
+function TimePicker({ value, onChange }) {
+  function parse(str) {
+    if (!str) return { h: '9', m: '00', p: 'AM' };
+    const match = str.match(/^(\d+):(\d+)\s*(AM|PM)?/i);
+    return match ? { h: match[1], m: match[2], p: (match[3] || 'AM').toUpperCase() } : { h: '9', m: '00', p: 'AM' };
+  }
+  const parsed = parse(value);
+  const [enabled, setEnabled] = useState(!!value);
+  const [h, setH] = useState(parsed.h);
+  const [m, setM] = useState(parsed.m);
+  const [p, setP] = useState(parsed.p);
+  const ref = useRef({ h: parsed.h, m: parsed.m, p: parsed.p });
+
+  function update(newH, newM, newP) {
+    ref.current = { h: newH, m: newM, p: newP };
+    setH(newH); setM(newM); setP(newP);
+    onChange(`${newH}:${newM} ${newP}`);
+  }
+
+  if (!enabled) {
+    return (
+      <button type="button" onClick={() => { setEnabled(true); onChange(`${h}:${m} ${p}`); }}
+        style={{ padding: '7px 14px', background: '#f9fafb', color: 'var(--gray-600)', border: '1.5px dashed var(--gray-300)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: '10px', width: '100%', textAlign: 'left' }}>
+        + Set time (optional)
+      </button>
+    );
+  }
+
+  const selStyle = { padding: '8px 6px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', outline: 'none', background: '#fff', flex: 1 };
+  return (
+    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
+      <select value={h} onChange={e => update(e.target.value, ref.current.m, ref.current.p)} style={selStyle}>
+        {['1','2','3','4','5','6','7','8','9','10','11','12'].map(v => <option key={v}>{v}</option>)}
+      </select>
+      <span style={{ fontWeight: 700, color: 'var(--gray-400)', fontSize: '16px' }}>:</span>
+      <select value={m} onChange={e => update(ref.current.h, e.target.value, ref.current.p)} style={selStyle}>
+        {['00','15','30','45'].map(v => <option key={v}>{v}</option>)}
+      </select>
+      <div style={{ display: 'flex', border: '1.5px solid var(--gray-200)', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
+        {['AM','PM'].map((v, i) => (
+          <button key={v} type="button" onClick={() => update(ref.current.h, ref.current.m, v)}
+            style={{ padding: '8px 13px', background: p === v ? '#eff6ff' : '#fff', color: p === v ? 'var(--primary)' : 'var(--gray-500)', border: 'none', borderLeft: i > 0 ? '1px solid var(--gray-200)' : 'none', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px' }}>
+            {v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Shared appointment form fields ───────────────────────────────────────────
 function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -187,7 +238,7 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
       <label style={fLbl}>Address</label>
       <input value={form.address || ''} onChange={e => setField('address', e.target.value)} placeholder="e.g. 123 Main St" style={fInput} />
       <label style={fLbl}>Job Time</label>
-      <input value={form.jobTime || ''} onChange={e => setField('jobTime', e.target.value)} placeholder="e.g. 9:00 AM" style={fInput} />
+      <TimePicker value={form.jobTime || ''} onChange={v => setField('jobTime', v)} />
       <label style={fLbl}>Assigned Worker</label>
       <input value={form.assignedWorker || ''} onChange={e => setField('assignedWorker', e.target.value)} placeholder="e.g. John" style={{ ...fInput, marginBottom: 0 }} />
     </>
@@ -278,7 +329,7 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, onComplete, lead
 
 // ── Booking modal (click a day on the calendar) ───────────────────────────────
 function BookingModal({ year, month, day, leads, clients = [], addCalBooking, onClose }) {
-  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', address: '', service: 'Window Cleaning', jobTime: '', assignedWorker: '' });
+  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', address: '', service: 'Window Cleaning', jobTime: '', assignedWorker: '', amount: '', method: 'Cash' });
   const [formErr, setFormErr] = useState('');
 
   const targetDate  = mkDate(year, month, day);
@@ -289,7 +340,22 @@ function BookingModal({ year, month, day, leads, clients = [], addCalBooking, on
   function handleSubmitNew() {
     if (!form.clientName.trim()) { setFormErr('Client name is required'); return; }
     setFormErr('');
-    addCalBooking({ ...form, date: targetDate });
+    const amt = parseFloat(form.amount) || 0;
+    addCalBooking({ ...form, date: targetDate, amount: amt });
+    // If amount entered, write Revenue record immediately
+    if (amt > 0) {
+      createRecord(AT_TABLES.revenue, {
+        'Revenue Name':   `${form.clientName} - ${form.service || 'Window Cleaning'}`,
+        'Date':           targetDate,
+        'Client Name':    form.clientName,
+        'Phone':          form.phone || '',
+        'Job_Service':    form.service || 'Window Cleaning',
+        'City':           form.city || '',
+        'Payment_Method': form.method || 'Cash',
+        'Amount':         amt,
+        'Status':         'Job Done',
+      });
+    }
     onClose();
   }
 
@@ -305,10 +371,40 @@ function BookingModal({ year, month, day, leads, clients = [], addCalBooking, on
         </div>
         <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px' }}>
           <AppointmentFormFields form={form} setField={setField} leads={leads} clients={clients} />
-          {formErr && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{formErr}</div>}
+
+          {/* Amount — records as Revenue immediately if filled */}
+          <label style={fLbl}>Payment Amount (optional)</label>
+          <div style={{ position: 'relative', marginBottom: '10px' }}>
+            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontWeight: 700, fontSize: '14px' }}>$</span>
+            <input type="number" value={form.amount} onChange={e => setField('amount', e.target.value)} placeholder="0.00"
+              style={{ ...fInput, paddingLeft: '24px', marginBottom: 0 }} />
+          </div>
+          {parseFloat(form.amount) > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <label style={fLbl}>Payment Method</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {['Cash', 'Bank'].map((mt, i) => (
+                  <button key={mt} type="button" onClick={() => setField('method', mt)} style={{
+                    flex: 1, padding: '8px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    border: `1.5px solid ${form.method === mt ? (mt === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
+                    background: form.method === mt ? (mt === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
+                    color: form.method === mt ? (mt === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
+                  }}>
+                    {mt.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: '6px', fontSize: '11px', color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '5px 8px' }}>
+                Will be recorded as Revenue
+              </div>
+            </div>
+          )}
+
+          {formErr && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{formErr}</div>}
           <button
             onClick={handleSubmitNew}
-            style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}
+            style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '10px' }}
           >
             Add Appointment
           </button>
@@ -336,17 +432,18 @@ export default function CalendarPage() {
   const [tableSearch, setTableSearch] = useState('');
   const [tablePage,   setTablePage]   = useState(0);
 
-  // Exclude 'booked' leads — they always have a calBooking entry (created by confirmBook),
-  // so showing both would cause duplicates.
-  const monthLeadBookings = leads
-    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'archived' && l.status !== 'booked')
-    .map(l => ({ ...l, parsedDate: new Date(l.jobDate), isCalBooking: false }))
-    .filter(b => b.parsedDate.getFullYear() === year && b.parsedDate.getMonth() === month);
-
   const monthCalBookings = calBookings
     .filter(b => { const d = new Date(b.date); return d.getFullYear() === year && d.getMonth() === month; })
     .filter(b => b.bookingStatus !== 'Cancelled')
     .map(b => ({ ...b, parsedDate: new Date(b.date), name: b.clientName, isCalBooking: true, jobType: b.service }));
+
+  // Exclude leads whose phone already has a calBooking this month — prevents duplicates
+  // (confirmBook creates both a calBooking AND sets jobDate on the lead)
+  const calBookingPhones = new Set(monthCalBookings.map(b => b.phone).filter(Boolean));
+  const monthLeadBookings = leads
+    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'archived' && !calBookingPhones.has(l.phone))
+    .map(l => ({ ...l, parsedDate: new Date(l.jobDate), isCalBooking: false }))
+    .filter(b => b.parsedDate.getFullYear() === year && b.parsedDate.getMonth() === month);
 
   const allMonthBookings = [...monthLeadBookings, ...monthCalBookings];
 

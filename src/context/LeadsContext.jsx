@@ -141,13 +141,19 @@ export function LeadsProvider({ children }) {
         date:           bookingData.date,
         jobTime:        bookingData.jobTime || '',
         assignedWorker: bookingData.worker  || '',
-        amount:         lead.value || 0,
+        amount:         bookingData.amount || lead.value || 0,
         linkedLeadId:   id,
       });
       saveJobDate(id, bookingData.date);
+      // If payment was entered upfront, record it as Revenue now
+      if (bookingData.amount > 0) {
+        await savePaidInfo(id, true, bookingData.amount, bookingData.paymentMethod || 'Cash');
+        showToast('Lead booked ✓ — Payment recorded');
+        return;
+      }
     }
     showToast('Lead booked ✓ — added to Calendar');
-  }, [bookModalId, changeStatus, leads, addCalBooking, saveJobDate, showToast]);
+  }, [bookModalId, changeStatus, leads, addCalBooking, saveJobDate, savePaidInfo, showToast]);
 
   const closeBookModal = useCallback(() => setBookModalId(null), []);
 
