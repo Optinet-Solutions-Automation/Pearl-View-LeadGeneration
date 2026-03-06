@@ -3,6 +3,8 @@ import { STATUS_MAP, AT_STATUS_MAP, PROG_MAP } from '../utils/constants';
 import { parseDate } from '../utils/dateUtils';
 import { createRecord, updateRecord, deleteRecord, fetchRecords, AT_TABLES } from '../utils/airtableSync';
 
+const VALID_JOB_TYPES = new Set(['Window Cleaning', 'Pressure Washing', 'Solar Panel', 'Other']);
+
 const IS_LOCAL = import.meta.env.DEV;
 const AT_TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN || '';
 const AT_BASE  = import.meta.env.VITE_AIRTABLE_BASE_ID || '';
@@ -32,7 +34,7 @@ function normaliseRecord(rec) {
     date: rawDate || '',
     dateObj: parseDate(rawDate),
     address: f['Adress'] || f['Service Address'] || '',
-    jobType: f['Property Type'] || '',
+    jobType: VALID_JOB_TYPES.has(f['Property Type']) ? f['Property Type'] : '',
     windows: f['Estimated Window Count'] || 0,
     stories: f['Stories'] || 0,
     value: f['Quote Amount'] || 0,
@@ -57,6 +59,9 @@ function normaliseRecord(rec) {
 // ─── Normalise a raw Airtable Bookings record into the calBooking shape ───────
 function normaliseCalBooking(rec) {
   const f = rec.fields;
+  // Source encoded in Booking Name: "LEAD::Name - date" = from lead flow, else manual
+  const bookingName   = f['Booking Name'] || '';
+  const isLeadBooking = bookingName.startsWith('LEAD::');
   return {
     id:             `cal-${rec.id}`,
     airtableId:     rec.id,
@@ -74,6 +79,7 @@ function normaliseCalBooking(rec) {
     upsellAmount:   f['Upsell Amount']   || 0,
     upsellNotes:    f['Upsell Notes']    || '',
     linkedLeadId:   null,
+    bookingSource:  isLeadBooking ? 'Lead' : 'Manual',
   };
 }
 
@@ -685,6 +691,7 @@ export function useLeads() {
 
   const addCalBooking = useCallback(async (data) => {
     const localId = `cal-${Date.now()}`;
+    const isFromLead = !!data.linkedLeadId;
     const record = {
       id: localId, airtableId: null,
       clientName: data.clientName || '', phone: data.phone || '',
@@ -694,11 +701,15 @@ export function useLeads() {
       jobTime: data.jobTime || '', assignedWorker: data.assignedWorker || '',
       upsellAmount: 0, upsellNotes: '',
       linkedLeadId: data.linkedLeadId || null,
+      bookingSource: isFromLead ? 'Lead' : 'Manual',
     };
     setCalBookings(prev => [record, ...prev]);
-    // Write to Airtable Bookings table
+    // Encode source in Booking Name: "LEAD::" prefix for lead-sourced bookings
+    const bookingName = isFromLead
+      ? `LEAD::${record.clientName} - ${record.date}`
+      : `${record.clientName} - ${record.date}`;
     const atFields = {
-      'Booking Name':    `${record.clientName} - ${record.date}`,
+      'Booking Name':    bookingName,
       'Client Name':     record.clientName,
       'Date':            record.date,
       'Job_Service':     record.service,

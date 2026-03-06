@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { createRecord, AT_TABLES } from '../../utils/airtableSync';
 
@@ -109,54 +109,35 @@ function CompleteJobModal({ booking, onClose, onConfirm }) {
   );
 }
 
-// ── Time picker (hour + minute selects + AM/PM toggle) ───────────────────────
+// ── Time picker — native browser time input, converts to/from "9:00 AM" ──────
 function TimePicker({ value, onChange }) {
-  function parse(str) {
-    if (!str) return { h: '9', m: '00', p: 'AM' };
-    const match = str.match(/^(\d+):(\d+)\s*(AM|PM)?/i);
-    return match ? { h: match[1], m: match[2], p: (match[3] || 'AM').toUpperCase() } : { h: '9', m: '00', p: 'AM' };
+  function toInput(str) {
+    if (!str) return '';
+    const m = str.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (!m) return '';
+    let h = parseInt(m[1]);
+    const min = m[2].padStart(2, '0');
+    const p = (m[3] || 'AM').toUpperCase();
+    if (p === 'PM' && h < 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
   }
-  const parsed = parse(value);
-  const [enabled, setEnabled] = useState(!!value);
-  const [h, setH] = useState(parsed.h);
-  const [m, setM] = useState(parsed.m);
-  const [p, setP] = useState(parsed.p);
-  const ref = useRef({ h: parsed.h, m: parsed.m, p: parsed.p });
-
-  function update(newH, newM, newP) {
-    ref.current = { h: newH, m: newM, p: newP };
-    setH(newH); setM(newM); setP(newP);
-    onChange(`${newH}:${newM} ${newP}`);
+  function fromInput(str) {
+    if (!str) return '';
+    const [hStr, mStr] = str.split(':');
+    let h = parseInt(hStr);
+    const period = h >= 12 ? 'PM' : 'AM';
+    if (h > 12) h -= 12;
+    if (h === 0) h = 12;
+    return `${h}:${mStr} ${period}`;
   }
-
-  if (!enabled) {
-    return (
-      <button type="button" onClick={() => { setEnabled(true); onChange(`${h}:${m} ${p}`); }}
-        style={{ padding: '7px 14px', background: '#f9fafb', color: 'var(--gray-600)', border: '1.5px dashed var(--gray-300)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: '10px', width: '100%', textAlign: 'left' }}>
-        + Set time (optional)
-      </button>
-    );
-  }
-
-  const selStyle = { padding: '8px 6px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', outline: 'none', background: '#fff', flex: 1 };
   return (
-    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
-      <select value={h} onChange={e => update(e.target.value, ref.current.m, ref.current.p)} style={selStyle}>
-        {['1','2','3','4','5','6','7','8','9','10','11','12'].map(v => <option key={v}>{v}</option>)}
-      </select>
-      <span style={{ fontWeight: 700, color: 'var(--gray-400)', fontSize: '16px' }}>:</span>
-      <select value={m} onChange={e => update(ref.current.h, e.target.value, ref.current.p)} style={selStyle}>
-        {['00','15','30','45'].map(v => <option key={v}>{v}</option>)}
-      </select>
-      <div style={{ display: 'flex', border: '1.5px solid var(--gray-200)', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
-        {['AM','PM'].map((v, i) => (
-          <button key={v} type="button" onClick={() => update(ref.current.h, ref.current.m, v)}
-            style={{ padding: '8px 13px', background: p === v ? '#eff6ff' : '#fff', color: p === v ? 'var(--primary)' : 'var(--gray-500)', border: 'none', borderLeft: i > 0 ? '1px solid var(--gray-200)' : 'none', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px' }}>
-            {v}
-          </button>
-        ))}
-      </div>
-    </div>
+    <input
+      type="time"
+      value={toInput(value)}
+      onChange={e => onChange(e.target.value ? fromInput(e.target.value) : '')}
+      style={{ ...fInput, marginBottom: '10px' }}
+    />
   );
 }
 
@@ -428,9 +409,10 @@ export default function CalendarPage() {
   const [month,       setMonth]       = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState(null);
   const [modalDay,    setModalDay]    = useState(null);
-  const [editBooking, setEditBooking] = useState(null);
-  const [tableSearch, setTableSearch] = useState('');
-  const [tablePage,   setTablePage]   = useState(0);
+  const [editBooking,    setEditBooking]    = useState(null);
+  const [tableSearch,    setTableSearch]    = useState('');
+  const [tablePage,      setTablePage]      = useState(0);
+  const [hideCompleted,  setHideCompleted]  = useState(true);
 
   const monthCalBookings = calBookings
     .filter(b => { const d = new Date(b.date); return d.getFullYear() === year && d.getMonth() === month; })
@@ -515,11 +497,14 @@ export default function CalendarPage() {
     ? `${MONTHS[month]} ${selectedDay}, ${year}`
     : `All Bookings — ${MONTHS[month]} ${year}`;
 
-  const searchedRows = tableRows.filter(b => {
-    if (!tableSearch) return true;
-    const q = tableSearch.toLowerCase();
-    return (b.name || '').toLowerCase().includes(q) || (b.phone || '').includes(q);
-  });
+  const completedCount = tableRows.filter(b => b.bookingStatus === 'Completed').length;
+  const searchedRows = tableRows
+    .filter(b => !hideCompleted || b.bookingStatus !== 'Completed')
+    .filter(b => {
+      if (!tableSearch) return true;
+      const q = tableSearch.toLowerCase();
+      return (b.name || '').toLowerCase().includes(q) || (b.phone || '').includes(q);
+    });
   const totalPages = Math.max(1, Math.ceil(searchedRows.length / ROWS_PER_PAGE));
   const safePage   = Math.min(tablePage, totalPages - 1);
   const pagedRows  = searchedRows.slice(safePage * ROWS_PER_PAGE, (safePage + 1) * ROWS_PER_PAGE);
@@ -594,12 +579,20 @@ export default function CalendarPage() {
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>{tableTitle}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', borderRadius: '20px', padding: '2px 10px' }}>
                 {searchedRows.length} job{searchedRows.length !== 1 ? 's' : ''}
               </span>
+              {completedCount > 0 && (
+                <button
+                  onClick={() => setHideCompleted(v => !v)}
+                  style={{ fontSize: '10.5px', fontWeight: 600, color: hideCompleted ? 'var(--gray-500)' : '#15803d', background: hideCompleted ? '#f9fafb' : '#f0fdf4', border: `1px solid ${hideCompleted ? 'var(--gray-200)' : '#bbf7d0'}`, borderRadius: '20px', padding: '2px 9px', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  {hideCompleted ? `Show ${completedCount} done` : 'Hide done'}
+                </button>
+              )}
               {selectedHasBookings && (
-                <button onClick={() => setSelectedDay(null)} style={{ fontSize: '11px', color: 'var(--gray-400)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>Show all ✕</button>
+                <button onClick={() => setSelectedDay(null)} style={{ fontSize: '11px', color: 'var(--gray-400)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>All ✕</button>
               )}
             </div>
           </div>
@@ -666,7 +659,8 @@ export default function CalendarPage() {
                       <td style={{ ...td, fontWeight: 600, color: 'var(--gray-900)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {b.name}
-                          {b.isCalBooking && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>MANUAL</span>}
+                          {b.isCalBooking && b.bookingSource !== 'Lead' && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>MANUAL</span>}
+                          {b.isCalBooking && b.bookingSource === 'Lead' && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#eff6ff', color: 'var(--primary)', flexShrink: 0 }}>BOOKED</span>}
                         </div>
                       </td>
                       <td style={{ ...td, color: 'var(--gray-600)' }}>{b.phone || '—'}</td>

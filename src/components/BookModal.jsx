@@ -1,54 +1,36 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
 
-// ── Time picker ───────────────────────────────────────────────────────────────
+// Native time input — converts between "9:00 AM" display format and HH:MM input value
 function TimePicker({ value, onChange }) {
-  function parse(str) {
-    if (!str) return { h: '9', m: '00', p: 'AM' };
-    const match = str.match(/^(\d+):(\d+)\s*(AM|PM)?/i);
-    return match ? { h: match[1], m: match[2], p: (match[3] || 'AM').toUpperCase() } : { h: '9', m: '00', p: 'AM' };
+  function toInput(str) {
+    if (!str) return '';
+    const m = str.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (!m) return '';
+    let h = parseInt(m[1]);
+    const min = m[2].padStart(2, '0');
+    const p = (m[3] || 'AM').toUpperCase();
+    if (p === 'PM' && h < 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${min}`;
   }
-  const parsed = parse(value);
-  const [enabled, setEnabled] = useState(!!value);
-  const [h, setH] = useState(parsed.h);
-  const [m, setM] = useState(parsed.m);
-  const [p, setP] = useState(parsed.p);
-  const ref = useRef({ h: parsed.h, m: parsed.m, p: parsed.p });
-
-  function update(newH, newM, newP) {
-    ref.current = { h: newH, m: newM, p: newP };
-    setH(newH); setM(newM); setP(newP);
-    onChange(`${newH}:${newM} ${newP}`);
+  function fromInput(str) {
+    if (!str) return '';
+    const [hStr, mStr] = str.split(':');
+    let h = parseInt(hStr);
+    const period = h >= 12 ? 'PM' : 'AM';
+    if (h > 12) h -= 12;
+    if (h === 0) h = 12;
+    return `${h}:${mStr} ${period}`;
   }
-
-  if (!enabled) {
-    return (
-      <button type="button" onClick={() => { setEnabled(true); onChange(`${h}:${m} ${p}`); }}
-        style={{ padding: '7px 14px', background: '#f9fafb', color: 'var(--gray-600)', border: '1.5px dashed var(--gray-300)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', width: '100%', textAlign: 'left' }}>
-        + Set time (optional)
-      </button>
-    );
-  }
-
-  const selStyle = { padding: '9px 6px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', fontSize: '13px', outline: 'none', background: '#fff', flex: 1 };
   return (
-    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-      <select value={h} onChange={e => update(e.target.value, ref.current.m, ref.current.p)} style={selStyle}>
-        {['1','2','3','4','5','6','7','8','9','10','11','12'].map(v => <option key={v}>{v}</option>)}
-      </select>
-      <span style={{ fontWeight: 700, color: 'var(--gray-400)', fontSize: '16px' }}>:</span>
-      <select value={m} onChange={e => update(ref.current.h, e.target.value, ref.current.p)} style={selStyle}>
-        {['00','15','30','45'].map(v => <option key={v}>{v}</option>)}
-      </select>
-      <div style={{ display: 'flex', border: '1.5px solid var(--gray-200)', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
-        {['AM','PM'].map((v, i) => (
-          <button key={v} type="button" onClick={() => update(ref.current.h, ref.current.m, v)}
-            style={{ padding: '9px 13px', background: p === v ? '#eff6ff' : '#fff', color: p === v ? 'var(--primary)' : 'var(--gray-500)', border: 'none', borderLeft: i > 0 ? '1px solid var(--gray-200)' : 'none', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px' }}>
-            {v}
-          </button>
-        ))}
-      </div>
-    </div>
+    <input
+      type="time"
+      value={toInput(value)}
+      onChange={e => onChange(e.target.value ? fromInput(e.target.value) : '')}
+      className="finput"
+      style={{ width: '100%', boxSizing: 'border-box' }}
+    />
   );
 }
 

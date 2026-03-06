@@ -350,24 +350,31 @@ export default function DetailPanel() {
         {/* Status */}
         <div className="psec">
           <div className="psec-title">Status</div>
-          <select
-            className="status-sel"
-            value={l.status}
-            onChange={e => changeStatus(l.id, e.target.value)}
-            disabled={l.status === 'job_done' && l.paid && l.paidAmount > 0}
-            title={l.status === 'job_done' && l.paid && l.paidAmount > 0 ? 'Remove payment record to change status' : undefined}
-          >
-            <option value="new">🔵 New Lead</option>
-            <option value="in_progress">🟡 In Progress</option>
-            <option value="quote_sent">🟣 Quote Sent</option>
-            <option value="booked">📅 Booked</option>
-            <option value="job_done">✅ Job Done</option>
-            <option value="refused">🚫 Refused</option>
-          </select>
-          {l.status === 'job_done' && l.paid && l.paidAmount > 0 && (
-            <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '5px' }}>
-              Remove payment to change status
+          {l.status === 'job_done' && l.paid && l.paidAmount > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: 1, padding: '8px 12px', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#15803d' }}>
+                ✅ Job Done
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', background: '#f9fafb', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '11px', color: 'var(--gray-400)', flexShrink: 0 }}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '11px', height: '11px' }}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                Locked
+              </div>
             </div>
+          ) : (
+            <select
+              className="status-sel"
+              value={l.status}
+              onChange={e => changeStatus(l.id, e.target.value)}
+            >
+              <option value="new">🔵 New Lead</option>
+              <option value="in_progress">🟡 In Progress</option>
+              <option value="quote_sent">🟣 Quote Sent</option>
+              <option value="booked">📅 Booked</option>
+              <option value="job_done">✅ Job Done</option>
+              <option value="refused">🚫 Refused</option>
+            </select>
           )}
         </div>
 
@@ -452,10 +459,9 @@ export default function DetailPanel() {
           <div className="jrow" style={{ alignItems: 'center' }}>
             <span className="jlbl">Job Type</span>
             <select
-              className="status-sel"
               value={l.jobType || ''}
               onChange={e => saveJobType(l.id, e.target.value)}
-              style={{ fontSize: '12px', padding: '4px 8px', height: 'auto', flex: 1 }}
+              style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--gray-200)', borderRadius: '6px', fontFamily: 'inherit', background: '#fff', color: 'var(--gray-700)', outline: 'none', maxWidth: '160px' }}
             >
               <option value="">— Select —</option>
               <option value="Window Cleaning">Window Cleaning</option>
@@ -508,9 +514,12 @@ export default function DetailPanel() {
               </div>
               <button
                 onClick={handleDeletePayment}
-                style={{ width: '100%', padding: '7px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%', padding: '6px', background: 'transparent', color: '#dc2626', border: 'none', borderTop: '1px solid #dcfce7', marginTop: '4px', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >
-                Delete Payment &amp; Revenue Record
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                </svg>
+                Delete Payment
               </button>
             </div>
           ) : (

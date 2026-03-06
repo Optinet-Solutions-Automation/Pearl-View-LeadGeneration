@@ -65,7 +65,6 @@ export default function LeadCard({ lead }) {
   }));
 
   const canMoveForward = !!NEXT_STATUS[lead.status];
-  const canCall        = !!lead.phone;
 
   // ── Swipe handlers ──────────────────────────────────────────────────────────
   function onTouchStart(e) {
@@ -83,9 +82,9 @@ export default function LeadCard({ lead }) {
     if (!touchRef.current.didSwipe && dy > 8 && dy > Math.abs(dx)) return;
     // Ignore direction if action not available
     if (dx > 0 && !canMoveForward) return;
-    if (dx < 0 && !canCall) return;
+    if (dx < 0) return; // left swipe disabled
     touchRef.current.didSwipe = true;
-    setSwipeX(Math.max(-(THRESHOLD + 15), Math.min(THRESHOLD + 15, dx)));
+    setSwipeX(Math.min(THRESHOLD + 15, dx));
   }
 
   function onTouchEnd() {
@@ -95,8 +94,6 @@ export default function LeadCard({ lead }) {
         changeStatus(lead.id, next);
         const nextLabel = COLS.find(c => c.id === next)?.label || next;
         showToast(`Moved to ${nextLabel}`);
-      } else if (swipeX < 0 && canCall) {
-        window.open(`tel:${lead.phone}`, '_self');
       }
     }
     touchRef.current.didSwipe = false;
@@ -187,22 +184,6 @@ export default function LeadCard({ lead }) {
           </svg>
           <span style={{ color: '#fff', fontSize: '9px', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>
             Move Up
-          </span>
-        </div>
-      )}
-
-      {/* ── Swipe-left action background (Call) ── */}
-      {swipeX < -10 && (
-        <div style={{
-          position: 'absolute', right: 0, top: 0, bottom: 0, width: '80px',
-          background: '#0d9488', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 3,
-        }}>
-          <svg fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>
-          </svg>
-          <span style={{ color: '#fff', fontSize: '9px', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>
-            Call
           </span>
         </div>
       )}

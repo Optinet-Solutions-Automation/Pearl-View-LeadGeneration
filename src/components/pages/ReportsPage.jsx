@@ -57,7 +57,8 @@ export default function ReportsPage() {
   const [range,       setRange]       = useState('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd,   setCustomEnd]   = useState('');
-  const [activeTab,   setActiveTab]   = useState('overview'); // 'overview' | 'source' | 'transactions'
+  const [activeTab,      setActiveTab]      = useState('overview'); // 'overview' | 'source' | 'transactions'
+  const [selectedSource, setSelectedSource] = useState(null); // null = all sources
 
   const [expenses,       setExpenses]       = useState([]);
   const [revenueRecords, setRevenueRecords] = useState([]);
@@ -299,33 +300,85 @@ export default function ReportsPage() {
       {activeTab === 'source' && (
         <>
           {Object.keys(bySource).length > 0 ? (
-            <div style={card}>
-              <div style={cardHdr}>Revenue by Lead Source</div>
-              <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px' }}>
-                Where your {rangeLabel.toLowerCase()} revenue came from
-              </div>
-              {Object.entries(bySource).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => {
-                const meta = getSourceMeta(k);
-                return (
-                  <Bar key={k} label={meta.label} value={v.amount} max={maxSource} color={meta.color} bg={meta.bg} count={v.count} />
-                );
-              })}
-
-              {/* Source breakdown cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '16px' }}>
+            <>
+              {/* Clickable source cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '14px' }}>
                 {Object.entries(bySource).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => {
-                  const meta = getSourceMeta(k);
-                  const pct  = totalIncome > 0 ? Math.round((v.amount / totalIncome) * 100) : 0;
+                  const meta    = getSourceMeta(k);
+                  const pct     = totalIncome > 0 ? Math.round((v.amount / totalIncome) * 100) : 0;
+                  const isActive = selectedSource === k;
                   return (
-                    <div key={k} style={{ background: meta.bg, border: `1.5px solid ${meta.color}22`, borderRadius: '10px', padding: '12px' }}>
-                      <div style={{ fontSize: '10px', fontWeight: 700, color: meta.color, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '6px' }}>{meta.label}</div>
-                      <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--gray-900)' }}>${v.amount.toLocaleString('en-AU')}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '3px' }}>{v.count} job{v.count !== 1 ? 's' : ''} · {pct}%</div>
+                    <div
+                      key={k}
+                      onClick={() => setSelectedSource(isActive ? null : k)}
+                      style={{
+                        background: isActive ? meta.color : meta.bg,
+                        border: `2px solid ${isActive ? meta.color : `${meta.color}33`}`,
+                        borderRadius: '12px', padding: '14px 12px', cursor: 'pointer',
+                        transition: 'all .15s',
+                      }}
+                    >
+                      <div style={{ fontSize: '10px', fontWeight: 700, color: isActive ? 'rgba(255,255,255,0.8)' : meta.color, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>
+                        {meta.label}
+                      </div>
+                      <div style={{ fontSize: '19px', fontWeight: 800, color: isActive ? '#fff' : 'var(--gray-900)' }}>
+                        ${v.amount.toLocaleString('en-AU')}
+                      </div>
+                      <div style={{ fontSize: '11px', color: isActive ? 'rgba(255,255,255,0.75)' : 'var(--gray-500)', marginTop: '3px' }}>
+                        {v.count} job{v.count !== 1 ? 's' : ''} · {pct}%
+                      </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
+
+              {/* Bar chart */}
+              <div style={card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <div style={cardHdr2}>
+                    {selectedSource ? `${getSourceMeta(selectedSource).label} — Transactions` : 'All Sources'}
+                  </div>
+                  {selectedSource && (
+                    <button onClick={() => setSelectedSource(null)} style={{ fontSize: '11px', color: 'var(--gray-400)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Clear ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Bars — filtered or all */}
+                {!selectedSource && Object.entries(bySource).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => {
+                  const meta = getSourceMeta(k);
+                  return <Bar key={k} label={meta.label} value={v.amount} max={maxSource} color={meta.color} bg={meta.bg} count={v.count} />;
+                })}
+
+                {/* Transaction list for selected source */}
+                {revenueWithSource
+                  .filter(r => !selectedSource || r.source === selectedSource)
+                  .map(row => {
+                    const sm = getSourceMeta(row.source);
+                    const isUpsell = (row.name || '').toLowerCase().includes('upsell');
+                    return (
+                      <div key={row.id} style={{ padding: '10px 0', borderTop: '1px solid var(--gray-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{row.client || row.name}</span>
+                            {isUpsell && <span style={{ fontSize: '9px', fontWeight: 700, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', padding: '1px 5px', borderRadius: '6px' }}>UPSELL</span>}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                            {new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                            {row.jobType ? ` · ${row.jobType}` : ''}
+                            {row.method ? ` · ${row.method}` : ''}
+                          </div>
+                        </div>
+                        <span style={{ fontWeight: 700, color: '#15803d', fontSize: '14px', flexShrink: 0 }}>
+                          ${Number(row.amount).toLocaleString('en-AU')}
+                        </span>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </>
           ) : (
             <EmptyState msg="No revenue data with source information for this period." />
           )}
