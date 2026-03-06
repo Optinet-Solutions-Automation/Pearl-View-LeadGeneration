@@ -14,11 +14,19 @@ function normaliseRecord(rec) {
   const f = rec.fields;
   const isCall = !!(f['Caller ID'] || f['Call Time']);
   const rawSrc = isCall ? (f['Call - Lead Source'] || '') : (f['Lead Source'] || '');
+  const rawSrcNorm = rawSrc.toLowerCase().replace(/[\s-]/g, '');
+
+  // LP only set for website leads; all other sources (Phone Call, Facebook, Google, Other) get null
+  let lp = null;
+  if (rawSrcNorm.includes('pearlview')) lp = 'LP2';
+  else if (rawSrcNorm.includes('crystalpro') || rawSrcNorm.includes('crystal')) lp = 'LP1';
+
+  // source encodes call vs form type (used for isCallLead detection)
   let source;
   if (isCall) {
-    source = rawSrc.includes('pearlview') ? 'call2' : 'call1';
+    source = lp === 'LP2' ? 'call2' : 'call1';
   } else {
-    source = rawSrc.includes('pearlview') ? 'form2' : 'form1';
+    source = lp === 'LP2' ? 'form2' : 'form1';
   }
   const rawStatus = f['Lead Status'] || 'New';
   const status = STATUS_MAP[rawStatus] || 'new';
@@ -27,7 +35,7 @@ function normaliseRecord(rec) {
   const rawDate = isCall ? f['Call Time'] : f['Inquiry Date'];
   return {
     id: rec.id, name, source,
-    lp: source.includes('2') ? 'LP2' : 'LP1',
+    lp,
     phone: f['Phone Number'] || f['Caller ID'] || '',
     email: f['Email'] || '',
     subject: fullSubject,

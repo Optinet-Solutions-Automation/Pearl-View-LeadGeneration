@@ -229,14 +229,19 @@ export default function DetailPanel() {
 
   if (!l) return <aside className="panel" />;
 
-  const isCallLead = l.source === 'call1' || l.source === 'call2';
-  const lpName = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
+  const isCallLead = l.hasCall;
+  const lpName = l.lp === 'LP2' ? 'Pearl View' : l.lp === 'LP1' ? 'Crystal Pro' : null;
 
-  const srcLabel = l.leadSource || (
-    isCallLead ? `Call · ${lpName}` :
-    l.source === 'form1' ? 'website-crystalpro' :
-    l.source === 'form2' ? 'website-pearlview' : 'Manual'
-  );
+  // Human-readable source for the header meta line
+  const metaSource = (() => {
+    if (isCallLead) return lpName ? `Call · ${lpName}` : 'Phone Call';
+    if (lpName) return `Form · ${lpName}`;
+    if (l.leadSource) return l.leadSource; // e.g. 'Google', 'Facebook', 'Other'
+    return 'Form';
+  })();
+
+  // Source badge in Job Details section
+  const srcLabel = l.leadSource || (isCallLead ? (lpName ? `Call · ${lpName}` : 'Phone Call') : (lpName ? `Form · ${lpName}` : 'Form'));
   const srcTag = <span className="tag tag-gray" style={{ fontSize: '11px' }}>{srcLabel}</span>;
 
   function handleNoteChange(e) {
@@ -340,7 +345,7 @@ export default function DetailPanel() {
             </button>
           </div>
           <div className="panel-meta">
-            {isCallLead ? `Direct Call · ${l.lp}` : `Form · ${l.lp}`} · {formatDate(l.date)}
+            {metaSource} · {formatDate(l.date)}
           </div>
         </div>
         <button className="close-btn" onClick={closePanel}>✕</button>

@@ -47,8 +47,8 @@ export default function LeadCard({ lead }) {
   }, [isEditing]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
-  const isCall = lead.source === 'call1' || lead.source === 'call2';
-  const lpName = lead.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
+  const isCall = lead.hasCall;
+  const lpName = lead.lp === 'LP2' ? 'Pearl View' : lead.lp === 'LP1' ? 'Crystal Pro' : null;
 
   // Aging timer — only for New Lead status
   const age       = lead.status === 'new' ? getAge(lead.dateObj) : null;
@@ -107,11 +107,13 @@ export default function LeadCard({ lead }) {
   }
 
   // ── Tag elements ────────────────────────────────────────────────────────────
-  const srcTag = isCall
-    ? <span className="tag tag-call">Call · {lpName}</span>
-    : lead.source === 'form1'
-    ? <span className="tag tag-form1">Form · Crystal Pro</span>
-    : <span className="tag tag-form2">Form · Pearl View</span>;
+  const srcLabel = (() => {
+    if (isCall) return lpName ? `Call · ${lpName}` : 'Phone Call';
+    if (lpName) return `Form · ${lpName}`;
+    return lead.leadSource || 'Form';
+  })();
+  const srcTagClass = isCall ? 'tag-call' : lead.lp === 'LP1' ? 'tag-form1' : lead.lp === 'LP2' ? 'tag-form2' : 'tag-gray';
+  const srcTag = <span className={`tag ${srcTagClass}`}>{srcLabel}</span>;
 
   const refuseTag = lead.status === 'refused' && lead.refuseReason
     ? <span className="tag" style={{ background: '#fee2e2', color: '#991b1b' }}>
