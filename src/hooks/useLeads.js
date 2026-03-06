@@ -539,6 +539,21 @@ export function useLeads() {
       const data = await r.json();
       if (data.id) {
         setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId: data.id } : l));
+        // Notify n8n → WhatsApp (fire-and-forget)
+        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+        if (webhookUrl) {
+          fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name:       leadData.name        || '',
+              phone:      leadData.phone       || '',
+              email:      leadData.email       || '',
+              subject:    leadData.subject     || '',
+              leadSource: leadData.leadSource  || '',
+            }),
+          }).catch(() => {});
+        }
         return data.id;
       }
       return null;

@@ -1,0 +1,165 @@
+{
+  "name": "Pearl View — WhatsApp AI Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["messages"],
+        "options": {}
+      },
+      "id": "b1000001-0000-0000-0000-000000000001",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [180, 300],
+      "webhookId": "pearl-view-wa-assistant",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the incoming WhatsApp message\nconst data = $input.first().json;\n\nconst messageObj = data.messages?.[0];\nif (!messageObj || messageObj.type !== 'text') {\n  // Ignore non-text messages (images, voice, etc.)\n  return [];\n}\n\nconst userMessage = messageObj.text?.body?.trim() || '';\nconst senderPhone = messageObj.from || '';\n\nif (!userMessage) return [];\n\nreturn [{ json: { userMessage, senderPhone } }];\n"
+      },
+      "id": "b1000002-0000-0000-0000-000000000002",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "base": {
+          "__rl": true,
+          "value": "appNc7dQkFIq0dFFM",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblS1keAU26CH08KJ",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "b1000003-0000-0000-0000-000000000003",
+      "name": "Fetch Leads",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [620, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all Airtable lead records + build the AI prompt\nconst allItems = $input.all();\nconst leads = allItems.map(item => item.json.fields || item.json);\n\nconst userMessage = $('Extract Message').first().json.userMessage;\nconst senderPhone = $('Extract Message').first().json.senderPhone;\n\n// ── Compute summary stats ──────────────────────────────────────\nconst total = leads.length;\n\nconst byStatus = {};\nleads.forEach(l => {\n  const s = l['Lead Status'] || 'Unknown';\n  byStatus[s] = (byStatus[s] || 0) + 1;\n});\n\nconst totalRevenue = leads\n  .filter(l => l['Lead Status'] === 'Job Done')\n  .reduce((sum, l) => sum + (parseFloat(l['Final Invoice Amount']) || parseFloat(l['Quote Amount']) || 0), 0);\n\nconst totalQuoted = leads\n  .filter(l => ['Quote Sent', 'Booked', 'Job Done'].includes(l['Lead Status']))\n  .reduce((sum, l) => sum + (parseFloat(l['Quote Amount']) || 0), 0);\n\n// ── Recent leads (last 7 days) ─────────────────────────────────\nconst weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);\nconst recentLeads = leads\n  .filter(l => l['Inquiry Date'] && new Date(l['Inquiry Date']) >= weekAgo)\n  .map(l => `- ${l['Client Name'] || 'Unknown'} | ${l['Lead Status']} | $${l['Quote Amount'] || 0} | ${l['Lead Source'] || 'N/A'}`);\n\n// ── Refused breakdown ──────────────────────────────────────────\nconst refused = leads.filter(l => l['Lead Status'] === 'Refused');\nconst refusalReasons = {};\nrefused.forEach(l => {\n  const r = l['Refusal Reason'] || 'Unknown';\n  refusalReasons[r] = (refusalReasons[r] || 0) + 1;\n});\n\n// ── Lead source breakdown ──────────────────────────────────────\nconst bySources = {};\nleads.forEach(l => {\n  const s = l['Lead Source'] || 'Unknown';\n  bySources[s] = (bySources[s] || 0) + 1;\n});\n\n// ── All leads compact list (last 100 for context) ──────────────\nconst leadList = leads\n  .slice(0, 100)\n  .map(l => `${l['Client Name'] || '?'} | ${l['Lead Status']} | Quote: $${l['Quote Amount'] || 0} | Invoice: $${l['Final Invoice Amount'] || 0} | Source: ${l['Lead Source'] || 'N/A'} | Date: ${l['Inquiry Date'] ? l['Inquiry Date'].slice(0, 10) : 'N/A'}`)\n  .join('\\n');\n\n// ── Build system prompt ────────────────────────────────────────\nconst systemPrompt = `You are a smart business assistant for Pearl View, an Australian window cleaning company. The owner will ask you questions via WhatsApp about their leads, revenue, and clients. Answer clearly and concisely.\n\nLIVE CRM DATA (as of right now):\n\nOVERALL STATS:\n- Total leads: ${total}\n- Total revenue collected (Job Done): $${totalRevenue.toLocaleString('en-AU', { minimumFractionDigits: 2 })}\n- Total value quoted: $${totalQuoted.toLocaleString('en-AU', { minimumFractionDigits: 2 })}\n\nSTATUS BREAKDOWN:\n${Object.entries(byStatus).map(([s, c]) => `- ${s}: ${c}`).join('\\n')}\n\nLEAD SOURCE BREAKDOWN:\n${Object.entries(bySources).map(([s, c]) => `- ${s}: ${c}`).join('\\n')}\n\nREFUSAL REASONS:\n${Object.entries(refusalReasons).length ? Object.entries(refusalReasons).map(([r, c]) => `- ${r}: ${c}`).join('\\n') : '- None'}\n\nRECENT LEADS (last 7 days):\n${recentLeads.length ? recentLeads.join('\\n') : '- No new leads this week'}\n\nALL LEADS (Name | Status | Quote | Invoice | Source | Date):\n${leadList}\n\nRULES:\n- Use plain text only — no asterisks, no markdown, no bullet symbols. Just clean lines.\n- Keep answers short unless the owner asks for a full report.\n- Format money as AUD with $ sign.\n- If asked something you cannot answer from the data, say so honestly.\n- Do not make up data.`;\n\nreturn [{ json: { systemPrompt, userMessage, senderPhone } }];\n"
+      },
+      "id": "b1000004-0000-0000-0000-000000000004",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "YOUR_ANTHROPIC_API_KEY" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"system\": {{ JSON.stringify($json.systemPrompt) }},\n  \"messages\": [{ \"role\": \"user\", \"content\": {{ JSON.stringify($json.userMessage) }} }]\n}",
+        "options": {}
+      },
+      "id": "b1000005-0000-0000-0000-000000000005",
+      "name": "Ask Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1060, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract Claude's reply text\nconst response = $input.first().json;\nconst replyText = response.content?.[0]?.text || 'Sorry, I could not generate a response. Please try again.';\nconst senderPhone = $('Build AI Prompt').first().json.senderPhone;\n\nreturn [{ json: { replyText, senderPhone } }];\n"
+      },
+      "id": "b1000006-0000-0000-0000-000000000006",
+      "name": "Extract Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendText",
+        "phoneNumberId": "YOUR_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "={{ $json.senderPhone }}",
+        "textBody": "={{ $json.replyText }}"
+      },
+      "id": "b1000007-0000-0000-0000-000000000007",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1500, 300],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [{ "node": "Extract Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [{ "node": "Fetch Leads", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Leads": {
+      "main": [
+        [{ "node": "Build AI Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build AI Prompt": {
+      "main": [
+        [{ "node": "Ask Claude", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ask Claude": {
+      "main": [
+        [{ "node": "Extract Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Reply": {
+      "main": [
+        [{ "node": "Send Reply", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
