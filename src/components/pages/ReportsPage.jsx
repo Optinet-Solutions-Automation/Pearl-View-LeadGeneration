@@ -127,6 +127,13 @@ export default function ReportsPage() {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const filteredExpenses = expenses.filter(e => inRange(e.date));
+
+  // Separate upsell records from regular job revenue
+  const isUpsellRecord = r => (r.name || '').toLowerCase().includes('upsell') || r.jobType === 'Upsell';
+  const mainRevenue   = filteredRevenue.filter(r => !isUpsellRecord(r));
+  const upsellRevenue = filteredRevenue.filter(r =>  isUpsellRecord(r));
+  const totalUpsell   = upsellRevenue.reduce((s, r) => s + r.amount, 0);
+
   const totalIncome   = filteredRevenue.reduce((s, r) => s + r.amount, 0);
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
   const profit        = totalIncome - totalExpenses;
@@ -146,9 +153,9 @@ export default function ReportsPage() {
     bySource[k].count  += 1;
   });
 
-  // Group by job type
+  // Group by job type (exclude upsell records — tracked separately)
   const byJobType = {};
-  filteredRevenue.forEach(r => {
+  mainRevenue.forEach(r => {
     const k = r.jobType || 'Other';
     if (!byJobType[k]) byJobType[k] = { amount: 0, count: 0 };
     byJobType[k].amount += r.amount;
@@ -185,7 +192,12 @@ export default function ReportsPage() {
 
       {/* ── Summary cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
-        <SummaryCard label="Income" value={totalIncome} count={`${filteredRevenue.length} jobs`} color="#15803d" bg="#f0fdf4" border="#bbf7d0" />
+        <SummaryCard
+          label="Income"
+          value={totalIncome}
+          count={`${mainRevenue.length} job${mainRevenue.length !== 1 ? 's' : ''}${totalUpsell > 0 ? ` + $${totalUpsell.toLocaleString()} upsell` : ''}`}
+          color="#15803d" bg="#f0fdf4" border="#bbf7d0"
+        />
         <SummaryCard label="Expenses" value={totalExpenses} count={`${filteredExpenses.length} items`} color="#dc2626" bg="#fef2f2" border="#fecaca" />
         <SummaryCard
           label="Profit"
@@ -372,17 +384,19 @@ export default function ReportsPage() {
                   .filter(r => !selectedSource || r.source === selectedSource)
                   .map(row => {
                     const sm = getSourceMeta(row.source);
-                    const isUpsell = (row.name || '').toLowerCase().includes('upsell');
+                    const isUpsell = isUpsellRecord(row);
+                    const upsellDesc = isUpsell ? ((row.name || '').split('Upsell: ')[1] || '').trim() : '';
                     return (
                       <div key={row.id} style={{ padding: '10px 0', borderTop: '1px solid var(--gray-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{row.client || row.name}</span>
                             {isUpsell && <span style={{ fontSize: '9px', fontWeight: 700, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', padding: '1px 5px', borderRadius: '6px' }}>UPSELL</span>}
+                            {isUpsell && upsellDesc && <span style={{ fontSize: '11px', color: '#92400e' }}>{upsellDesc}</span>}
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
                             {new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                            {row.jobType ? ` · ${row.jobType}` : ''}
+                            {!isUpsell && row.jobType ? ` · ${row.jobType}` : ''}
                             {row.method ? ` · ${row.method}` : ''}
                           </div>
                         </div>
@@ -415,18 +429,20 @@ export default function ReportsPage() {
               {filteredRevenue.map(row => {
                 const src = sourceByPhone[row.phone?.replace(/\s/g, '').toLowerCase()] || '';
                 const sm  = src ? getSourceMeta(src) : null;
-                const isUpsell = (row.name || '').toLowerCase().includes('upsell');
+                const isUpsell = isUpsellRecord(row);
+                const upsellDesc = isUpsell ? ((row.name || '').split('Upsell: ')[1] || '').trim() : '';
                 return (
                   <div key={row.id} style={{ padding: '11px 0', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{row.client || row.name}</span>
                         {isUpsell && <span style={{ fontSize: '9px', fontWeight: 700, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', padding: '1px 5px', borderRadius: '6px' }}>UPSELL</span>}
+                        {isUpsell && upsellDesc && <span style={{ fontSize: '11px', color: '#92400e' }}>{upsellDesc}</span>}
                         {sm && <span style={{ fontSize: '9px', fontWeight: 700, background: sm.bg, color: sm.color, padding: '1px 5px', borderRadius: '6px' }}>{sm.label.toUpperCase()}</span>}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '3px' }}>
                         {new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        {row.jobType ? ` · ${row.jobType}` : ''}
+                        {!isUpsell && row.jobType ? ` · ${row.jobType}` : ''}
                         {row.city ? ` · ${row.city}` : ''}
                       </div>
                       {row.method && (

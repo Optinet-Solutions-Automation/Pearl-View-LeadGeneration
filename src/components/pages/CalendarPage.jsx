@@ -470,7 +470,7 @@ export default function CalendarPage() {
         'Date':           new Date().toISOString().split('T')[0],
         'Client Name':    booking.clientName,
         'Phone':          booking.phone || '',
-        'Job_Service':    upsellNotes || 'Upsell',
+        'Job_Service':    'Upsell',
         'City':           booking.city || '',
         'Payment_Method': method || 'Cash',
         'Amount':         upsellAmount,
