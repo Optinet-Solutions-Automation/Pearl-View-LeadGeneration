@@ -183,34 +183,6 @@ export default function ReportsPage() {
         <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Income, expenses & lead sources</div>
       </div>
 
-      {/* ── Range selector ── */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', overflowX: 'auto', paddingBottom: '2px' }}>
-        {RANGES.map(r => (
-          <button key={r.id} onClick={() => setRange(r.id)} style={{
-            padding: '7px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
-            border: `1.5px solid ${range === r.id ? 'var(--primary)' : 'var(--gray-200)'}`,
-            background: range === r.id ? 'var(--primary)' : '#fff',
-            color: range === r.id ? '#fff' : 'var(--gray-600)',
-          }}>
-            {r.label}
-          </button>
-        ))}
-      </div>
-
-      {range === 'custom' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-          <div>
-            <label style={lbl}>From</label>
-            <input className="finput" type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={lbl}>To</label>
-            <input className="finput" type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-          </div>
-        </div>
-      )}
-
       {/* ── Summary cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
         <SummaryCard label="Income" value={totalIncome} count={`${filteredRevenue.length} jobs`} color="#15803d" bg="#f0fdf4" border="#bbf7d0" />
@@ -227,7 +199,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Tab bar ── */}
-      <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '4px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '4px', marginBottom: '10px' }}>
         {[
           { id: 'overview',      label: 'Overview' },
           { id: 'source',        label: 'By Source' },
@@ -245,6 +217,33 @@ export default function ReportsPage() {
           </button>
         ))}
       </div>
+
+      {/* ── Range selector (below tabs, always visible) ── */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', overflowX: 'auto', paddingBottom: '2px' }}>
+        {RANGES.map(r => (
+          <button key={r.id} onClick={() => setRange(r.id)} style={{
+            padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
+            border: `1.5px solid ${range === r.id ? 'var(--primary)' : 'var(--gray-200)'}`,
+            background: range === r.id ? 'var(--primary)' : '#fff',
+            color: range === r.id ? '#fff' : 'var(--gray-600)',
+          }}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {range === 'custom' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+          <div>
+            <label style={lbl}>From</label>
+            <input className="finput" type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={lbl}>To</label>
+            <input className="finput" type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+      )}
 
       {/* ── Overview tab ── */}
       {activeTab === 'overview' && (

@@ -123,14 +123,13 @@ export function LeadsProvider({ children }) {
     setRefuseModalPrevStatus(null);
   }, []);
 
-  // Confirm booking: change status to 'booked' + auto-create calendar entry
+  // Confirm booking: status → booked + Scheduled calBooking. Revenue only recorded when Job Done.
   const confirmBook = useCallback(async (bookingData) => {
     if (!bookModalId) return;
     const id = bookModalId;
     setBookModalId(null);
     const result = await changeStatus(id, 'booked');
     if (result === 'error') { showToast('Failed to save — check your connection'); return; }
-    // Auto-create calendar booking
     const lead = leads.find(l => l.id === id);
     if (lead && bookingData.date) {
       await addCalBooking({
@@ -142,18 +141,13 @@ export function LeadsProvider({ children }) {
         jobTime:        bookingData.jobTime || '',
         assignedWorker: bookingData.worker  || '',
         amount:         bookingData.amount || lead.value || 0,
+        bookingStatus:  'Scheduled',
         linkedLeadId:   id,
       });
       saveJobDate(id, bookingData.date);
-      // If payment was entered upfront, record it as Revenue now
-      if (bookingData.amount > 0) {
-        await savePaidInfo(id, true, bookingData.amount, bookingData.paymentMethod || 'Cash');
-        showToast('Lead booked ✓ — Payment recorded');
-        return;
-      }
     }
     showToast('Lead booked ✓ — added to Calendar');
-  }, [bookModalId, changeStatus, leads, addCalBooking, saveJobDate, savePaidInfo, showToast]);
+  }, [bookModalId, changeStatus, leads, addCalBooking, saveJobDate, showToast]);
 
   const closeBookModal = useCallback(() => setBookModalId(null), []);
 

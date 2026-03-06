@@ -461,7 +461,7 @@ export default function DetailPanel() {
             <select
               value={l.jobType || ''}
               onChange={e => saveJobType(l.id, e.target.value)}
-              style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--gray-200)', borderRadius: '6px', fontFamily: 'inherit', background: '#fff', color: 'var(--gray-700)', outline: 'none', maxWidth: '160px' }}
+              style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--gray-200)', borderRadius: '6px', fontFamily: 'inherit', background: '#fff', color: 'var(--gray-700)', outline: 'none', flex: 1 }}
             >
               <option value="">— Select —</option>
               <option value="Window Cleaning">Window Cleaning</option>
@@ -497,7 +497,7 @@ export default function DetailPanel() {
           <div className="psec-title">Payment</div>
           {l.paid ? (
             <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: l.status !== 'job_done' ? '8px' : 0 }}>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>✓ Payment Recorded</div>
                   <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '3px' }}>
@@ -505,6 +505,7 @@ export default function DetailPanel() {
                     {l.paymentMethod ? ` · ${l.paymentMethod.toUpperCase()}` : ''}
                   </div>
                 </div>
+                {/* Edit always available — price may change after job (discount or increase) */}
                 <button
                   onClick={handleSubmitPayment}
                   style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d', background: '#fff', border: '1px solid #86efac', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
@@ -512,15 +513,18 @@ export default function DetailPanel() {
                   Edit
                 </button>
               </div>
-              <button
-                onClick={handleDeletePayment}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%', padding: '6px', background: 'transparent', color: '#dc2626', border: 'none', borderTop: '1px solid #dcfce7', marginTop: '4px', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
-                </svg>
-                Delete Payment
-              </button>
+              {/* Delete only available before job_done — no job should be recorded as free */}
+              {l.status !== 'job_done' && (
+                <button
+                  onClick={handleDeletePayment}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%', padding: '6px', background: 'transparent', color: '#dc2626', border: 'none', borderTop: '1px solid #dcfce7', marginTop: '4px', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                  </svg>
+                  Delete Payment
+                </button>
+              )}
             </div>
           ) : (
             <button
@@ -574,21 +578,23 @@ export default function DetailPanel() {
         <div className="psec" style={{ borderBottom: 'none' }}>
           <div className="psec-title">Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {/* Row 1: Send Quote + Job Done */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-                Send Quote
-              </button>
-              <button className="action-btn btn-green" onClick={handleJobDone} style={{ minHeight: '44px' }}>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Job Done
-              </button>
-            </div>
+            {/* Row 1: Send Quote + Job Done — hidden when job is already done */}
+            {l.status !== 'job_done' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  </svg>
+                  Send Quote
+                </button>
+                <button className="action-btn btn-green" onClick={handleJobDone} style={{ minHeight: '44px' }}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  Job Done
+                </button>
+              </div>
+            )}
             {/* Row 2: Book (full width) — hidden once booked or job done */}
             {l.status !== 'booked' && l.status !== 'job_done' && (
               <button
