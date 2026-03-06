@@ -60,7 +60,7 @@ function RecentRow({ l, onClick }) {
     archived:    { bg: 'var(--gray-100)', color: 'var(--gray-500)', label: 'Archived' },
   };
   const s = STATUS_STYLE[l.status] || STATUS_STYLE.archived;
-  const isCall = l.source === 'call1' || l.source === 'call2';
+  const isCall = l.hasCall;
 
   return (
     <div
@@ -93,20 +93,30 @@ function RecentRow({ l, onClick }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+const SOURCE_META_OV = {
+  'website-pearlview':  { label: 'Pearl View',  color: '#7c3aed', bg: '#fdf4ff' },
+  'website-crystalpro': { label: 'Crystal Pro', color: '#2563eb', bg: '#eff6ff' },
+  'Phone Call':         { label: 'Phone Call',  color: '#0d9488', bg: '#f0fdfa' },
+  'Facebook':           { label: 'Facebook',    color: '#1877f2', bg: '#eff6ff' },
+  'Google':             { label: 'Google',      color: '#dc2626', bg: '#fef2f2' },
+  'Other':              { label: 'Other',        color: '#6b7280', bg: '#f9fafb' },
+};
+
 export default function OverviewPage() {
-  const { leads, openPanel, setCurrentPage } = useLeadsContext();
+  const { leads, calBookings, openPanel, setCurrentPage } = useLeadsContext();
 
   // Status buckets
   const newLeads   = leads.filter(l => l.status === 'new');
   const inProgress = leads.filter(l => l.status === 'in_progress');
   const quoteSent  = leads.filter(l => l.status === 'quote_sent');
+  const booked     = leads.filter(l => l.status === 'booked');
   const jobDone    = leads.filter(l => l.status === 'job_done');
   const refused    = leads.filter(l => l.status === 'refused');
 
   // Today's snapshot
   const newToday     = newLeads.filter(l => isToday(l.dateObj)).length;
   const followUpsDue = leads.filter(l => l.followUp && new Date(l.followUp) < new Date());
-  const jobsToday    = leads.filter(l => l.jobDate && isToday(new Date(l.jobDate))).length;
+  const bookedToday  = (calBookings || []).filter(b => b.date && isToday(new Date(b.date)) && b.bookingStatus !== 'Completed').length;
 
   // Revenue
   const totalRevenue   = leads.filter(l => l.paid).reduce((sum, l) => sum + (l.paidAmount || 0), 0);
@@ -122,9 +132,12 @@ export default function OverviewPage() {
 
   const totalActions = followUpsDue.length + agingNew.length + uncollected.length;
 
-  // Sources
-  const lp1 = leads.filter(l => l.lp === 'LP1').length;
-  const lp2 = leads.filter(l => l.lp === 'LP2').length;
+  // Source breakdown from all leads
+  const sourceBreakdown = {};
+  leads.forEach(l => {
+    const src = l.leadSource || (l.hasCall ? 'Phone Call' : l.lp === 'LP1' ? 'website-crystalpro' : l.lp === 'LP2' ? 'website-pearlview' : 'Other');
+    sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
+  });
 
   // Recent activity (last 8)
   const recent = leads.slice(0, 8);
@@ -143,16 +156,21 @@ export default function OverviewPage() {
           <div style={{ fontSize: '28px', fontWeight: 800, color: '#134e4a', lineHeight: 1 }}>{newToday}</div>
           <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '4px' }}>received</div>
         </div>
-        <div style={{ background: followUpsDue.length > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue.length > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: followUpsDue.length > 0 ? 'pointer' : 'default' }}
-          onClick={() => followUpsDue.length > 0 && setCurrentPage('leads')}>
+        <div
+          style={{ background: followUpsDue.length > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue.length > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: followUpsDue.length > 0 ? 'pointer' : 'default' }}
+          onClick={() => followUpsDue.length > 0 && setCurrentPage('leads')}
+        >
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-500)', marginBottom: '5px' }}>Follow-ups</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-400)', lineHeight: 1 }}>{followUpsDue.length}</div>
           <div style={{ fontSize: '10px', color: followUpsDue.length > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>overdue</div>
         </div>
-        <div style={{ background: jobsToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${jobsToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px' }}>
-          <div style={{ fontSize: '9.5px', fontWeight: 700, color: jobsToday > 0 ? '#d97706' : 'var(--gray-500)', marginBottom: '5px' }}>Scheduled</div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: jobsToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{jobsToday}</div>
-          <div style={{ fontSize: '10px', color: jobsToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>jobs today</div>
+        <div
+          style={{ background: bookedToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${bookedToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: bookedToday > 0 ? 'pointer' : 'default' }}
+          onClick={() => bookedToday > 0 && setCurrentPage('calendar')}
+        >
+          <div style={{ fontSize: '9.5px', fontWeight: 700, color: bookedToday > 0 ? '#d97706' : 'var(--gray-500)', marginBottom: '5px' }}>Booked Today</div>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: bookedToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{bookedToday}</div>
+          <div style={{ fontSize: '10px', color: bookedToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>on calendar</div>
         </div>
       </div>
 
@@ -162,8 +180,9 @@ export default function OverviewPage() {
         <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch', marginBottom: '10px' }}>
           {[
             { label: 'New',      count: newLeads.length,   color: '#0d9488', bg: '#f0fdfa'  },
-            { label: 'Progress', count: inProgress.length, color: '#2563eb', bg: '#eff6ff'  },
+            { label: 'Progress', count: inProgress.length, color: '#d97706', bg: '#fffbeb'  },
             { label: 'Quoted',   count: quoteSent.length,  color: '#7c3aed', bg: '#ede9fe'  },
+            { label: 'Booked',   count: booked.length,     color: '#2563eb', bg: '#dbeafe'  },
             { label: 'Done',     count: jobDone.length,    color: '#16a34a', bg: '#f0fdf4'  },
             { label: 'Refused',  count: refused.length,    color: '#dc2626', bg: '#fef2f2'  },
           ].map((s, i, arr) => (
@@ -187,8 +206,9 @@ export default function OverviewPage() {
             <div style={{ height: '6px', borderRadius: '20px', background: 'var(--gray-100)', overflow: 'hidden', display: 'flex' }}>
               {[
                 { count: newLeads.length,   color: '#0d9488' },
-                { count: inProgress.length, color: '#2563eb' },
+                { count: inProgress.length, color: '#d97706' },
                 { count: quoteSent.length,  color: '#7c3aed' },
+                { count: booked.length,     color: '#2563eb' },
                 { count: jobDone.length,    color: '#16a34a' },
                 { count: refused.length,    color: '#dc2626' },
               ].map((s, i) => (
@@ -295,29 +315,45 @@ export default function OverviewPage() {
       )}
 
       {/* ── Lead Sources ── */}
-      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '16px 18px' }}>
-        <SectionHeader title="Lead Sources" />
-        <div className="lp-grid">
-          <div className="lp-card lp-card-blue">
-            <div className="lp-card-label" style={{ color: 'var(--primary)' }}>LP Site 1 · Crystal Pro</div>
-            <a href="https://crystalpro.com.au/" target="_blank" rel="noreferrer" className="lp-card-link" style={{ color: 'var(--primary)' }}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px', flexShrink: 0 }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-              <span>crystalpro.com.au</span>
+      {Object.keys(sourceBreakdown).length > 0 && (
+        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '16px 18px' }}>
+          <SectionHeader title="Lead Sources" count={leads.length} />
+          {Object.entries(sourceBreakdown)
+            .sort((a, b) => b[1] - a[1])
+            .map(([src, count]) => {
+              const meta = SOURCE_META_OV[src] || { label: src || 'Unknown', color: '#6b7280', bg: '#f9fafb' };
+              const pct  = Math.round((count / leads.length) * 100);
+              return (
+                <div key={src} style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-700)' }}>{meta.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{pct}%</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gray-800)' }}>{count}</span>
+                    </div>
+                  </div>
+                  <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: meta.color, borderRadius: '4px', transition: 'width .35s ease' }} />
+                  </div>
+                </div>
+              );
+            })}
+          {/* Website links */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--gray-100)' }}>
+            <a href="https://crystalpro.com.au/" target="_blank" rel="noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '7px', background: '#eff6ff', borderRadius: '8px', fontSize: '11px', fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '11px', height: '11px' }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+              Crystal Pro
             </a>
-            <div className="lp-card-desc">Form leads + Call leads</div>
-            <div className="lp-card-count">{lp1} total leads</div>
-          </div>
-          <div className="lp-card lp-card-purple">
-            <div className="lp-card-label" style={{ color: 'var(--purple)' }}>LP Site 2 · Pearl View</div>
-            <a href="https://pearlview.com.au/" target="_blank" rel="noreferrer" className="lp-card-link" style={{ color: 'var(--purple)' }}>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px', flexShrink: 0 }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-              <span>pearlview.com.au</span>
+            <a href="https://pearlview.com.au/" target="_blank" rel="noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '7px', background: '#fdf4ff', borderRadius: '8px', fontSize: '11px', fontWeight: 700, color: '#7c3aed', textDecoration: 'none' }}>
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '11px', height: '11px' }}><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+              Pearl View
             </a>
-            <div className="lp-card-desc">Form leads + Call leads</div>
-            <div className="lp-card-count">{lp2} total leads</div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Recent Activity ── */}
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '16px 18px' }}>

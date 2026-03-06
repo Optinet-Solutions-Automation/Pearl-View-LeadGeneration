@@ -23,7 +23,7 @@ function ageStyle(ms) {
 }
 
 // ── Next status in pipeline (for swipe-right Move Forward) ───────────────────
-const NEXT_STATUS = { new: 'in_progress', in_progress: 'quote_sent', quote_sent: 'job_done' };
+const NEXT_STATUS = { new: 'in_progress', in_progress: 'quote_sent', quote_sent: 'booked', booked: 'job_done' };
 
 export default function LeadCard({ lead }) {
   const {
