@@ -35,6 +35,9 @@ export function LeadsProvider({ children }) {
   // Book modal state (when setting status → booked)
   const [bookModalId, setBookModalId] = useState(null);
 
+  // Quote-send modal state (when changing status → quote_sent via swipe/drag)
+  const [quoteSendModalId, setQuoteSendModalId] = useState(null);
+
   useEffect(() => {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
   }, [fetchLeads]);
@@ -79,6 +82,12 @@ export function LeadsProvider({ children }) {
     // Rule: 'booked' → show booking modal to capture date/time/worker
     if (status === 'booked') {
       setBookModalId(id);
+      return;
+    }
+
+    // Rule: → quote_sent always asks for quote amount first
+    if (status === 'quote_sent') {
+      setQuoteSendModalId(id);
       return;
     }
 
@@ -150,6 +159,23 @@ export function LeadsProvider({ children }) {
   }, [bookModalId, changeStatus, leads, addCalBooking, saveJobDate, showToast]);
 
   const closeBookModal = useCallback(() => setBookModalId(null), []);
+
+  // Send quote: save amount then change status to quote_sent (bypasses interceptor)
+  const sendQuoteAndChangeStatus = useCallback(async (id, amount) => {
+    await saveQuoteAmount(id, amount);
+    const result = await changeStatus(id, 'quote_sent');
+    if (result === 'error') showToast('Failed to save — check your connection');
+    else showToast('Quote sent ✓');
+  }, [saveQuoteAmount, changeStatus, showToast]);
+
+  const confirmQuoteSend = useCallback(async (amount) => {
+    if (!quoteSendModalId) return;
+    const id = quoteSendModalId;
+    setQuoteSendModalId(null);
+    await sendQuoteAndChangeStatus(id, amount);
+  }, [quoteSendModalId, sendQuoteAndChangeStatus]);
+
+  const closeQuoteSendModal = useCallback(() => setQuoteSendModalId(null), []);
 
   // Confirm moving a quote_sent lead back — optionally deleting the estimation
   const confirmQuoteTransfer = useCallback(async (shouldDeleteQuote) => {
@@ -335,6 +361,11 @@ export function LeadsProvider({ children }) {
       bookModalId,
       confirmBook,
       closeBookModal,
+      quoteSendModalId,
+      quoteSendLeadName: leads.find(l => l.id === quoteSendModalId)?.name || null,
+      confirmQuoteSend,
+      closeQuoteSendModal,
+      sendQuoteAndChangeStatus,
       quoteTransferModalId,
       quoteTransferTargetStatus,
       quoteTransferLeadValue,

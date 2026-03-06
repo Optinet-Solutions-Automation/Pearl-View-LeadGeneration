@@ -183,7 +183,8 @@ function SendQuoteModal({ leadName, onSubmit, onClose }) {
 export default function DetailPanel() {
   const {
     activeLead: l, closePanel, changeStatus,
-    saveNote, saveJobType, savePaidInfo, deletePayment, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
+    saveNote, saveJobType, savePaidInfo, deletePayment, saveCity, saveJobDate, saveEmail,
+    sendQuoteAndChangeStatus,
     archiveLead, showToast, renameLead, setRefuseReason,
   } = useLeadsContext();
 
@@ -258,11 +259,8 @@ export default function DetailPanel() {
   function handleSendQuote() { setQuoteModalOpen(true); }
 
   async function onQuoteSubmit(amount) {
-    // Sequential: save quote amount first, then change status
-    await saveQuoteAmount(l.id, amount);
-    await changeStatus(l.id, 'quote_sent');
     setQuoteModalOpen(false);
-    showToast('Quote sent ✓');
+    await sendQuoteAndChangeStatus(l.id, amount);
   }
   function handleJobDone()         { changeStatus(l.id, 'job_done'); }
   function handleDeletePayment()   { deletePayment(l.id); }
@@ -585,15 +583,17 @@ export default function DetailPanel() {
         <div className="psec" style={{ borderBottom: 'none' }}>
           <div className="psec-title">Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {/* Row 1: Send Quote + Job Done — hidden when job is already done */}
+            {/* Row 1: Send Quote + Job Done */}
             {l.status !== 'job_done' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                  </svg>
-                  Send Quote
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: l.status === 'quote_sent' ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                {l.status !== 'quote_sent' && (
+                  <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Send Quote
+                  </button>
+                )}
                 <button className="action-btn btn-green" onClick={handleJobDone} style={{ minHeight: '44px' }}>
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
                     <polyline points="20 6 9 17 4 12"/>

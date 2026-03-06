@@ -41,6 +41,7 @@ body {
   height: 100vh; /* fallback for older browsers */
   overflow: hidden;
   font-size: 13.5px;
+  overscroll-behavior: none; /* prevent Android/iOS bounce scrolling */
 }
 
 #root {
@@ -936,6 +937,7 @@ body.keyboard-open .fab              { display: none !important; }
   .stats { grid-template-columns: repeat(2, 1fr); }
 
   .panel.open { width: 100%; position: fixed; inset: 0; z-index: 150; }
+  .panel.open .panel-body { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
   /* Kanban: horizontal scroll so all columns remain visible */
   .board {
