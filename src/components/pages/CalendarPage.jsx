@@ -626,8 +626,8 @@ export default function CalendarPage() {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <div className="cal-book-wrap">
+              <table className="cal-book-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
                     <th style={th}>Date</th>
@@ -643,12 +643,13 @@ export default function CalendarPage() {
                   {pagedRows.map(b => (
                     <tr
                       key={b.id}
+                      className="cal-book-tr"
                       onClick={() => b.isCalBooking ? setEditBooking(b) : goToLead(b.id)}
                       style={{ borderBottom: '1px solid var(--gray-100)', cursor: 'pointer', touchAction: 'manipulation' }}
                       onMouseEnter={e => { e.currentTarget.style.background = b.isCalBooking ? '#fefce8' : 'var(--gray-50)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = ''; }}
                     >
-                      <td style={td}>
+                      <td className="cal-td-date" style={td}>
                         <div style={{ background: b.isCalBooking ? '#fefce8' : '#eff6ff', borderRadius: '8px', padding: '5px 10px', textAlign: 'center', display: 'inline-block', minWidth: '44px' }}>
                           <div style={{ fontSize: '9.5px', fontWeight: 700, color: b.isCalBooking ? '#92400e' : 'var(--primary)', textTransform: 'uppercase' }}>
                             {b.parsedDate.toLocaleDateString('en-AU', { month: 'short' })}
@@ -656,21 +657,21 @@ export default function CalendarPage() {
                           <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--gray-900)', lineHeight: 1.1 }}>{b.parsedDate.getDate()}</div>
                         </div>
                       </td>
-                      <td style={{ ...td, fontWeight: 600, color: 'var(--gray-900)' }}>
+                      <td className="cal-td-client" style={{ ...td, fontWeight: 600, color: 'var(--gray-900)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {b.name}
                           {b.isCalBooking && b.bookingSource !== 'Lead' && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>MANUAL</span>}
                           {b.isCalBooking && b.bookingSource === 'Lead' && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#eff6ff', color: 'var(--primary)', flexShrink: 0 }}>BOOKED</span>}
                         </div>
                       </td>
-                      <td style={{ ...td, color: 'var(--gray-600)' }}>{b.phone || '—'}</td>
-                      <td style={td}>
+                      <td className="cal-td-phone" style={{ ...td, color: 'var(--gray-600)' }}>{b.phone || '—'}</td>
+                      <td className="cal-td-service" style={td}>
                         {(b.jobType || b.service)
                           ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{b.jobType || b.service}</span>
                           : <span style={{ color: 'var(--gray-400)' }}>—</span>
                         }
                       </td>
-                      <td style={{ ...td, color: 'var(--gray-600)', fontSize: '12px' }}>
+                      <td className="cal-td-time" style={{ ...td, color: 'var(--gray-600)', fontSize: '12px' }}>
                         {b.jobTime || b.assignedWorker
                           ? <div>
                               {b.jobTime && <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{b.jobTime}</div>}
@@ -679,7 +680,7 @@ export default function CalendarPage() {
                           : <span style={{ color: 'var(--gray-300)' }}>—</span>
                         }
                       </td>
-                      <td style={td}>
+                      <td className="cal-td-status" style={td}>
                         {b.isCalBooking ? (
                           <span style={{
                             fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
@@ -692,7 +693,7 @@ export default function CalendarPage() {
                           <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)' }}>Lead</span>
                         )}
                       </td>
-                      <td style={{ ...td, textAlign: 'right' }}>
+                      <td className="cal-td-amount" style={{ ...td, textAlign: 'right' }}>
                         <div style={{ fontWeight: 700, color: b.bookingStatus === 'Completed' ? '#15803d' : 'var(--primary)' }}>
                           {(b.amount > 0 || b.value > 0) ? `$${(b.amount || b.value || 0).toLocaleString()}` : '—'}
                         </div>

@@ -1059,7 +1059,35 @@ body.keyboard-open .fab              { display: none !important; }
 
   /* Notification dropdown: wider on small screens */
   .notif-dropdown { width: calc(100vw - 24px); right: -50px; }
+
+  /* ── Calendar booking table → card layout ── */
+  /* Remove the overflowX scroll container so vertical scroll isn't blocked */
+  .cal-book-wrap { overflow-x: unset !important; }
+  .cal-book-table { display: block; }
+  .cal-book-table thead { display: none; }
+  .cal-book-table tbody { display: block; }
+  .cal-book-tr {
+    display: flex !important;
+    align-items: center;
+    gap: 0;
+    padding: 11px 14px !important;
+    min-height: 52px;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  /* All td: strip table padding (overrides inline styles) */
+  .cal-book-tr td { padding: 0 !important; border: none; vertical-align: middle; }
+  .cal-td-date   { flex-shrink: 0; margin-right: 12px; }
+  .cal-td-client { flex: 1; min-width: 0; font-size: 13px !important; }
+  .cal-td-phone  { display: none !important; }  /* tapping the row opens the full detail */
+  .cal-td-service { display: none !important; } /* shown inside the modal instead */
+  .cal-td-time   { display: none !important; }
+  .cal-td-status { flex-shrink: 0; margin-left: 8px; }
+  .cal-td-amount { flex-shrink: 0; margin-left: 8px; text-align: right !important; font-size: 12.5px; }
 }
+
+/* ── CALENDAR BOOKING TABLE (base) ──────── */
+/* Allow horizontal scroll on desktop/tablet, but don't block parent scroll on mobile */
+.cal-book-wrap { overflow-x: auto; touch-action: pan-y; }
 
 /* ── OVERVIEW LP CARDS ───────────────────── */
 .lp-grid {
