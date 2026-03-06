@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
-import { createRecord } from '../../utils/airtableSync';
+import { createRecord, AT_TABLES } from '../../utils/airtableSync';
 
 const DAYS     = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -322,7 +322,7 @@ function BookingModal({ year, month, day, leads, clients = [], addCalBooking, on
 export default function CalendarPage() {
   const {
     leads, calBookings, clients,
-    saveJobDate, openPanel, setCurrentPage,
+    saveJobDate, openPanel, setCurrentPage, changeStatus,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
     showToast,
   } = useLeadsContext();
@@ -336,8 +336,10 @@ export default function CalendarPage() {
   const [tableSearch, setTableSearch] = useState('');
   const [tablePage,   setTablePage]   = useState(0);
 
+  // Exclude 'booked' leads — they always have a calBooking entry (created by confirmBook),
+  // so showing both would cause duplicates.
   const monthLeadBookings = leads
-    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'archived')
+    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'archived' && l.status !== 'booked')
     .map(l => ({ ...l, parsedDate: new Date(l.jobDate), isCalBooking: false }))
     .filter(b => b.parsedDate.getFullYear() === year && b.parsedDate.getMonth() === month);
 
@@ -380,11 +382,11 @@ export default function CalendarPage() {
       upsellAmount: upsellAmount || 0,
       upsellNotes:  upsellNotes || '',
     });
-    // Record payment via existing hook (creates Revenue record)
+    // Record payment (creates Revenue record, updates booking + lead paid state)
     recordBookingPayment(booking.id, amount, method);
-    // If there's an upsell, write an extra Revenue record for it
+    // If there's an upsell, write a separate Revenue record for it
     if (upsellAmount > 0) {
-      createRecord('Revenue', {
+      createRecord(AT_TABLES.revenue, {
         'Revenue Name':   `${booking.clientName} - Upsell: ${upsellNotes || 'Extra Service'}`,
         'Date':           new Date().toISOString().split('T')[0],
         'Client Name':    booking.clientName,
@@ -395,6 +397,14 @@ export default function CalendarPage() {
         'Amount':         upsellAmount,
         'Status':         'Job Done',
       });
+    }
+    // Move the linked lead to Job Done status
+    const linkedLead = leads.find(l =>
+      (booking.linkedLeadId && l.id === booking.linkedLeadId) ||
+      (booking.phone && l.phone === booking.phone)
+    );
+    if (linkedLead && linkedLead.status !== 'job_done') {
+      changeStatus(linkedLead.id, 'job_done');
     }
     showToast('Job marked as done ✓ — Revenue recorded');
     setEditBooking(null);
