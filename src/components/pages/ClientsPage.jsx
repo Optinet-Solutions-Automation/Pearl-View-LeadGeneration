@@ -8,11 +8,25 @@ const PAGE_SIZE = 10;
 const iLbl   = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-500)', marginBottom: '5px', display: 'block' };
 const iInput = { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#fff' };
 
-const LP_SOURCE_OPTIONS = [
-  { value: '',            label: 'Unknown' },
-  { value: 'Crystal Pro', label: 'Crystal Pro (LP1)' },
-  { value: 'Pearl View',  label: 'Pearl View (LP2)' },
+const SOURCE_OPTIONS = [
+  { value: '',                   label: '— Unknown —' },
+  { value: 'website-pearlview',  label: 'Pearl View Website' },
+  { value: 'website-crystalpro', label: 'Crystal Pro Website' },
+  { value: 'Phone Call',         label: 'Phone Call' },
+  { value: 'Facebook',           label: 'Facebook' },
+  { value: 'Google',             label: 'Google' },
+  { value: 'Other',              label: 'Other' },
 ];
+
+// Derive LP1/LP2 from a leadSource string (works whether stored as 'Crystal Pro',
+// 'Pearl View', 'website-crystalpro', 'website-pearlview', etc.)
+function deriveLpFromSource(src) {
+  if (!src) return null;
+  const s = src.toLowerCase().replace(/[\s-]/g, '');
+  if (s.includes('crystalpro') || s.includes('crystal')) return 'LP1';
+  if (s.includes('pearlview')  || s.includes('pearl'))   return 'LP2';
+  return null;
+}
 
 // ── Add Client modal ──────────────────────────────────────────────────────────
 function AddClientModal({ onClose, onSave }) {
@@ -70,7 +84,7 @@ function AddClientModal({ onClose, onSave }) {
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={iLbl}>Lead Source</label>
               <select value={form.leadSource} onChange={e => setF('leadSource', e.target.value)} style={{ ...iInput, cursor: 'pointer' }}>
-                {LP_SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {SOURCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -101,7 +115,9 @@ export default function ClientsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [localSearch, setLocalSearch] = useState('');
 
-  // ── Merge Clients table with Leads ───────────────────────────────────────────
+  // ── Build client list from Clients table only (phone-deduped) ────────────────
+  // Leads are only used to enrich status/value. Source of truth = Clients table.
+  // Use Sync button to push new leads into the Clients table.
   const mergedClients = useMemo(() => {
     const result = [];
     const seenPhones = new Set();
@@ -111,10 +127,11 @@ export default function ClientsPage() {
       const normalPhone = (c.phone || '').replace(/\s/g, '').toLowerCase();
       const normalName  = (c.name  || '').toLowerCase().trim();
 
-      // Skip duplicate Clients table records with the same phone/name
+      // Deduplicate by phone (primary) or name (fallback)
       if (normalPhone && seenPhones.has(normalPhone)) return;
       if (!normalPhone && normalName && seenNames.has(normalName)) return;
 
+      // Enrich with matching leads from the active Leads table (status, value, lead count)
       const matchingLeads = leads.filter(l => {
         if (normalPhone) {
           const lp = (l.phone || '').replace(/\s/g, '').toLowerCase();
@@ -126,70 +143,18 @@ export default function ClientsPage() {
       const latestLead = matchingLeads[0];
       result.push({
         ...c,
-        date:        latestLead?.date || '',
-        dateObj:     latestLead?.dateObj || new Date(0),
-        leadCount:   matchingLeads.length,
+        date:         latestLead?.date   || '',
+        dateObj:      latestLead?.dateObj || new Date(0),
+        leadCount:    matchingLeads.length,
         latestStatus: latestLead?.status || null,
         latestValue:  latestLead?.value  || 0,
-        lp:          latestLead?.lp || null,
-        fromClients: true,
+        // LP derived from matched lead first, then from client's own leadSource field
+        lp:           latestLead?.lp || deriveLpFromSource(c.leadSource),
       });
 
       if (normalPhone) seenPhones.add(normalPhone);
       if (normalName)  seenNames.add(normalName);
     });
-
-    // Include ALL leads (form + call) not already covered by Clients table
-    // For call leads with no real name ("Unknown Caller"), use phone number as display name
-    leads
-      .filter(l => {
-        const realName = l.name !== 'Unknown' && l.name !== 'Unknown Caller';
-        // Include if has a real name, OR if it's a call lead with a phone number (display phone as name)
-        return realName || !!l.phone;
-      })
-      .forEach(l => {
-        const displayName = (l.name === 'Unknown' || l.name === 'Unknown Caller')
-          ? l.phone  // fallback to phone number as display name
-          : l.name;
-        if (!displayName) return;
-
-        const normalPhone = (l.phone || '').replace(/\s/g, '').toLowerCase();
-        const normalName  = displayName.toLowerCase().trim();
-
-        // Skip if already seen (dedup form + call leads with same phone)
-        if (normalPhone && seenPhones.has(normalPhone)) return;
-        if (!normalPhone && seenNames.has(normalName))  return;
-        if (normalPhone) seenPhones.add(normalPhone);
-        else             seenNames.add(normalName);
-
-        // Count ALL leads (form + call) sharing the same phone
-        const allMatchingLeads = normalPhone
-          ? leads.filter(x => (x.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone)
-          : leads.filter(x => x.id === l.id);
-
-        // Use the latest lead for status/value/date
-        const sortedMatches = allMatchingLeads.sort((a, b) => b.dateObj - a.dateObj);
-        const latestLead = sortedMatches[0];
-
-        result.push({
-          id:          l.id,
-          airtableId:  null,
-          name:        displayName,
-          phone:       l.phone  || '',
-          email:       latestLead.email  || '',
-          address:     latestLead.address || '',
-          city:        latestLead.city   || '',
-          notes:       latestLead.notes  || '',
-          jobType:     latestLead.jobType || '',
-          date:        latestLead.date,
-          dateObj:     latestLead.dateObj,
-          leadCount:   allMatchingLeads.length,
-          latestStatus: latestLead.status,
-          latestValue:  latestLead.value || 0,
-          lp:          latestLead.lp || null,
-          fromClients:  false,
-        });
-      });
 
     return result.sort((a, b) => b.dateObj - a.dateObj);
   }, [clients, leads]);
@@ -268,7 +233,7 @@ export default function ClientsPage() {
         <div>
           <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '2px' }}>Clients</div>
           <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
-            {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''} · sourced from Clients table + leads
+            {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''} · from Clients table · use Sync to add new leads
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
@@ -423,9 +388,6 @@ export default function ClientsPage() {
                     )}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>{c.date ? formatDate(c.date) : '—'}</div>
-                  {!c.fromClients && (
-                    <div style={{ fontSize: '10px', color: 'var(--gray-300)', marginTop: '2px' }}>from leads</div>
-                  )}
                 </div>
               )}
             </div>

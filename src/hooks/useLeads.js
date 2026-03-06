@@ -566,7 +566,7 @@ export function useLeads() {
       : clients.find(c => (c.name || '').toLowerCase().trim() === (lead.name || '').toLowerCase().trim());
     if (exists) return; // already in Clients table
     // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
-    const src = lead.leadSource || (lead.lp === 'LP2' ? 'Pearl View' : lead.lp === 'LP1' ? 'Crystal Pro' : '');
+    const src = lead.leadSource || (lead.lp === 'LP2' ? 'website-pearlview' : lead.lp === 'LP1' ? 'website-crystalpro' : '');
     const newId = await createRecord(AT_TABLES.clients, {
       'Client Name':   lead.name,
       'Phone Number':  lead.phone   || '',
@@ -615,7 +615,9 @@ export function useLeads() {
 
       const phone = (l.phone || '').replace(/\s/g, '').toLowerCase();
       const lname = displayName.toLowerCase();
-      const lpSrc = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
+      // Use actual lead source (e.g. 'website-pearlview', 'Phone Call', 'Facebook')
+      // Fall back to LP-derived label only if leadSource is empty
+      const lpSrc = l.leadSource || (l.lp === 'LP2' ? 'website-pearlview' : 'website-crystalpro');
 
       // Check if already exists
       const existing = phone ? phoneToClient[phone] : nameToClient[lname];
