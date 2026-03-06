@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
 import { PAGE_TITLES } from './Sidebar';
 import { isToday, formatCallTime } from '../utils/dateUtils';

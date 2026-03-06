@@ -1,36 +1,39 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar:       #134e4a;
-  --sidebar-hover: #1a5f5c;
-  --sidebar-active:#0f766e;
-  --primary:       #0d9488;
-  --primary-dk:    #0f766e;
-  --primary-lt:    #14b8a6;
-  --blue-50:       #f0fdfa;
-  --blue-100:      #ccfbf1;
-  --blue-200:      #99f6e4;
+  /* Nature theme — Light Mode */
+  --bg:            #f8f5f0;
+  --surface:       #ffffff;
+  --sidebar:       #1b3a1f;
+  --sidebar-hover: #243e28;
+  --sidebar-active:#2d5030;
+  --primary:       #2e7d32;
+  --primary-dk:    #1b5e20;
+  --primary-lt:    #4caf50;
+  --blue-50:       #f1f8e9;
+  --blue-100:      #dcedc8;
+  --blue-200:      #aed581;
   --white:         #ffffff;
-  --gray-50:       #f8fafc;
-  --gray-100:      #f1f5f9;
-  --gray-200:      #e2e8f0;
-  --gray-300:      #cbd5e1;
-  --gray-400:      #94a3b8;
-  --gray-500:      #64748b;
-  --gray-600:      #475569;
-  --gray-700:      #334155;
-  --gray-800:      #1e293b;
-  --gray-900:      #0f172a;
-  --green:         #16a34a;
+  --gray-50:       #fafaf8;
+  --gray-100:      #f3f0eb;
+  --gray-200:      #e5e0d8;
+  --gray-300:      #ccc8be;
+  --gray-400:      #9e9a8e;
+  --gray-500:      #736e62;
+  --gray-600:      #5c5750;
+  --gray-700:      #3e3a34;
+  --gray-800:      #3e2723;
+  --gray-900:      #1a120e;
+  --green:         #2e7d32;
   --amber:         #d97706;
-  --red:           #dc2626;
-  --purple:        #7c3aed;
-  --teal:          #0d9488;
+  --red:           #c62828;
+  --purple:        #6a1b9a;
+  --teal:          #2e7d32;
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background: var(--blue-50);
+  font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+  background: var(--bg);
   color: var(--gray-800);
   display: flex;
   /* 100dvh = dynamic viewport height — respects Android address bar & gesture nav */
@@ -94,7 +97,7 @@ body {
 .nav-item.active::before {
   content: ''; position: absolute;
   left: 0; top: 0; bottom: 0; width: 3px;
-  background: #2dd4bf; border-radius: 0 2px 2px 0;
+  background: #a5d6a7; border-radius: 0 2px 2px 0;
 }
 .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; opacity: .75; }
 .nav-item.active svg, .nav-item:hover svg { opacity: 1; }
@@ -1332,3 +1335,167 @@ body.keyboard-open .fab              { display: none !important; }
     grid-column: auto;
   }
 }
+
+/* ── Design polish ──────────────────────────────────────────────────────── */
+
+/* Better card shadows (light mode) */
+.card {
+  box-shadow: 0 1px 3px rgba(62,39,35,.04), 0 2px 8px rgba(62,39,35,.04);
+  transition: border-color .15s, box-shadow .2s, transform .15s;
+}
+.card:hover {
+  border-color: var(--blue-200);
+  box-shadow: 0 4px 20px rgba(46,125,50,.12);
+  transform: translateY(-1px);
+}
+.card.active {
+  border-color: var(--primary);
+  box-shadow: 0 4px 20px rgba(46,125,50,.2);
+}
+
+/* Stat cards — left accent bar */
+.stat-card {
+  box-shadow: 0 1px 3px rgba(62,39,35,.05), 0 2px 8px rgba(62,39,35,.04);
+  transition: box-shadow .2s, transform .15s;
+}
+.stat-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(46,125,50,.14) !important;
+}
+
+/* Topbar shadow (no border line) */
+.topbar {
+  box-shadow: 0 1px 0 var(--gray-200), 0 2px 12px rgba(62,39,35,.06);
+}
+
+/* Bottom nav glass effect */
+.mobile-bottom-nav {
+  box-shadow: 0 -2px 20px rgba(62,39,35,.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255,255,255,.92) !important;
+}
+
+/* FAB shadow with green glow */
+.fab {
+  box-shadow: 0 4px 18px rgba(46,125,50,.45), 0 0 0 0 rgba(46,125,50,0);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.fab:hover {
+  box-shadow: 0 6px 24px rgba(46,125,50,.55);
+  transform: scale(1.06);
+}
+.fab:active {
+  transform: scale(.92);
+  box-shadow: 0 2px 8px rgba(46,125,50,.3);
+}
+
+/* Sidebar subtle gradient overlay */
+.sidebar {
+  background: linear-gradient(180deg, #1b3a1f 0%, #162e1a 100%);
+}
+
+/* Notif dropdown shadow */
+.notif-dropdown {
+  box-shadow: 0 8px 40px rgba(62,39,35,.18), 0 2px 8px rgba(62,39,35,.1);
+}
+
+/* Modal shadow */
+.modal {
+  box-shadow: 0 20px 60px rgba(62,39,35,.2), 0 4px 16px rgba(62,39,35,.1);
+}
+
+/* Action button micro interaction */
+.action-btn {
+  transition: opacity .15s, transform .1s;
+}
+.action-btn:hover { opacity: .9; transform: translateY(-1px); }
+.action-btn:active { transform: scale(.97); }
+
+/* Panel header subtle bg */
+.panel-hdr {
+  background: var(--gray-50);
+}
+
+/* ── MOBILE BOTTOM NAV — Active tab indicator ───────────────────────────────
+   Adds a green capsule at the top of the active tab (native-app style)
+   ─────────────────────────────────────────────────────────────────────────── */
+.mobile-nav-tab { position: relative; }
+.mobile-nav-tab.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 6px 6px;
+}
+.mobile-nav-tab.active .mobile-nav-label {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ── SEARCH — Pill-shaped input ─────────────────────────────────────────── */
+.search-wrap input {
+  border-radius: 24px;
+  padding-left: 36px;
+}
+
+/* ── BTN-NEW — Pill shape + shadow ─────────────────────────────────────── */
+.btn-new {
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(46,125,50,.28);
+  letter-spacing: 0.01em;
+}
+
+/* ── VIEW BTN — Solid primary CTA ──────────────────────────────────────── */
+.view-btn {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  border-radius: 8px !important;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.view-btn:hover {
+  background: var(--primary-dk) !important;
+  border-color: var(--primary-dk) !important;
+}
+
+/* ── TAGS — Slightly more padding + letter spacing ──────────────────────── */
+.tag {
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
+
+/* ── LEAD CARD — Refined border radius + hover shadow ───────────────────── */
+.card {
+  border-radius: 12px;
+}
+
+/* ── STAT CARD — Accent left border + rounded corners ──────────────────── */
+.stat-card {
+  border-radius: 14px;
+  border-left: 3px solid var(--primary);
+}
+
+/* ── NOTIF BTN — Rounder, smooth hover ─────────────────────────────────── */
+.notif-btn {
+  border-radius: 10px;
+  transition: background .15s, color .15s, transform .1s;
+}
+.notif-btn:hover { background: var(--gray-200); color: var(--gray-700); transform: scale(1.05); }
+
+/* ── CTRL BTN — Rounder ─────────────────────────────────────────────────── */
+.ctrl-btn { border-radius: 10px; }
+
+/* ── COL HEADER — Tighter accent dot ───────────────────────────────────── */
+.col-dot { width: 9px; height: 9px; }
+
+/* ── AVATAR — Subtle ring ───────────────────────────────────────────────── */
+.avatar {
+  box-shadow: 0 0 0 2px rgba(46,125,50,.2);
+}
+
