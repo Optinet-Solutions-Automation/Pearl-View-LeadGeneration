@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, formatLeadSource } from '../utils/dateUtils';
 
 const STATUS_LABELS = {
   new:         { label: 'New Lead',    bg: '#eff6ff', color: '#2563eb' },
@@ -162,7 +162,7 @@ export default function ClientDetailModal({ client, onClose, onArchive }) {
                 <InfoCard icon="🏠" label="Property" value={client.address || client.jobType || '—'} />
                 {client.leadSource && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <InfoCard icon="🌐" label="Lead Source" value={client.leadSource} />
+                    <InfoCard icon="🌐" label="Lead Source" value={formatLeadSource(client.leadSource) || client.leadSource} />
                   </div>
                 )}
               </div>

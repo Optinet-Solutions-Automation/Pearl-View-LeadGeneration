@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, formatLeadSource } from '../utils/dateUtils';
 import { REFUSE_LABELS } from '../utils/constants';
 
 
@@ -236,12 +236,14 @@ export default function DetailPanel() {
   const metaSource = (() => {
     if (isCallLead) return lpName ? `Call · ${lpName}` : 'Phone Call';
     if (lpName) return `Form · ${lpName}`;
-    if (l.leadSource) return l.leadSource; // e.g. 'Google', 'Facebook', 'Other'
+    if (l.leadSource) return formatLeadSource(l.leadSource);
     return 'Form';
   })();
 
   // Source badge in Job Details section
-  const srcLabel = l.leadSource || (isCallLead ? (lpName ? `Call · ${lpName}` : 'Phone Call') : (lpName ? `Form · ${lpName}` : 'Form'));
+  const srcLabel = l.leadSource
+    ? formatLeadSource(l.leadSource)
+    : (isCallLead ? (lpName ? `Call · ${lpName}` : 'Phone Call') : (lpName ? `Form · ${lpName}` : 'Form'));
   const srcTag = <span className="tag tag-gray" style={{ fontSize: '11px' }}>{srcLabel}</span>;
 
   function handleNoteChange(e) {

@@ -407,6 +407,16 @@ body {
 }
 .ftextarea { min-height: 70px; resize: vertical; }
 .finput:focus, .fselect:focus, .ftextarea:focus { border-color: var(--primary); }
+/* Uniform height for native date/time/number inputs */
+.finput[type="date"],
+.finput[type="time"],
+.finput[type="number"] {
+  height: 38px;
+  line-height: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
 .modal-footer { display: flex; gap: 9px; justify-content: flex-end; margin-top: 18px; }
 .btn-cancel {
   padding: 8px 16px; border: 1.5px solid var(--gray-200);

@@ -384,50 +384,54 @@ export default function ClientsPage() {
   return (
     <div className="page">
       {/* ── Header ── */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '2px' }}>Clients</div>
-          <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
-            {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''} · Clients table · Sync to add new leads
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div>
+            <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)', lineHeight: 1.2 }}>Clients</div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+              {mergedClients.length} client{mergedClients.length !== 1 ? 's' : ''}
+            </div>
           </div>
-        </div>
-        {/* Action buttons — full-width row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            style={{
-              padding: '10px', fontSize: '13px', fontWeight: 700, borderRadius: '8px',
-              border: '1.5px solid var(--gray-200)', background: '#fff',
-              cursor: syncing ? 'not-allowed' : 'pointer',
-              color: syncing ? 'var(--gray-400)' : 'var(--gray-700)', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            }}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px', flexShrink: 0 }}>
-              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
-            </svg>
-            {syncing ? 'Syncing…' : 'Sync Clients'}
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            style={{
-              padding: '10px', fontSize: '13px', fontWeight: 700, borderRadius: '8px',
-              border: 'none', background: 'var(--primary)', color: '#fff',
-              cursor: 'pointer', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            }}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px', flexShrink: 0 }}>
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add Client
-          </button>
+          {/* Action buttons — inline with title */}
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              style={{
+                padding: '7px 12px', fontSize: '12px', fontWeight: 700, borderRadius: '8px',
+                border: '1.5px solid var(--gray-200)', background: '#fff',
+                cursor: syncing ? 'not-allowed' : 'pointer',
+                color: syncing ? 'var(--gray-400)' : 'var(--gray-700)', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: '5px',
+              }}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '12px', height: '12px', flexShrink: 0 }}>
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+              </svg>
+              {syncing ? 'Syncing…' : 'Sync'}
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              style={{
+                padding: '7px 12px', fontSize: '12px', fontWeight: 700, borderRadius: '8px',
+                border: 'none', background: 'var(--primary)', color: '#fff',
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: '5px',
+              }}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '12px', height: '12px', flexShrink: 0 }}>
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Add Client
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── Source filter tabs (scrollable) ── */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', overflowX: 'auto', paddingBottom: '4px', WebkitOverflowScrolling: 'touch' }}>
+      {/* Outer div handles scroll; inner div is the flex row (avoids height-collapse bug with overflow-x on flex items) */}
+      <div style={{ overflowX: 'auto', marginBottom: '10px', paddingBottom: '4px', WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: '6px', width: 'max-content' }}>
         {SOURCE_TABS.map(tab => (
           <button
             key={tab.key}
@@ -453,6 +457,7 @@ export default function ClientsPage() {
             </span>
           </button>
         ))}
+      </div>
       </div>
 
       {/* ── Search ── */}
