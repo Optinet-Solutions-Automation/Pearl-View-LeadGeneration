@@ -34,10 +34,10 @@ function CompleteJobModal({ booking, onClose, onConfirm }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2200, padding: '16px' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2200, padding: '0', overflowY: 'auto' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', boxShadow: '0 -8px 40px rgba(0,0,0,0.22)', overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid var(--gray-100)' }}>
           <div>
             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>✅ Mark Job as Done</div>
@@ -251,7 +251,7 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, onComplete, lead
 
   return (
     <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', maxHeight: '92dvh', display: 'flex', flexDirection: 'column', boxShadow: '0 -8px 40px rgba(0,0,0,0.18)', paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Edit Appointment</div>
@@ -342,7 +342,7 @@ function BookingModal({ year, month, day, leads, clients = [], addCalBooking, on
 
   return (
     <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', maxHeight: '92dvh', display: 'flex', flexDirection: 'column', boxShadow: '0 -8px 40px rgba(0,0,0,0.18)', paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>New Appointment</div>
@@ -644,7 +644,7 @@ export default function CalendarPage() {
                     <tr
                       key={b.id}
                       onClick={() => b.isCalBooking ? setEditBooking(b) : goToLead(b.id)}
-                      style={{ borderBottom: '1px solid var(--gray-100)', cursor: 'pointer' }}
+                      style={{ borderBottom: '1px solid var(--gray-100)', cursor: 'pointer', touchAction: 'manipulation' }}
                       onMouseEnter={e => { e.currentTarget.style.background = b.isCalBooking ? '#fefce8' : 'var(--gray-50)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = ''; }}
                     >
@@ -738,7 +738,7 @@ export default function CalendarPage() {
   );
 }
 
-const modalOverlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px' };
+const modalOverlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 2000, padding: '0', overflowY: 'auto' };
 const fInput = { width: '100%', padding: '8px 11px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '10px' };
 const fLbl   = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-500)', marginBottom: '5px', display: 'block' };
 const th = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' };

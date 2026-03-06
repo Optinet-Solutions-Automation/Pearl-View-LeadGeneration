@@ -393,12 +393,14 @@ body {
 .overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,.45); z-index: 200;
-  align-items: center; justify-content: center;
+  align-items: flex-end; justify-content: center;
+  overflow-y: auto;
 }
 .overlay.open { display: flex; }
 .modal {
-  background: #fff; border-radius: 16px; padding: 26px;
-  width: min(460px, calc(100vw - 32px)); max-height: 80vh; overflow-y: auto;
+  background: #fff; border-radius: 16px 16px 0 0; padding: 26px;
+  padding-bottom: max(26px, env(safe-area-inset-bottom, 26px));
+  width: min(480px, 100vw); max-height: 90dvh; overflow-y: auto;
 }
 .modal-title { font-size: 17px; font-weight: 700; color: var(--gray-900); margin-bottom: 18px; }
 .fgroup { margin-bottom: 13px; }
@@ -937,7 +939,8 @@ body.keyboard-open .fab              { display: none !important; }
   .stats { grid-template-columns: repeat(2, 1fr); }
 
   .panel.open { width: 100%; position: fixed; inset: 0; z-index: 150; }
-  .panel.open .panel-body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* 24px minimum ensures action buttons clear the system nav bar on Android */
+  .panel.open .panel-body { padding-bottom: max(env(safe-area-inset-bottom, 24px), 24px); }
 
   /* Kanban: horizontal scroll so all columns remain visible */
   .board {
@@ -968,8 +971,9 @@ body.keyboard-open .fab              { display: none !important; }
   .pg-info { width: 100%; text-align: center; }
   .pg-controls { width: 100%; justify-content: center; }
 
-  /* Add padding so content isn't hidden behind bottom nav (+ safe area for Android/iOS) */
-  .page { padding-bottom: calc(12px + 58px + env(safe-area-inset-bottom, 0px)); }
+  /* Padding so content isn't hidden behind bottom nav. max() ensures a 24px
+     minimum even when env(safe-area-inset-bottom) returns 0 on Android. */
+  .page { padding-bottom: max(calc(24px + 58px + env(safe-area-inset-bottom, 0px)), 82px); }
 
   /* Toast above bottom nav */
   .toast { bottom: calc(16px + 58px + env(safe-area-inset-bottom, 0px)); }
@@ -995,7 +999,7 @@ body.keyboard-open .fab              { display: none !important; }
   .stat-lbl  { font-size: 10px; }
 
   /* Tighter page padding to maximise content width (preserve bottom padding for nav bar + safe area) */
-  .page { padding: 12px 14px calc(12px + 58px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
+  .page { padding: 12px 14px max(calc(24px + 58px + env(safe-area-inset-bottom, 0px)), 82px); gap: 12px; }
 
   /* Board header */
   .board-title { font-size: 13.5px; }
