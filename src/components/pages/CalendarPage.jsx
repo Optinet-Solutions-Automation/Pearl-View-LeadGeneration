@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
+import { createRecord } from '../../utils/airtableSync';
 
 const DAYS     = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -10,60 +11,97 @@ function mkDate(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-// ── Payment modal for calendar bookings ──────────────────────────────────────
-function CalPaymentModal({ booking, onClose, onConfirm }) {
-  const [method, setMethod] = useState('Cash');
-  const [amount, setAmount] = useState('');
-  const [err,    setErr]    = useState('');
+// ── Complete Job modal (payment + upsell) ─────────────────────────────────────
+function CompleteJobModal({ booking, onClose, onConfirm }) {
+  const [method,      setMethod]      = useState('Cash');
+  const [amount,      setAmount]      = useState(booking.amount > 0 ? String(booking.amount) : '');
+  const [upsellAmt,   setUpsellAmt]   = useState('');
+  const [upsellNotes, setUpsellNotes] = useState('');
+  const [err,         setErr]         = useState('');
 
   function handleSubmit() {
     const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { setErr('Please enter a valid amount'); return; }
+    if (!amt || amt <= 0) { setErr('Please enter the payment amount'); return; }
     setErr('');
-    onConfirm(amt, method);
+    onConfirm({
+      amount: amt,
+      method,
+      upsellAmount: parseFloat(upsellAmt) || 0,
+      upsellNotes:  upsellNotes.trim(),
+    });
     onClose();
   }
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2100, padding: '16px' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2200, padding: '16px' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '360px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid var(--gray-100)' }}>
           <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>Confirm Payment</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>✅ Mark Job as Done</div>
             <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{booking.clientName}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
         </div>
-        <div style={{ padding: '16px 20px' }}>
-          <label style={fLbl}>Payment Method</label>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-            {['Cash', 'Bank'].map(m => (
-              <button key={m} onClick={() => setMethod(m)} style={{
-                flex: 1, padding: '9px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit',
-                border: `1.5px solid ${method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
-                background: method === m ? (m === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
-                color: method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
-              }}>
-                {m.toUpperCase()}
-              </button>
-            ))}
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Payment */}
+          <div>
+            <label style={fLbl}>Payment Method</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {['Cash', 'Bank'].map(m => (
+                <button key={m} onClick={() => setMethod(m)} style={{
+                  flex: 1, padding: '9px', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  border: `1.5px solid ${method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-200)'}`,
+                  background: method === m ? (m === 'Cash' ? '#f0fdf4' : '#eff6ff') : '#fff',
+                  color: method === m ? (m === 'Cash' ? '#16a34a' : '#2563eb') : 'var(--gray-500)',
+                }}>
+                  {m.toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
-          <label style={fLbl}>Amount</label>
-          <div style={{ position: 'relative', marginBottom: '14px' }}>
-            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontWeight: 700, fontSize: '14px' }}>$</span>
-            <input
-              type="number" value={amount} onChange={e => setAmount(e.target.value)}
-              placeholder="0.00" autoFocus
-              style={{ width: '100%', padding: '9px 12px 9px 26px', fontSize: '16px', fontWeight: 700, border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-            />
+          <div>
+            <label style={fLbl}>Amount Paid *</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontWeight: 700, fontSize: '14px' }}>$</span>
+              <input
+                type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                placeholder="0.00" autoFocus
+                style={{ width: '100%', padding: '9px 12px 9px 26px', fontSize: '16px', fontWeight: 700, border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
           </div>
-          {err && <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
-          <button onClick={handleSubmit} style={{ width: '100%', padding: '10px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Confirm Payment
+
+          {/* Upsell (optional) */}
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#92400e', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Upsell (optional)</div>
+            <div>
+              <label style={fLbl}>Extra Amount ($)</label>
+              <div style={{ position: 'relative', marginBottom: '8px' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-500)', fontWeight: 700, fontSize: '14px' }}>$</span>
+                <input
+                  type="number" value={upsellAmt} onChange={e => setUpsellAmt(e.target.value)}
+                  placeholder="0.00"
+                  style={{ width: '100%', padding: '8px 12px 8px 26px', fontSize: '14px', fontWeight: 600, border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={fLbl}>Description</label>
+              <input
+                type="text" value={upsellNotes} onChange={e => setUpsellNotes(e.target.value)}
+                placeholder="e.g. Extra floor, gutter clean…"
+                style={{ width: '100%', padding: '8px 11px', fontSize: '13px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          {err && <div style={{ fontSize: '12px', color: '#dc2626', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
+          <button onClick={handleSubmit} style={{ width: '100%', padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Confirm — Job Done
           </button>
         </div>
       </div>
@@ -75,14 +113,11 @@ function CalPaymentModal({ booking, onClose, onConfirm }) {
 function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Merge leads + clients into one deduplicated suggestion list
   const suggestions = useMemo(() => {
     if (form.clientName.trim().length < 1) return [];
     const term = form.clientName.toLowerCase();
     const seen = new Set();
     const result = [];
-
-    // Clients table first (richer data: city, address)
     clients.forEach(c => {
       if (!c.name?.toLowerCase().includes(term)) return;
       const key = (c.phone || c.name).toLowerCase();
@@ -90,8 +125,6 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
       seen.add(key);
       result.push({ id: c.id, name: c.name, phone: c.phone, city: c.city, address: c.address, fromClients: true });
     });
-
-    // Supplement with leads not already covered
     leads.forEach(l => {
       if (!l.name?.toLowerCase().includes(term)) return;
       const key = (l.phone || l.name).toLowerCase();
@@ -99,7 +132,6 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
       seen.add(key);
       result.push({ id: l.id, name: l.name, phone: l.phone, city: l.city, address: l.address, fromClients: false });
     });
-
     return result.slice(0, 8);
   }, [form.clientName, clients, leads]);
 
@@ -129,19 +161,10 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
           autoComplete="off"
         />
         {showSuggestions && suggestions.length > 0 && (
-          <div style={{
-            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-            background: '#fff', border: '1.5px solid var(--gray-200)', borderRadius: '8px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginTop: '2px', overflow: 'hidden',
-          }}>
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', border: '1.5px solid var(--gray-200)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginTop: '2px', overflow: 'hidden' }}>
             {suggestions.map(item => (
-              <div
-                key={item.id}
-                onMouseDown={() => selectSuggestion(item)}
-                style={{
-                  padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)',
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                }}
+              <div key={item.id} onMouseDown={() => selectSuggestion(item)}
+                style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'center', gap: '8px' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--gray-50)'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}
               >
@@ -151,9 +174,7 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
                     {[item.phone, item.city, item.address].filter(Boolean).join(' · ')}
                   </div>
                 </div>
-                {item.fromClients && (
-                  <span style={{ fontSize: '9px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', padding: '1px 5px', borderRadius: '6px', flexShrink: 0 }}>CLIENT</span>
-                )}
+                {item.fromClients && <span style={{ fontSize: '9px', fontWeight: 700, background: '#eff6ff', color: 'var(--primary)', padding: '1px 5px', borderRadius: '6px', flexShrink: 0 }}>CLIENT</span>}
               </div>
             ))}
           </div>
@@ -164,27 +185,38 @@ function AppointmentFormFields({ form, setField, leads = [], clients = [] }) {
       <label style={fLbl}>City / Location</label>
       <input value={form.city} onChange={e => setField('city', e.target.value)} placeholder="e.g. Brisbane" style={fInput} />
       <label style={fLbl}>Address</label>
-      <input value={form.address || ''} onChange={e => setField('address', e.target.value)} placeholder="e.g. 123 Main St" style={{ ...fInput, marginBottom: 0 }} />
+      <input value={form.address || ''} onChange={e => setField('address', e.target.value)} placeholder="e.g. 123 Main St" style={fInput} />
+      <label style={fLbl}>Job Time</label>
+      <input value={form.jobTime || ''} onChange={e => setField('jobTime', e.target.value)} placeholder="e.g. 9:00 AM" style={fInput} />
+      <label style={fLbl}>Assigned Worker</label>
+      <input value={form.assignedWorker || ''} onChange={e => setField('assignedWorker', e.target.value)} placeholder="e.g. John" style={{ ...fInput, marginBottom: 0 }} />
     </>
   );
 }
 
 // ── Edit booking modal ────────────────────────────────────────────────────────
-function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [], clients = [] }) {
+function EditBookingModal({ booking, onSave, onClose, onCancel, onComplete, leads = [], clients = [] }) {
   const [form, setForm] = useState({
-    clientName: booking.clientName || '',
-    phone:      booking.phone      || '',
-    city:       booking.city       || '',
-    address:    booking.address    || '',
-    service:    booking.service    || 'Window Cleaning',
+    clientName:     booking.clientName     || '',
+    phone:          booking.phone          || '',
+    city:           booking.city           || '',
+    address:        booking.address        || '',
+    service:        booking.service        || 'Window Cleaning',
+    jobTime:        booking.jobTime        || '',
+    assignedWorker: booking.assignedWorker || '',
   });
-  const [err, setErr] = useState('');
+  const [err,          setErr]          = useState('');
+  const [showComplete, setShowComplete] = useState(false);
+
   function setField(k, v) { setForm(f => ({ ...f, [k]: v })); }
   function handleSave() {
     if (!form.clientName.trim()) { setErr('Client name is required'); return; }
     setErr('');
     onSave(form);
   }
+
+  const isDone = booking.bookingStatus === 'Completed';
+
   return (
     <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
@@ -196,11 +228,35 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [], clie
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
         </div>
         <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
+
+          {/* Completed status banner */}
+          {isDone && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>✓ Job Completed</span>
+              {booking.amount > 0 && <span style={{ fontSize: '12px', color: '#16a34a' }}>· ${booking.amount.toLocaleString()}</span>}
+              {booking.upsellAmount > 0 && <span style={{ fontSize: '11px', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', padding: '1px 6px', borderRadius: '6px' }}>+${booking.upsellAmount} upsell</span>}
+            </div>
+          )}
+
           <AppointmentFormFields form={form} setField={setField} leads={leads} clients={clients} />
+
           {err && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>}
+
           <button onClick={handleSave} style={{ width: '100%', padding: '10px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '14px' }}>
             Save Changes
           </button>
+
+          {/* Mark Done button */}
+          {!isDone && (
+            <button
+              onClick={() => setShowComplete(true)}
+              style={{ width: '100%', padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ width: '14px', height: '14px' }}><polyline points="20 6 9 17 4 12"/></svg>
+              Mark Job as Done
+            </button>
+          )}
+
           {onCancel && (
             <button onClick={onCancel} style={{ width: '100%', padding: '10px', background: '#fff', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: '8px' }}>
               Cancel Booking
@@ -208,13 +264,21 @@ function EditBookingModal({ booking, onSave, onClose, onCancel, leads = [], clie
           )}
         </div>
       </div>
+
+      {showComplete && (
+        <CompleteJobModal
+          booking={booking}
+          onClose={() => setShowComplete(false)}
+          onConfirm={data => { onComplete(data); onClose(); }}
+        />
+      )}
     </div>
   );
 }
 
 // ── Booking modal (click a day on the calendar) ───────────────────────────────
 function BookingModal({ year, month, day, leads, clients = [], addCalBooking, onClose }) {
-  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', address: '', service: 'Window Cleaning' });
+  const [form,    setForm]    = useState({ clientName: '', phone: '', city: '', address: '', service: 'Window Cleaning', jobTime: '', assignedWorker: '' });
   const [formErr, setFormErr] = useState('');
 
   const targetDate  = mkDate(year, month, day);
@@ -260,6 +324,7 @@ export default function CalendarPage() {
     leads, calBookings, clients,
     saveJobDate, openPanel, setCurrentPage,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
+    showToast,
   } = useLeadsContext();
 
   const today = new Date();
@@ -306,6 +371,34 @@ export default function CalendarPage() {
   }
   function isToday(d) { return d === today.getDate() && month === today.getMonth() && year === today.getFullYear(); }
   function goToLead(id) { setCurrentPage('leads'); setTimeout(() => openPanel(id), 100); }
+
+  function handleComplete(booking, { amount, method, upsellAmount, upsellNotes }) {
+    // Update booking status + upsell fields
+    updateCalBooking(booking.id, {
+      bookingStatus: 'Completed',
+      amount,
+      upsellAmount: upsellAmount || 0,
+      upsellNotes:  upsellNotes || '',
+    });
+    // Record payment via existing hook (creates Revenue record)
+    recordBookingPayment(booking.id, amount, method);
+    // If there's an upsell, write an extra Revenue record for it
+    if (upsellAmount > 0) {
+      createRecord('Revenue', {
+        'Revenue Name':   `${booking.clientName} - Upsell: ${upsellNotes || 'Extra Service'}`,
+        'Date':           new Date().toISOString().split('T')[0],
+        'Client Name':    booking.clientName,
+        'Phone':          booking.phone || '',
+        'Job_Service':    upsellNotes || 'Upsell',
+        'City':           booking.city || '',
+        'Payment_Method': method || 'Cash',
+        'Amount':         upsellAmount,
+        'Status':         'Job Done',
+      });
+    }
+    showToast('Job marked as done ✓ — Revenue recorded');
+    setEditBooking(null);
+  }
 
   const selectedHasBookings = selectedDay && (byDay[selectedDay] || []).length > 0;
   const tableRows = selectedHasBookings
@@ -441,7 +534,7 @@ export default function CalendarPage() {
                     <th style={th}>Client</th>
                     <th style={th}>Phone</th>
                     <th style={th}>Service</th>
-                    <th style={th}>City</th>
+                    <th style={th}>Time / Worker</th>
                     <th style={th}>Status</th>
                     <th style={{ ...th, textAlign: 'right' }}>Amount</th>
                   </tr>
@@ -464,7 +557,7 @@ export default function CalendarPage() {
                         </div>
                       </td>
                       <td style={{ ...td, fontWeight: 600, color: 'var(--gray-900)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {b.name}
                           {b.isCalBooking && <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '8px', background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>MANUAL</span>}
                         </div>
@@ -476,8 +569,14 @@ export default function CalendarPage() {
                           : <span style={{ color: 'var(--gray-400)' }}>—</span>
                         }
                       </td>
-                      <td style={{ ...td, color: 'var(--gray-500)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {b.city || b.address || '—'}
+                      <td style={{ ...td, color: 'var(--gray-600)', fontSize: '12px' }}>
+                        {b.jobTime || b.assignedWorker
+                          ? <div>
+                              {b.jobTime && <div style={{ fontWeight: 600, color: 'var(--gray-800)' }}>{b.jobTime}</div>}
+                              {b.assignedWorker && <div style={{ color: 'var(--gray-500)' }}>{b.assignedWorker}</div>}
+                            </div>
+                          : <span style={{ color: 'var(--gray-300)' }}>—</span>
+                        }
                       </td>
                       <td style={td}>
                         {b.isCalBooking ? (
@@ -492,8 +591,13 @@ export default function CalendarPage() {
                           <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)' }}>Lead</span>
                         )}
                       </td>
-                      <td style={{ ...td, textAlign: 'right', fontWeight: 700, color: b.bookingStatus === 'Completed' ? '#15803d' : 'var(--primary)' }}>
-                        {(b.amount > 0 || b.value > 0) ? `$${(b.amount || b.value || 0).toLocaleString()}` : '—'}
+                      <td style={{ ...td, textAlign: 'right' }}>
+                        <div style={{ fontWeight: 700, color: b.bookingStatus === 'Completed' ? '#15803d' : 'var(--primary)' }}>
+                          {(b.amount > 0 || b.value > 0) ? `$${(b.amount || b.value || 0).toLocaleString()}` : '—'}
+                        </div>
+                        {b.upsellAmount > 0 && (
+                          <div style={{ fontSize: '10px', color: '#d97706', fontWeight: 600 }}>+${b.upsellAmount} upsell</div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -524,6 +628,7 @@ export default function CalendarPage() {
           booking={editBooking}
           leads={leads} clients={clients}
           onSave={data => { updateCalBooking(editBooking.id, data); setEditBooking(null); }}
+          onComplete={data => handleComplete(editBooking, data)}
           onCancel={() => { removeCalBooking(editBooking.id); setEditBooking(null); }}
           onClose={() => setEditBooking(null)}
         />

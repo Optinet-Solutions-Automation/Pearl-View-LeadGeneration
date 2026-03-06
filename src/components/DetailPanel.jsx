@@ -328,13 +328,12 @@ export default function DetailPanel() {
   const isCallLead = l.source === 'call1' || l.source === 'call2';
   const lpName = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
 
-  const srcTag = isCallLead
-    ? <span className="tag tag-call" style={{ fontSize: '11px' }}>Call · {lpName}</span>
-    : l.source === 'form1'
-    ? <span className="tag tag-form1" style={{ fontSize: '11px' }}>Form · Crystal Pro</span>
-    : l.source === 'manual'
-    ? <span className="tag tag-gray" style={{ fontSize: '11px' }}>{l.leadChannel || 'Manual'}</span>
-    : <span className="tag tag-form2" style={{ fontSize: '11px' }}>Form · Pearl View</span>;
+  const srcLabel = l.leadSource || (
+    isCallLead ? `Call · ${lpName}` :
+    l.source === 'form1' ? 'website-crystalpro' :
+    l.source === 'form2' ? 'website-pearlview' : 'Manual'
+  );
+  const srcTag = <span className="tag tag-gray" style={{ fontSize: '11px' }}>{srcLabel}</span>;
 
   function handleNoteChange(e) {
     const val = e.target.value;
@@ -462,8 +461,9 @@ export default function DetailPanel() {
             <option value="new">🔵 New Lead</option>
             <option value="in_progress">🟡 In Progress</option>
             <option value="quote_sent">🟣 Quote Sent</option>
-            <option value="refused">🚫 Refused</option>
+            <option value="booked">📅 Booked</option>
             <option value="job_done">✅ Job Done</option>
+            <option value="refused">🚫 Refused</option>
           </select>
           {l.status === 'job_done' && l.paid && l.paidAmount > 0 && (
             <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '5px' }}>

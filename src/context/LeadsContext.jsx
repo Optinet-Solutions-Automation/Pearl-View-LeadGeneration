@@ -32,6 +32,9 @@ export function LeadsProvider({ children }) {
   const [quoteTransferTargetStatus, setQuoteTransferTargetStatus] = useState(null);
   const [quoteTransferLeadValue,    setQuoteTransferLeadValue]    = useState(0);
 
+  // Book modal state (when setting status → booked)
+  const [bookModalId, setBookModalId] = useState(null);
+
   useEffect(() => {
     fetchLeads().catch(() => showToast('Failed to load data — check console'));
   }, [fetchLeads]);
@@ -70,6 +73,12 @@ export function LeadsProvider({ children }) {
     // Rule: Job Done is locked once a payment is recorded
     if (lead.status === 'job_done' && lead.paid) {
       showToast('Status locked — payment already recorded');
+      return;
+    }
+
+    // Rule: 'booked' → show booking modal to capture date/time/worker
+    if (status === 'booked') {
+      setBookModalId(id);
       return;
     }
 
@@ -113,6 +122,34 @@ export function LeadsProvider({ children }) {
     setRefuseModalId(null);
     setRefuseModalPrevStatus(null);
   }, []);
+
+  // Confirm booking: change status to 'booked' + auto-create calendar entry
+  const confirmBook = useCallback(async (bookingData) => {
+    if (!bookModalId) return;
+    const id = bookModalId;
+    setBookModalId(null);
+    const result = await changeStatus(id, 'booked');
+    if (result === 'error') { showToast('Failed to save — check your connection'); return; }
+    // Auto-create calendar booking
+    const lead = leads.find(l => l.id === id);
+    if (lead && bookingData.date) {
+      await addCalBooking({
+        clientName:     lead.name,
+        phone:          lead.phone || '',
+        city:           lead.city  || '',
+        service:        lead.jobType || 'Window Cleaning',
+        date:           bookingData.date,
+        jobTime:        bookingData.jobTime || '',
+        assignedWorker: bookingData.worker  || '',
+        amount:         lead.value || 0,
+        linkedLeadId:   id,
+      });
+      saveJobDate(id, bookingData.date);
+    }
+    showToast('Lead booked ✓ — added to Calendar');
+  }, [bookModalId, changeStatus, leads, addCalBooking, saveJobDate, showToast]);
+
+  const closeBookModal = useCallback(() => setBookModalId(null), []);
 
   // Confirm moving a quote_sent lead back — optionally deleting the estimation
   const confirmQuoteTransfer = useCallback(async (shouldDeleteQuote) => {
@@ -295,6 +332,9 @@ export function LeadsProvider({ children }) {
       refuseModalPrevStatus,
       confirmRefuse,
       closeRefuseModal,
+      bookModalId,
+      confirmBook,
+      closeBookModal,
       quoteTransferModalId,
       quoteTransferTargetStatus,
       quoteTransferLeadValue,

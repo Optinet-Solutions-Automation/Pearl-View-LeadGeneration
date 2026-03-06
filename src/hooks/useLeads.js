@@ -49,6 +49,7 @@ function normaliseRecord(rec) {
     paymentMethod: f['Payment Method'] || '',
     city: f['City'] || '',
     leadChannel: f['Lead Channel'] || '',
+    leadSource: f['Lead Source'] || '',
     airtableId: rec.id,
   };
 }
@@ -57,18 +58,22 @@ function normaliseRecord(rec) {
 function normaliseCalBooking(rec) {
   const f = rec.fields;
   return {
-    id:            `cal-${rec.id}`,
-    airtableId:    rec.id,
-    clientName:    f['Client Name']    || '',
-    phone:         f['Phone']          || '',
-    email:         '',
-    city:          f['City']           || '',
-    service:       f['Job_Service']    || '',
-    paymentMethod: 'Cash',
-    date:          f['Date']           ? f['Date'].split('T')[0] : '',
-    bookingStatus: f['Booking Status'] || 'Scheduled',
-    amount:        f['Amount']         || 0,
-    linkedLeadId:  null,
+    id:             `cal-${rec.id}`,
+    airtableId:     rec.id,
+    clientName:     f['Client Name']     || '',
+    phone:          f['Phone']           || '',
+    email:          '',
+    city:           f['City']            || '',
+    service:        f['Job_Service']     || '',
+    paymentMethod:  'Cash',
+    date:           f['Date']            ? f['Date'].split('T')[0] : '',
+    bookingStatus:  f['Booking Status']  || 'Scheduled',
+    amount:         f['Amount']          || 0,
+    jobTime:        f['Job Time']        || '',
+    assignedWorker: f['Assigned Worker'] || '',
+    upsellAmount:   f['Upsell Amount']   || 0,
+    upsellNotes:    f['Upsell Notes']    || '',
+    linkedLeadId:   null,
   };
 }
 
@@ -486,16 +491,18 @@ export function useLeads() {
       address: leadData.address || '', jobType: 'Residential', windows: 0,
       starred: false, notes: '', hasCall: leadData.source?.startsWith('call') || false,
       progress: 10, refuseReason: '', airtableId: null,
+      leadSource: leadData.leadSource || '',
     }, ...prev]);
     // Create record in Airtable — use dedicated endpoint (mirrors patchAirtable pattern)
     const fields = {
       'Client Name':             leadData.name,
-      'Phone Number':            leadData.phone   || '',
-      'Email':                   leadData.email   || '',
-      'Inquiry Subject/Reason':  leadData.subject || '',
+      'Phone Number':            leadData.phone      || '',
+      'Email':                   leadData.email      || '',
+      'Inquiry Subject/Reason':  leadData.subject    || '',
       'Lead Status':             'New Lead',
-      'Quote Amount':            leadData.value   || 0,
+      'Quote Amount':            leadData.value      || 0,
       'Inquiry Date':            now.toISOString(),
+      'Lead Source':             leadData.leadSource || '',
     };
     const req = IS_LOCAL
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`, {
@@ -684,20 +691,25 @@ export function useLeads() {
       email: data.email || '', city: data.city || '',
       service: data.service || '', paymentMethod: data.paymentMethod || 'Cash',
       date: data.date || '', bookingStatus: 'Scheduled', amount: data.amount || 0,
+      jobTime: data.jobTime || '', assignedWorker: data.assignedWorker || '',
+      upsellAmount: 0, upsellNotes: '',
       linkedLeadId: data.linkedLeadId || null,
     };
     setCalBookings(prev => [record, ...prev]);
     // Write to Airtable Bookings table
-    const airtableId = await createRecord(AT_TABLES.calendar, {
-      'Booking Name':   `${record.clientName} - ${record.date}`,
-      'Client Name':    record.clientName,
-      'Date':           record.date,
-      'Job_Service':    record.service,
-      'City':           record.city,
-      'Phone':          record.phone,
-      'Booking Status': 'Scheduled',
-      'Amount':         record.amount || 0,
-    });
+    const atFields = {
+      'Booking Name':    `${record.clientName} - ${record.date}`,
+      'Client Name':     record.clientName,
+      'Date':            record.date,
+      'Job_Service':     record.service,
+      'City':            record.city,
+      'Phone':           record.phone,
+      'Booking Status':  'Scheduled',
+      'Amount':          record.amount || 0,
+      'Job Time':        record.jobTime,
+      'Assigned Worker': record.assignedWorker,
+    };
+    const airtableId = await createRecord(AT_TABLES.calendar, atFields);
     if (airtableId) {
       setCalBookings(prev => prev.map(b => b.id === localId ? { ...b, airtableId } : b));
     }
@@ -720,12 +732,16 @@ export function useLeads() {
       const booking = prev.find(b => b.id === id);
       if (booking?.airtableId) {
         const patch = {};
-        if (data.clientName !== undefined) patch['Client Name']    = data.clientName;
-        if (data.phone      !== undefined) patch['Phone']          = data.phone;
-        if (data.city       !== undefined) patch['City']           = data.city;
-        if (data.service    !== undefined) patch['Job_Service']    = data.service;
+        if (data.clientName    !== undefined) patch['Client Name']    = data.clientName;
+        if (data.phone         !== undefined) patch['Phone']          = data.phone;
+        if (data.city          !== undefined) patch['City']           = data.city;
+        if (data.service       !== undefined) patch['Job_Service']    = data.service;
         if (data.bookingStatus !== undefined) patch['Booking Status'] = data.bookingStatus;
-        if (data.amount     !== undefined) patch['Amount']         = data.amount;
+        if (data.amount        !== undefined) patch['Amount']         = data.amount;
+        if (data.jobTime       !== undefined) patch['Job Time']       = data.jobTime;
+        if (data.assignedWorker !== undefined) patch['Assigned Worker'] = data.assignedWorker;
+        if (data.upsellAmount  !== undefined) patch['Upsell Amount']  = data.upsellAmount;
+        if (data.upsellNotes   !== undefined) patch['Upsell Notes']   = data.upsellNotes;
         if (Object.keys(patch).length) updateRecord(AT_TABLES.calendar, booking.airtableId, patch);
       }
       return prev.map(b => b.id === id ? { ...b, ...data } : b);

@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
+import { LEAD_SOURCES } from '../utils/constants';
 
 export default function NewLeadModal() {
   const { isModalOpen, setModalOpen, addLead, clients, leads } = useLeadsContext();
 
   const [form, setForm] = useState({
-    leadChannel: 'Facebook Organic',
+    leadSource: 'Other',
     name: '',
     phone: '',
     email: '',
@@ -63,7 +64,7 @@ export default function NewLeadModal() {
     }
     addLead({
       source: 'manual',
-      leadChannel: form.leadChannel,
+      leadSource: form.leadSource,
       name: form.name.trim(),
       phone: form.phone.trim(),
       email: form.email.trim(),
@@ -71,7 +72,7 @@ export default function NewLeadModal() {
       subject: form.subject.trim(),
       value: parseInt(form.value) || 0,
     });
-    setForm({ leadChannel: 'Facebook Organic', name: '', phone: '', email: '', address: '', subject: '', value: '' });
+    setForm({ leadSource: 'Other', name: '', phone: '', email: '', address: '', subject: '', value: '' });
     setModalOpen(false);
   }
 
@@ -88,13 +89,8 @@ export default function NewLeadModal() {
 
         <div className="fgroup">
           <label className="flabel">Lead Source</label>
-          <select className="fselect" name="leadChannel" value={form.leadChannel} onChange={handleChange}>
-            <option value="Facebook Organic">Facebook Organic</option>
-            <option value="Recommendation">Recommendation</option>
-            <option value="Subcontractor">Subcontractor</option>
-            <option value="Door to Door">Door to Door</option>
-            <option value="Flyer">Flyer</option>
-            <option value="Other">Other</option>
+          <select className="fselect" name="leadSource" value={form.leadSource} onChange={handleChange}>
+            {LEAD_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
 
