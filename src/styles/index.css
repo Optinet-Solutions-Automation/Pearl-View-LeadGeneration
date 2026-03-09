@@ -194,7 +194,7 @@ body {
 /* ── KANBAN BOARD ────────────────────────── */
 .board {
   display: grid;
-  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  grid-template-columns: repeat(7, minmax(160px, 1fr));
   gap: 10px;
   overflow-x: auto;
 }
@@ -944,7 +944,7 @@ body.keyboard-open .fab              { display: none !important; }
 
   /* Kanban: horizontal scroll so all columns remain visible */
   .board {
-    grid-template-columns: repeat(6, 220px);
+    grid-template-columns: repeat(7, 220px);
     overflow-x: auto;
     padding-bottom: 8px;
   }
@@ -991,7 +991,7 @@ body.keyboard-open .fab              { display: none !important; }
   .btn-new { padding: 7px 10px; min-width: 34px; }
 
   /* Slightly narrower kanban columns */
-  .board { grid-template-columns: repeat(6, 175px); }
+  .board { grid-template-columns: repeat(7, 175px); }
 
   /* Compact stat cards */
   .stat-card { padding: 11px 12px; }

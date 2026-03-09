@@ -4,8 +4,8 @@ export const COLS = [
   { id: 'quote_sent', label: 'Quote Sent',  dot: '#7c3aed', cnt: '#ede9fe/#5b21b6' },
   { id: 'booked',     label: 'Booked',      dot: '#2563eb', cnt: '#dbeafe/#1d4ed8' },
   { id: 'job_done',   label: 'Job Done',    dot: '#16a34a', cnt: '#dcfce7/#14532d' },
-  { id: 'scam',       label: 'Scam',        dot: '#6b7280', cnt: '#f3f4f6/#374151' },
   { id: 'refused',    label: 'Refused',     dot: '#dc2626', cnt: '#fee2e2/#991b1b' },
+  { id: 'scam',       label: 'Scam',        dot: '#6b7280', cnt: '#f3f4f6/#374151' },
 ];
 
 export const STATUS_MAP = {
