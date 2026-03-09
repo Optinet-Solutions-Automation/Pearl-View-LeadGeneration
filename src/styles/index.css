@@ -194,9 +194,16 @@ body {
 /* ── KANBAN BOARD ────────────────────────── */
 .board {
   display: grid;
-  grid-template-columns: repeat(7, minmax(160px, 1fr));
+  grid-template-columns: repeat(7, 1fr);
   gap: 10px;
-  overflow-x: auto;
+}
+
+@media (max-width: 1338px) {
+  .board {
+    grid-template-columns: repeat(7, 210px);
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
 }
 .col {
   background: var(--gray-100); border-radius: 12px;
@@ -942,10 +949,11 @@ body.keyboard-open .fab              { display: none !important; }
   /* 24px minimum ensures action buttons clear the system nav bar on Android */
   .panel.open .panel-body { padding-bottom: max(env(safe-area-inset-bottom, 24px), 24px); }
 
-  /* Kanban: horizontal scroll so all columns remain visible */
+  /* Kanban: horizontal scroll carousel on tablet */
   .board {
-    grid-template-columns: repeat(7, 220px);
+    grid-template-columns: repeat(7, 200px);
     overflow-x: auto;
+    gap: 8px;
     padding-bottom: 8px;
   }
 
@@ -990,8 +998,8 @@ body.keyboard-open .fab              { display: none !important; }
   .btn-new-label { display: none; }
   .btn-new { padding: 7px 10px; min-width: 34px; }
 
-  /* Slightly narrower kanban columns */
-  .board { grid-template-columns: repeat(7, 175px); }
+  /* Kanban: narrower carousel columns on mobile */
+  .board { grid-template-columns: repeat(7, 175px); overflow-x: auto; padding-bottom: 8px; }
 
   /* Compact stat cards */
   .stat-card { padding: 11px 12px; }
