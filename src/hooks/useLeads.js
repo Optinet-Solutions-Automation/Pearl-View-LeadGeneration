@@ -309,6 +309,22 @@ export function useLeads() {
         if (match) updateRecord(AT_TABLES.revenue, match.id, { 'Status': 'Job Done' });
       });
     }
+    // Mark linked calBooking as Completed when lead is set to Job Done
+    if (status === 'job_done') {
+      const phone = (currentLead.phone || '').replace(/\s/g, '').toLowerCase();
+      setCalBookings(prev => {
+        const linked = prev.find(b =>
+          b.id === currentLead.id ||
+          (b.linkedLeadId && b.linkedLeadId === id) ||
+          (phone && (b.phone || '').replace(/\s/g, '').toLowerCase() === phone)
+        );
+        if (!linked || linked.bookingStatus === 'Completed') return prev;
+        if (linked.airtableId) {
+          updateRecord(AT_TABLES.calendar, linked.airtableId, { 'Booking Status': 'Completed' });
+        }
+        return prev.map(b => b.id === linked.id ? { ...b, bookingStatus: 'Completed' } : b);
+      });
+    }
     return 'ok';
   }, [patchAirtable, leads]);
 
@@ -498,9 +514,14 @@ export function useLeads() {
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const tempId = String(Date.now());
+    // Derive lp from leadSource (same logic as normaliseRecord) so badge is correct immediately
+    const srcNorm = (leadData.leadSource || '').toLowerCase().replace(/\s/g, '');
+    const derivedLp = srcNorm.includes('pearlview') ? 'LP2'
+      : (srcNorm.includes('crystalpro') || srcNorm.includes('crystal')) ? 'LP1'
+      : null;
     setLeads(prev => [{
       id: tempId, ...leadData,
-      lp: leadData.source === 'form2' || leadData.source === 'call2' ? 'LP2' : 'LP1',
+      lp: derivedLp,
       status: 'new', date: dateStr, dateObj: now,
       address: leadData.address || '', jobType: 'Residential', windows: 0,
       starred: false, notes: '', hasCall: leadData.source?.startsWith('call') || false,

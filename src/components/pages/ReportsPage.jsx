@@ -286,6 +286,42 @@ export default function ReportsPage() {
             </div>
           )}
 
+          {totalUpsell > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <div style={cardHdr2}>Upsell Income</div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>Extra services added on top of jobs</div>
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: 700, background: '#fffbeb', color: '#92400e', borderRadius: '20px', padding: '3px 10px', border: '1px solid #fde68a' }}>
+                  {upsellRevenue.length} upsell{upsellRevenue.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {upsellRevenue.map(r => {
+                const desc = ((r.name || '').split('Upsell: ')[1] || '').trim();
+                return (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>
+                        {r.client || r.name}
+                        {desc && <span style={{ fontWeight: 400, color: '#92400e', fontSize: '12px' }}> · {desc}</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                        {new Date(r.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} · {r.method || 'Cash'}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 700, color: '#d97706', fontSize: '14px' }}>+${r.amount.toLocaleString('en-AU')}</div>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '2px solid #fde68a', marginTop: '4px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#92400e' }}>
+                  Total: ${totalUpsell.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
+
           {Object.keys(byCategory).length > 0 && (
             <div style={card}>
               <div style={cardHdr}>Expenses by Category</div>
