@@ -57,6 +57,7 @@ function RecentRow({ l, onClick }) {
     quote_sent:  { bg: '#ede9fe', color: '#6d28d9', label: 'Quoted' },
     job_done:    { bg: '#dcfce7', color: '#15803d', label: 'Job Done' },
     refused:     { bg: '#fee2e2', color: '#991b1b', label: 'Refused' },
+    scam:        { bg: '#f3f4f6', color: '#374151', label: 'Scam' },
     archived:    { bg: 'var(--gray-100)', color: 'var(--gray-500)', label: 'Archived' },
   };
   const s = STATUS_STYLE[l.status] || STATUS_STYLE.archived;

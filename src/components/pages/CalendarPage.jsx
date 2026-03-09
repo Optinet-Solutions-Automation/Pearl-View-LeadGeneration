@@ -423,7 +423,7 @@ export default function CalendarPage() {
   // (confirmBook creates both a calBooking AND sets jobDate on the lead)
   const calBookingPhones = new Set(monthCalBookings.map(b => b.phone).filter(Boolean));
   const monthLeadBookings = leads
-    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'archived' && l.status !== 'job_done' && !calBookingPhones.has(l.phone))
+    .filter(l => l.jobDate && l.status !== 'refused' && l.status !== 'scam' && l.status !== 'archived' && l.status !== 'job_done' && !calBookingPhones.has(l.phone))
     .map(l => ({ ...l, parsedDate: new Date(l.jobDate), isCalBooking: false }))
     .filter(b => b.parsedDate.getFullYear() === year && b.parsedDate.getMonth() === month);
 

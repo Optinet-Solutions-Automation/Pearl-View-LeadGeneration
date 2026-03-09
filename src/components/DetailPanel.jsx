@@ -379,6 +379,7 @@ export default function DetailPanel() {
               <option value="booked">📅 Booked</option>
               <option value="job_done">✅ Job Done</option>
               <option value="refused">🚫 Refused</option>
+              <option value="scam">🛑 Scam</option>
             </select>
           )}
         </div>

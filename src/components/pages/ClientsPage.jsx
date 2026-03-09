@@ -122,6 +122,7 @@ const STATUS_DOT = {
   booked:      '#2563eb',
   job_done:    '#16a34a',
   refused:     '#dc2626',
+  scam:        '#6b7280',
 };
 
 function ClientCard({ c, onSelect, onArchive, onRestore, onPermDelete, isArchived, localSearch }) {

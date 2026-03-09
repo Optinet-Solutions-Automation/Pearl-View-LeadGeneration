@@ -5,6 +5,7 @@ export const COLS = [
   { id: 'booked',     label: 'Booked',      dot: '#2563eb', cnt: '#dbeafe/#1d4ed8' },
   { id: 'job_done',   label: 'Job Done',    dot: '#16a34a', cnt: '#dcfce7/#14532d' },
   { id: 'refused',    label: 'Refused',     dot: '#dc2626', cnt: '#fee2e2/#991b1b' },
+  { id: 'scam',       label: 'Scam',        dot: '#6b7280', cnt: '#f3f4f6/#374151' },
 ];
 
 export const STATUS_MAP = {
@@ -20,6 +21,7 @@ export const STATUS_MAP = {
   'Job Done':    'job_done',
   'Refused':     'refused',
   'Lost':        'refused',
+  'Scam':        'scam',
   'Archived':    'archived',
 };
 
@@ -30,6 +32,7 @@ export const AT_STATUS_MAP = {
   booked:      'Booked',
   refused:     'Refused',
   job_done:    'Job Done',
+  scam:        'Scam',
   archived:    'Archived',
 };
 
@@ -40,6 +43,7 @@ export const PROG_MAP = {
   booked:      80,
   refused:     100,
   job_done:    100,
+  scam:        0,
 };
 
 export const REFUSE_LABELS = {

@@ -40,9 +40,6 @@ export default function LeadsPage() {
   const ptrLabel = refreshing ? 'Refreshing…' : pullY >= PTR_THRESHOLD ? 'Release to refresh' : 'Pull to refresh';
 
   return (
-<<<<<<< HEAD
-    <div className="page">
-=======
     <div
       className="page"
       style={{ position: 'relative' }}
@@ -64,8 +61,6 @@ export default function LeadsPage() {
           <span>{ptrLabel}</span>
         </div>
       )}
-      <StatsRow />
->>>>>>> d4cccfbc89e8b322e6bcffb535d5707f54369706
       <KanbanBoard />
       <StatsRow />
     </div>
