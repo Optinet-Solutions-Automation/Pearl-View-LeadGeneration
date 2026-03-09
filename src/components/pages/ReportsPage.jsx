@@ -3,11 +3,25 @@ import { useLeadsContext } from '../../context/LeadsContext';
 import { fetchRecords, AT_TABLES } from '../../utils/airtableSync';
 
 const RANGES = [
-  { id: 'week',   label: 'This Week' },
-  { id: 'month',  label: 'This Month' },
-  { id: 'year',   label: 'This Year' },
+  { id: 'week',   label: 'Week' },
+  { id: 'month',  label: 'Month' },
+  { id: 'year',   label: 'Year' },
   { id: 'custom', label: 'Custom' },
 ];
+
+const SOURCE_META = {
+  'website-pearlview':  { label: 'Pearl View',   color: '#2563eb', bg: '#eff6ff' },
+  'website-crystalpro': { label: 'Crystal Pro',  color: '#7c3aed', bg: '#f5f3ff' },
+  'Phone Call':         { label: 'Phone Call',   color: '#0d9488', bg: '#f0fdfa' },
+  'Facebook':           { label: 'Facebook',     color: '#1877f2', bg: '#eff6ff' },
+  'Google':             { label: 'Google',       color: '#dc2626', bg: '#fef2f2' },
+  'Other':              { label: 'Other',        color: '#6b7280', bg: '#f9fafb' },
+  'Manual':             { label: 'Manual',       color: '#94a3b8', bg: '#f8fafc' },
+};
+
+function getSourceMeta(key) {
+  return SOURCE_META[key] || { label: key || 'Unknown', color: '#6b7280', bg: '#f9fafb' };
+}
 
 function startOf(type) {
   const d = new Date();
@@ -17,16 +31,22 @@ function startOf(type) {
   return null;
 }
 
-function Bar({ label, value, max, color }) {
+function Bar({ label, value, max, color, bg, count }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="reports-bar-row">
-      <div className="reports-bar-label">{label}</div>
-      <div className="reports-bar-track">
-        <div style={{ height: '10px', width: `${pct}%`, background: color, borderRadius: '4px', transition: 'width .3s' }} />
+    <div style={{ marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-700)' }}>{label}</span>
+          {count !== undefined && <span style={{ fontSize: '10px', color: 'var(--gray-400)', fontWeight: 500 }}>{count} job{count !== 1 ? 's' : ''}</span>}
+        </div>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-900)' }}>
+          ${value.toLocaleString('en-AU', { minimumFractionDigits: 0 })}
+        </span>
       </div>
-      <div className="reports-bar-value">
-        ${value.toLocaleString('en-AU', { minimumFractionDigits: 0 })}
+      <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '4px', transition: 'width .35s ease' }} />
       </div>
     </div>
   );
@@ -37,12 +57,13 @@ export default function ReportsPage() {
   const [range,       setRange]       = useState('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd,   setCustomEnd]   = useState('');
+  const [activeTab,      setActiveTab]      = useState('overview'); // 'overview' | 'source' | 'transactions'
+  const [selectedSource, setSelectedSource] = useState(null); // null = all sources
 
   const [expenses,       setExpenses]       = useState([]);
   const [revenueRecords, setRevenueRecords] = useState([]);
   const [isLoading,      setIsLoading]      = useState(true);
 
-  // Load Expenses + Revenue from Airtable on mount
   useEffect(() => {
     Promise.all([
       fetchRecords(AT_TABLES.expenses),
@@ -56,19 +77,32 @@ export default function ReportsPage() {
         date:        r.fields['Date']        || '',
       })));
       setRevenueRecords(revRecs.map(r => ({
-        id:     r.id,
-        _type:  'payment',
-        name:   r.fields['Client Name']    || '',
-        phone:  r.fields['Phone']          || '',
-        jobType: r.fields['Job_Service']   || '',
-        city:   r.fields['City']           || '',
-        method: r.fields['Payment_Method'] || '',
-        amount: parseFloat(r.fields['Amount'] || 0),
-        date:   r.fields['Date']           || '',
-        status: r.fields['Status']         || '',
+        id:      r.id,
+        name:    r.fields['Revenue Name']   || r.fields['Client Name'] || '',
+        client:  r.fields['Client Name']   || '',
+        phone:   r.fields['Phone']          || '',
+        jobType: r.fields['Job_Service']    || '',
+        city:    r.fields['City']           || '',
+        method:  r.fields['Payment_Method'] || '',
+        amount:  parseFloat(r.fields['Amount'] || 0),
+        date:    r.fields['Date']           || '',
+        status:  r.fields['Status']         || '',
       })));
     }).finally(() => setIsLoading(false));
   }, []);
+
+  // Build phone → leadSource lookup from leads
+  const sourceByPhone = useMemo(() => {
+    const map = {};
+    leads.forEach(l => {
+      if (!l.phone) return;
+      const key = l.phone.replace(/\s/g, '').toLowerCase();
+      if (!map[key]) {
+        map[key] = l.leadSource || (l.hasCall ? 'Phone Call' : 'Other');
+      }
+    });
+    return map;
+  }, [leads]);
 
   const { from, to } = useMemo(() => {
     if (range === 'custom') {
@@ -77,8 +111,7 @@ export default function ReportsPage() {
         to:   customEnd   ? new Date(customEnd + 'T23:59:59') : null,
       };
     }
-    const f = startOf(range);
-    return { from: f, to: new Date() };
+    return { from: startOf(range), to: new Date() };
   }, [range, customStart, customEnd]);
 
   function inRange(dateVal) {
@@ -89,32 +122,58 @@ export default function ReportsPage() {
     return true;
   }
 
-  const jobDoneCount    = leads.filter(l => l.status === 'job_done' && inRange(l.date)).length;
-  // Job done but not yet paid — needs payment collection
-  const outstandingLeads = leads.filter(l => l.status === 'job_done' && !l.paid && inRange(l.date));
-
-  // Only count records with Status='Job Done' (or no Status for old records) as income
   const filteredRevenue = revenueRecords
     .filter(r => inRange(r.date) && (r.status === 'Job Done' || r.status === ''))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const totalIncome = filteredRevenue.reduce((s, r) => s + r.amount, 0);
-
-  const incomeByJobType = {};
-  filteredRevenue.forEach(r => {
-    const k = r.jobType || 'Other';
-    incomeByJobType[k] = (incomeByJobType[k] || 0) + r.amount;
-  });
   const filteredExpenses = expenses.filter(e => inRange(e.date));
 
+  // Separate upsell records from regular job revenue
+  const isUpsellRecord = r => (r.name || '').toLowerCase().includes('upsell') || r.jobType === 'Upsell';
+  const mainRevenue   = filteredRevenue.filter(r => !isUpsellRecord(r));
+  const upsellRevenue = filteredRevenue.filter(r =>  isUpsellRecord(r));
+  const totalUpsell   = upsellRevenue.reduce((s, r) => s + r.amount, 0);
+
+  const totalIncome   = filteredRevenue.reduce((s, r) => s + r.amount, 0);
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
   const profit        = totalIncome - totalExpenses;
 
-  const expByCategory = {};
-  filteredExpenses.forEach(e => { expByCategory[e.category] = (expByCategory[e.category] || 0) + e.amount; });
+  // Revenue enriched with source (matched by phone)
+  const revenueWithSource = filteredRevenue.map(r => ({
+    ...r,
+    source: sourceByPhone[r.phone?.replace(/\s/g, '').toLowerCase()] || 'Other',
+  }));
 
-  const maxExp = Math.max(...Object.values(expByCategory), 1);
-  const maxInc = Math.max(...Object.values(incomeByJobType), 1);
+  // Group by source
+  const bySource = {};
+  revenueWithSource.forEach(r => {
+    const k = r.source;
+    if (!bySource[k]) bySource[k] = { amount: 0, count: 0 };
+    bySource[k].amount += r.amount;
+    bySource[k].count  += 1;
+  });
+
+  // Group by job type (exclude upsell records — tracked separately)
+  const byJobType = {};
+  mainRevenue.forEach(r => {
+    const k = r.jobType || 'Other';
+    if (!byJobType[k]) byJobType[k] = { amount: 0, count: 0 };
+    byJobType[k].amount += r.amount;
+    byJobType[k].count  += 1;
+  });
+
+  // Group expenses by category
+  const byCategory = {};
+  filteredExpenses.forEach(e => {
+    byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
+  });
+
+  const maxSource  = Math.max(...Object.values(bySource).map(v => v.amount),  1);
+  const maxJobType = Math.max(...Object.values(byJobType).map(v => v.amount), 1);
+  const maxCat     = Math.max(...Object.values(byCategory), 1);
+
+  const outstandingLeads = leads.filter(l => l.status === 'job_done' && !l.paid && inRange(l.date));
+  const rangeLabel = RANGES.find(r => r.id === range)?.label || '';
 
   if (isLoading) {
     return (
@@ -126,194 +185,349 @@ export default function ReportsPage() {
 
   return (
     <div className="page">
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ marginBottom: '14px' }}>
         <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gray-900)' }}>Reports</div>
-        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Income and expense overview</div>
+        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Income, expenses & lead sources</div>
       </div>
 
-      {/* Range selector */}
-      <div className="reports-range-btns">
-        {RANGES.map(r => (
-          <button
-            key={r.id}
-            onClick={() => setRange(r.id)}
-            style={{
-              padding: '7px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'inherit',
-              border: `1.5px solid ${range === r.id ? 'var(--primary)' : 'var(--gray-200)'}`,
-              background: range === r.id ? '#eff6ff' : '#fff',
-              color: range === r.id ? 'var(--primary)' : 'var(--gray-600)',
-            }}
-          >
-            {r.label}
+      {/* ── Summary cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+        <SummaryCard
+          label="Income"
+          value={totalIncome}
+          count={`${mainRevenue.length} job${mainRevenue.length !== 1 ? 's' : ''}${totalUpsell > 0 ? ` + $${totalUpsell.toLocaleString()} upsell` : ''}`}
+          color="#15803d" bg="#f0fdf4" border="#bbf7d0"
+        />
+        <SummaryCard label="Expenses" value={totalExpenses} count={`${filteredExpenses.length} items`} color="#dc2626" bg="#fef2f2" border="#fecaca" />
+        <SummaryCard
+          label="Profit"
+          value={Math.abs(profit)}
+          prefix={profit < 0 ? '-' : ''}
+          count={profit >= 0 ? 'net gain' : 'net loss'}
+          color={profit >= 0 ? '#15803d' : '#dc2626'}
+          bg={profit >= 0 ? '#f0fdf4' : '#fef2f2'}
+          border={profit >= 0 ? '#bbf7d0' : '#fecaca'}
+        />
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '4px', marginBottom: '10px' }}>
+        {[
+          { id: 'overview',      label: 'Overview' },
+          { id: 'source',        label: 'By Source' },
+          { id: 'transactions',  label: 'Transactions' },
+        ].map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+            flex: 1, padding: '8px 4px', borderRadius: '7px', fontSize: '12px', fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+            background: activeTab === t.id ? '#fff' : 'transparent',
+            color: activeTab === t.id ? 'var(--gray-900)' : 'var(--gray-500)',
+            boxShadow: activeTab === t.id ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
+            transition: 'all .15s',
+          }}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {range === 'custom' && (
-        <div className="reports-date-row">
-          <div className="fgroup">
-            <label className="flabel">From</label>
-            <input className="finput" type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} />
-          </div>
-          <div className="fgroup">
-            <label className="flabel">To</label>
-            <input className="finput" type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
-          </div>
-        </div>
-      )}
-
-      {/* Summary cards */}
-      <div className="reports-summary-grid">
-        <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total Income</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>${totalIncome.toLocaleString('en-AU', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>{filteredRevenue.length} paid job{filteredRevenue.length !== 1 ? 's' : ''}</div>
-        </div>
-        <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total Expenses</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#dc2626', marginTop: '6px' }}>${totalExpenses.toLocaleString('en-AU', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>{filteredExpenses.length} item{filteredExpenses.length !== 1 ? 's' : ''}</div>
-        </div>
-        <div className="reports-card-profit" style={{ background: profit >= 0 ? '#f0fdf4' : '#fef2f2', border: `1.5px solid ${profit >= 0 ? '#bbf7d0' : '#fecaca'}`, borderRadius: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: profit >= 0 ? '#15803d' : '#dc2626', textTransform: 'uppercase', letterSpacing: '.05em' }}>Net Profit</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: profit >= 0 ? '#15803d' : '#dc2626', marginTop: '6px' }}>
-            {profit < 0 ? '-' : ''}${Math.abs(profit).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '4px' }}>{jobDoneCount} job{jobDoneCount !== 1 ? 's' : ''} done</div>
-        </div>
+      {/* ── Range selector (below tabs, always visible) ── */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        {RANGES.map(r => (
+          <button key={r.id} onClick={() => setRange(r.id)} style={{
+            padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
+            border: `1.5px solid ${range === r.id ? 'var(--primary)' : 'var(--gray-200)'}`,
+            background: range === r.id ? 'var(--primary)' : '#fff',
+            color: range === r.id ? '#fff' : 'var(--gray-600)',
+          }}>
+            {r.label}
+          </button>
+        ))}
       </div>
-
-      {Object.keys(incomeByJobType).length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '20px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '14px' }}>Income by Job Type</div>
-          {Object.entries(incomeByJobType).sort((a, b) => b[1] - a[1]).map(([lbl, val]) => (
-            <Bar key={lbl} label={lbl} value={val} max={maxInc} color="#16a34a" />
-          ))}
-        </div>
-      )}
-
-      {Object.keys(expByCategory).length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '20px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '14px' }}>Expenses by Category</div>
-          {Object.entries(expByCategory).sort((a, b) => b[1] - a[1]).map(([lbl, val]) => (
-            <Bar key={lbl} label={lbl} value={val} max={maxExp} color="#dc2626" />
-          ))}
-        </div>
-      )}
-
-      {filteredRevenue.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>Revenue Transactions</div>
-            <span style={{ fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#15803d', borderRadius: '20px', padding: '2px 10px' }}>
-              {filteredRevenue.length} record{filteredRevenue.length !== 1 ? 's' : ''}
-            </span>
+      {range === 'custom' && (
+        <div style={{ background: '#fff', border: '1px solid var(--gray-200)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div>
+              <label style={lbl}>From</label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={e => setCustomStart(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#f9fafb' }}
+              />
+            </div>
+            <div>
+              <label style={lbl}>To</label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={e => setCustomEnd(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1.5px solid var(--gray-200)', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', color: 'var(--gray-800)', background: '#f9fafb' }}
+              />
+            </div>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
-                  <th style={pth}>Date</th>
-                  <th style={pth}>Client</th>
-                  <th style={pth}>Phone</th>
-                  <th style={pth}>Job / Service</th>
-                  <th style={pth}>City</th>
-                  <th style={pth}>Method</th>
-                  <th style={{ ...pth, textAlign: 'right' }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRevenue.map(row => (
-                  <tr key={row.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
-                    <td style={ptd}>
-                      <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
-                        {new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+          {customStart && customEnd && (
+            <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--gray-500)', textAlign: 'center' }}>
+              Showing {new Date(customStart).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {new Date(customEnd).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Overview tab ── */}
+      {activeTab === 'overview' && (
+        <>
+          {Object.keys(byJobType).length > 0 && (
+            <div style={card}>
+              <div style={cardHdr}>Income by Job Type</div>
+              {Object.entries(byJobType).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => (
+                <Bar key={k} label={k} value={v.amount} max={maxJobType} color="#16a34a" bg="#f0fdf4" count={v.count} />
+              ))}
+            </div>
+          )}
+
+          {totalUpsell > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <div style={cardHdr2}>Upsell Income</div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>Extra services added on top of jobs</div>
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: 700, background: '#fffbeb', color: '#92400e', borderRadius: '20px', padding: '3px 10px', border: '1px solid #fde68a' }}>
+                  {upsellRevenue.length} upsell{upsellRevenue.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {upsellRevenue.map(r => {
+                const desc = ((r.name || '').split('Upsell: ')[1] || '').trim();
+                return (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>
+                        {r.client || r.name}
+                        {desc && <span style={{ fontWeight: 400, color: '#92400e', fontSize: '12px' }}> · {desc}</span>}
                       </div>
-                    </td>
-                    <td style={{ ...ptd, fontWeight: 600, color: 'var(--gray-900)' }}>{row.name}</td>
-                    <td style={{ ...ptd, color: 'var(--gray-600)' }}>{row.phone || '—'}</td>
-                    <td style={ptd}>
-                      {row.jobType
-                        ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{row.jobType}</span>
-                        : <span style={{ color: 'var(--gray-400)' }}>—</span>
-                      }
-                    </td>
-                    <td style={{ ...ptd, color: 'var(--gray-500)' }}>{row.city || '—'}</td>
-                    <td style={ptd}>
-                      {row.method ? (
-                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 9px', borderRadius: '20px', background: row.method === 'Cash' ? '#f0fdf4' : '#eff6ff', color: row.method === 'Cash' ? '#15803d' : '#2563eb', border: `1px solid ${row.method === 'Cash' ? '#bbf7d0' : '#bfdbfe'}` }}>
+                      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                        {new Date(r.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} · {r.method || 'Cash'}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 700, color: '#d97706', fontSize: '14px' }}>+${r.amount.toLocaleString('en-AU')}</div>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '2px solid #fde68a', marginTop: '4px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: '#92400e' }}>
+                  Total: ${totalUpsell.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {Object.keys(byCategory).length > 0 && (
+            <div style={card}>
+              <div style={cardHdr}>Expenses by Category</div>
+              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                <Bar key={k} label={k} value={v} max={maxCat} color="#dc2626" bg="#fef2f2" />
+              ))}
+            </div>
+          )}
+
+          {outstandingLeads.length > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <div style={cardHdr2}>Awaiting Payment</div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>Job done — payment not yet collected</div>
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: 700, background: '#fff7ed', color: '#c2410c', borderRadius: '20px', padding: '3px 10px' }}>{outstandingLeads.length} unpaid</span>
+              </div>
+              {outstandingLeads.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>{l.phone || '—'} · {l.jobType || 'No job type'}</div>
+                  </div>
+                  <div style={{ fontWeight: 700, color: '#c2410c', fontSize: '14px' }}>
+                    {l.value > 0 ? `$${l.value.toLocaleString('en-AU')}` : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {filteredRevenue.length === 0 && filteredExpenses.length === 0 && (
+            <EmptyState />
+          )}
+        </>
+      )}
+
+      {/* ── By Source tab ── */}
+      {activeTab === 'source' && (
+        <>
+          {Object.keys(bySource).length > 0 ? (
+            <>
+              {/* Clickable source cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '14px' }}>
+                {Object.entries(bySource).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => {
+                  const meta    = getSourceMeta(k);
+                  const pct     = totalIncome > 0 ? Math.round((v.amount / totalIncome) * 100) : 0;
+                  const isActive = selectedSource === k;
+                  return (
+                    <div
+                      key={k}
+                      onClick={() => setSelectedSource(isActive ? null : k)}
+                      style={{
+                        background: isActive ? meta.color : meta.bg,
+                        border: `2px solid ${isActive ? meta.color : `${meta.color}33`}`,
+                        borderRadius: '12px', padding: '14px 12px', cursor: 'pointer',
+                        transition: 'all .15s',
+                      }}
+                    >
+                      <div style={{ fontSize: '10px', fontWeight: 700, color: isActive ? 'rgba(255,255,255,0.8)' : meta.color, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '5px' }}>
+                        {meta.label}
+                      </div>
+                      <div style={{ fontSize: '19px', fontWeight: 800, color: isActive ? '#fff' : 'var(--gray-900)' }}>
+                        ${v.amount.toLocaleString('en-AU')}
+                      </div>
+                      <div style={{ fontSize: '11px', color: isActive ? 'rgba(255,255,255,0.75)' : 'var(--gray-500)', marginTop: '3px' }}>
+                        {v.count} job{v.count !== 1 ? 's' : ''} · {pct}%
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bar chart */}
+              <div style={card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <div style={cardHdr2}>
+                    {selectedSource ? `${getSourceMeta(selectedSource).label} — Transactions` : 'All Sources'}
+                  </div>
+                  {selectedSource && (
+                    <button onClick={() => setSelectedSource(null)} style={{ fontSize: '11px', color: 'var(--gray-400)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Clear ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Bars — filtered or all */}
+                {!selectedSource && Object.entries(bySource).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => {
+                  const meta = getSourceMeta(k);
+                  return <Bar key={k} label={meta.label} value={v.amount} max={maxSource} color={meta.color} bg={meta.bg} count={v.count} />;
+                })}
+
+                {/* Transaction list for selected source */}
+                {revenueWithSource
+                  .filter(r => !selectedSource || r.source === selectedSource)
+                  .map(row => {
+                    const sm = getSourceMeta(row.source);
+                    const isUpsell = isUpsellRecord(row);
+                    const upsellDesc = isUpsell ? ((row.name || '').split('Upsell: ')[1] || '').trim() : '';
+                    return (
+                      <div key={row.id} style={{ padding: '10px 0', borderTop: '1px solid var(--gray-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{row.client || row.name}</span>
+                            {isUpsell && <span style={{ fontSize: '9px', fontWeight: 700, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', padding: '1px 5px', borderRadius: '6px' }}>UPSELL</span>}
+                            {isUpsell && upsellDesc && <span style={{ fontSize: '11px', color: '#92400e' }}>{upsellDesc}</span>}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                            {new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                            {!isUpsell && row.jobType ? ` · ${row.jobType}` : ''}
+                            {row.method ? ` · ${row.method}` : ''}
+                          </div>
+                        </div>
+                        <span style={{ fontWeight: 700, color: '#15803d', fontSize: '14px', flexShrink: 0 }}>
+                          ${Number(row.amount).toLocaleString('en-AU')}
+                        </span>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </>
+          ) : (
+            <EmptyState msg="No revenue data with source information for this period." />
+          )}
+        </>
+      )}
+
+      {/* ── Transactions tab ── */}
+      {activeTab === 'transactions' && (
+        <>
+          {filteredRevenue.length > 0 ? (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={cardHdr2}>Revenue Transactions</div>
+                <span style={{ fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#15803d', borderRadius: '20px', padding: '3px 10px' }}>
+                  {filteredRevenue.length} record{filteredRevenue.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {filteredRevenue.map(row => {
+                const src = sourceByPhone[row.phone?.replace(/\s/g, '').toLowerCase()] || '';
+                const sm  = src ? getSourceMeta(src) : null;
+                const isUpsell = isUpsellRecord(row);
+                const upsellDesc = isUpsell ? ((row.name || '').split('Upsell: ')[1] || '').trim() : '';
+                return (
+                  <div key={row.id} style={{ padding: '11px 0', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{row.client || row.name}</span>
+                        {isUpsell && <span style={{ fontSize: '9px', fontWeight: 700, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', padding: '1px 5px', borderRadius: '6px' }}>UPSELL</span>}
+                        {isUpsell && upsellDesc && <span style={{ fontSize: '11px', color: '#92400e' }}>{upsellDesc}</span>}
+                        {sm && <span style={{ fontSize: '9px', fontWeight: 700, background: sm.bg, color: sm.color, padding: '1px 5px', borderRadius: '6px' }}>{sm.label.toUpperCase()}</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '3px' }}>
+                        {new Date(row.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {!isUpsell && row.jobType ? ` · ${row.jobType}` : ''}
+                        {row.city ? ` · ${row.city}` : ''}
+                      </div>
+                      {row.method && (
+                        <span style={{ display: 'inline-block', marginTop: '4px', fontSize: '10px', fontWeight: 700, padding: '1px 8px', borderRadius: '20px', background: row.method === 'Cash' ? '#f0fdf4' : '#eff6ff', color: row.method === 'Cash' ? '#15803d' : '#2563eb', border: `1px solid ${row.method === 'Cash' ? '#bbf7d0' : '#bfdbfe'}` }}>
                           {row.method.toUpperCase()}
                         </span>
-                      ) : <span style={{ color: 'var(--gray-400)' }}>—</span>}
-                    </td>
-                    <td style={{ ...ptd, textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 800, color: '#15803d', fontSize: '15px', flexShrink: 0 }}>
                       ${Number(row.amount).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Awaiting Payment — job done but payment not yet collected */}
-      {outstandingLeads.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--gray-100)' }}>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' }}>Awaiting Payment</div>
-              <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>Job completed — payment not yet collected</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <span style={{ fontSize: '11px', fontWeight: 700, background: '#fff7ed', color: '#c2410c', borderRadius: '20px', padding: '2px 10px' }}>
-              {outstandingLeads.length} unpaid
-            </span>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
-                  <th style={pth}>Client</th>
-                  <th style={pth}>Phone</th>
-                  <th style={pth}>Job Type</th>
-                  <th style={{ ...pth, textAlign: 'right' }}>Est. Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {outstandingLeads.map(l => (
-                  <tr key={l.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
-                    <td style={{ ...ptd, fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</td>
-                    <td style={{ ...ptd, color: 'var(--gray-600)' }}>{l.phone || '—'}</td>
-                    <td style={ptd}>
-                      {l.jobType
-                        ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: '#eff6ff', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{l.jobType}</span>
-                        : <span style={{ color: 'var(--gray-400)' }}>—</span>
-                      }
-                    </td>
-                    <td style={{ ...ptd, textAlign: 'right', fontWeight: 700, color: '#c2410c' }}>
-                      {l.value > 0 ? `$${l.value.toLocaleString('en-AU', { minimumFractionDigits: 2 })}` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {filteredRevenue.length === 0 && filteredExpenses.length === 0 && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '48px', textAlign: 'center' }}>
-          <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-300)" strokeWidth="1.5" style={{ width: '48px', height: '48px', margin: '0 auto 12px', display: 'block' }}>
-            <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-          </svg>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-500)' }}>No data for this period</div>
-          <div style={{ fontSize: '12.5px', color: 'var(--gray-400)', marginTop: '6px' }}>Mark leads as paid and add expenses to see reports here</div>
-        </div>
+          ) : (
+            <EmptyState />
+          )}
+        </>
       )}
     </div>
   );
 }
 
-const pth = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' };
-const ptd = { padding: '11px 14px', color: 'var(--gray-700)', verticalAlign: 'middle' };
+function SummaryCard({ label, value, prefix = '', count, color, bg, border }) {
+  return (
+    <div style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: '12px', padding: '14px 12px' }}>
+      <div style={{ fontSize: '10px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 800, color, marginTop: '5px', lineHeight: 1.1 }}>
+        {prefix}${value.toLocaleString('en-AU', { minimumFractionDigits: 0 })}
+      </div>
+      <div style={{ fontSize: '10px', color, opacity: 0.75, marginTop: '3px' }}>{count}</div>
+    </div>
+  );
+}
+
+function EmptyState({ msg }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '48px 20px', textAlign: 'center' }}>
+      <svg fill="none" viewBox="0 0 24 24" stroke="var(--gray-300)" strokeWidth="1.5" style={{ width: '40px', height: '40px', margin: '0 auto 10px', display: 'block' }}>
+        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-500)' }}>No data for this period</div>
+      <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '5px' }}>{msg || 'Mark leads as paid and add expenses to see reports here'}</div>
+    </div>
+  );
+}
+
+const card     = { background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '18px 16px', marginBottom: '14px' };
+const cardHdr  = { fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)', marginBottom: '16px' };
+const cardHdr2 = { fontSize: '14px', fontWeight: 700, color: 'var(--gray-900)' };
+const lbl      = { fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--gray-500)', marginBottom: '5px', display: 'block' };

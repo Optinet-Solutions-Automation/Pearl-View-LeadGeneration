@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
-import { formatDate } from '../../utils/dateUtils';
+import { formatDate, formatLeadSource } from '../../utils/dateUtils';
 
 export default function DeletedHistoryPage() {
   const { deletedLeads, permanentDelete, recoverLead } = useLeadsContext();
@@ -56,12 +56,16 @@ export default function DeletedHistoryPage() {
               </thead>
               <tbody>
                 {deletedLeads.map((l, i) => {
-                  const isCall   = l.hasCall;
-                  const lpName   = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
-                  const srcLabel = isCall ? `Call · ${lpName}` : `Form · ${lpName}`;
+                  const isCall = l.hasCall;
+                  // Determine source label from leadSource field first, then lp fallback
+                  const rawSrc = l.leadSource;
+                  const lpName = l.lp === 'LP2' ? 'Pearl View' : l.lp === 'LP1' ? 'Crystal Pro' : null;
+                  const srcWebsite = rawSrc === 'website-pearlview' ? 'Pearl View'
+                    : rawSrc === 'website-crystalpro' ? 'Crystal Pro'
+                    : (rawSrc && !['Phone Call'].includes(rawSrc)) ? formatLeadSource(rawSrc)
+                    : lpName;
                   const deletedStr = l.deletedAt
-                    ? l.deletedAt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
-                      + ' ' + l.deletedAt.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })
+                    ? formatDate(l.deletedAt.toISOString())
                     : '—';
 
                   return (
@@ -69,13 +73,25 @@ export default function DeletedHistoryPage() {
                       <td style={tdStyle}>{i + 1}</td>
                       <td style={{ ...tdStyle, fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</td>
                       <td style={tdStyle}>
-                        <span style={{
-                          fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                          background: isCall ? '#dcfce7' : '#dbeafe',
-                          color: isCall ? '#15803d' : '#1d4ed8',
-                        }}>
-                          {srcLabel}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                          <span style={{
+                            fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                            whiteSpace: 'nowrap',
+                            background: isCall ? '#dcfce7' : '#dbeafe',
+                            color: isCall ? '#15803d' : '#1d4ed8',
+                          }}>
+                            {isCall ? 'Phone Call' : 'Web Form'}
+                          </span>
+                          {srcWebsite && (
+                            <span style={{
+                              fontSize: '10.5px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px',
+                              whiteSpace: 'nowrap',
+                              background: '#f1f5f9', color: '#475569',
+                            }}>
+                              {srcWebsite}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td style={{ ...tdStyle, color: 'var(--gray-600)' }}>{l.phone || l.email || '—'}</td>
                       <td style={{ ...tdStyle, color: 'var(--gray-500)' }}>{formatDate(l.date)}</td>

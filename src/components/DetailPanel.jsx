@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, formatLeadSource } from '../utils/dateUtils';
 import { REFUSE_LABELS } from '../utils/constants';
 
 
@@ -18,10 +18,10 @@ function PaymentModal({ leadName, initAmount, initMethod, onSubmit, onClose, sav
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: '16px' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 3000, overflowY: 'auto' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', boxShadow: '0 -8px 40px rgba(0,0,0,0.22)', paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)' }}>
           <div>
             <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Submit Payment</div>
@@ -138,10 +138,10 @@ function SendQuoteModal({ leadName, onSubmit, onClose }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: '16px' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 3000, overflowY: 'auto' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '360px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: '480px', boxShadow: '0 -8px 40px rgba(0,0,0,0.22)', paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)' }}>
           <div>
             <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Send Quote</div>
@@ -180,106 +180,12 @@ function SendQuoteModal({ leadName, onSubmit, onClose }) {
   );
 }
 
-function ScheduleModal({ lead, onSubmit, onClose }) {
-  const [date,    setDate]    = useState(lead.jobDate || new Date().toISOString().slice(0, 10));
-  const [service, setService] = useState(lead.jobType || 'Window Cleaning');
-  const [amount,  setAmount]  = useState(lead.paidAmount ? String(lead.paidAmount) : '');
-  const [city,    setCity]    = useState(lead.city || '');
-  const [err,     setErr]     = useState('');
-
-  function handleSubmit() {
-    if (!date) { setErr('Please select a date'); return; }
-    setErr('');
-    onSubmit({
-      date,
-      service,
-      amount:     parseFloat(amount) || 0,
-      city:       city.trim(),
-      clientName: lead.name,
-      phone:      lead.phone || '',
-    });
-  }
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: '16px' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--gray-100)' }}>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-900)' }}>Schedule Appointment</div>
-            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{lead.name}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-400)', padding: '4px' }}>✕</button>
-        </div>
-        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div>
-            <label style={mlbl}>Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="finput"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
-          <div>
-            <label style={mlbl}>Service</label>
-            <select
-              value={service}
-              onChange={e => setService(e.target.value)}
-              className="fselect"
-              style={{ width: '100%' }}
-            >
-              <option value="Window Cleaning">Window Cleaning</option>
-              <option value="Pressure Washing">Pressure Washing</option>
-              <option value="Solar Panel">Solar Panel</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div>
-            <label style={mlbl}>City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={e => setCity(e.target.value)}
-              placeholder="e.g. Sydney"
-              className="finput"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
-          <div>
-            <label style={mlbl}>Estimated Amount ($)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="finput"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
-          </div>
-          {err && (
-            <div style={{ fontSize: '12px', color: '#dc2626', padding: '8px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>{err}</div>
-          )}
-          <button
-            onClick={handleSubmit}
-            style={{ width: '100%', padding: '11px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Schedule Appointment
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function DetailPanel() {
   const {
     activeLead: l, closePanel, changeStatus,
-    saveNote, saveJobType, savePaidInfo, deletePayment, saveCity, saveJobDate, saveEmail, saveQuoteAmount,
-    archiveLead, showToast, renameLead, setRefuseReason, scheduleBooking,
+    saveNote, saveJobType, savePaidInfo, deletePayment, saveCity, saveJobDate, saveEmail,
+    sendQuoteAndChangeStatus,
+    archiveLead, showToast, renameLead, setRefuseReason,
   } = useLeadsContext();
 
   const [noteText,     setNoteText]     = useState('');
@@ -292,7 +198,6 @@ export default function DetailPanel() {
   const [paidAmount,   setPaidAmount]   = useState('');
   const [payMethod,    setPayMethod]    = useState('');
   const [payModalOpen,       setPayModalOpen]       = useState(false);
-  const [scheduleModalOpen,  setScheduleModalOpen]  = useState(false);
   const [quoteModalOpen,     setQuoteModalOpen]     = useState(false);
   const [paymentSaving,     setPaymentSaving]     = useState(false);
   const nameInputRef  = useRef(null);
@@ -325,16 +230,22 @@ export default function DetailPanel() {
 
   if (!l) return <aside className="panel" />;
 
-  const isCallLead = l.source === 'call1' || l.source === 'call2';
-  const lpName = l.lp === 'LP2' ? 'Pearl View' : 'Crystal Pro';
+  const isCallLead = l.hasCall;
+  const lpName = l.lp === 'LP2' ? 'Pearl View' : l.lp === 'LP1' ? 'Crystal Pro' : null;
 
-  const srcTag = isCallLead
-    ? <span className="tag tag-call" style={{ fontSize: '11px' }}>Call · {lpName}</span>
-    : l.source === 'form1'
-    ? <span className="tag tag-form1" style={{ fontSize: '11px' }}>Form · Crystal Pro</span>
-    : l.source === 'manual'
-    ? <span className="tag tag-gray" style={{ fontSize: '11px' }}>{l.leadChannel || 'Manual'}</span>
-    : <span className="tag tag-form2" style={{ fontSize: '11px' }}>Form · Pearl View</span>;
+  // Human-readable source for the header meta line
+  const metaSource = (() => {
+    if (isCallLead) return lpName ? `Call · ${lpName}` : 'Phone Call';
+    if (lpName) return `Form · ${lpName}`;
+    if (l.leadSource) return formatLeadSource(l.leadSource);
+    return 'Form';
+  })();
+
+  // Source badge in Job Details section
+  const srcLabel = l.leadSource
+    ? formatLeadSource(l.leadSource)
+    : (isCallLead ? (lpName ? `Call · ${lpName}` : 'Phone Call') : (lpName ? `Form · ${lpName}` : 'Form'));
+  const srcTag = <span className="tag tag-gray" style={{ fontSize: '11px' }}>{srcLabel}</span>;
 
   function handleNoteChange(e) {
     const val = e.target.value;
@@ -348,10 +259,8 @@ export default function DetailPanel() {
   function handleSendQuote() { setQuoteModalOpen(true); }
 
   async function onQuoteSubmit(amount) {
-    saveQuoteAmount(l.id, amount);
-    await changeStatus(l.id, 'quote_sent');
     setQuoteModalOpen(false);
-    showToast('Quote sent ✓');
+    await sendQuoteAndChangeStatus(l.id, amount);
   }
   function handleJobDone()         { changeStatus(l.id, 'job_done'); }
   function handleDeletePayment()   { deletePayment(l.id); }
@@ -390,11 +299,6 @@ export default function DetailPanel() {
     setPayMethod(method);
     setPayModalOpen(false);
     showToast('Payment saved ✓');
-  }
-
-  async function onScheduleSubmit(bookingData) {
-    await scheduleBooking(l.id, bookingData);
-    setScheduleModalOpen(false);
   }
 
   function handlePaidToggle(checked) {
@@ -441,7 +345,7 @@ export default function DetailPanel() {
             </button>
           </div>
           <div className="panel-meta">
-            {isCallLead ? `Direct Call · ${l.lp}` : `Form · ${l.lp}`} · {formatDate(l.date)}
+            {metaSource} · {formatDate(l.date)}
           </div>
         </div>
         <button className="close-btn" onClick={closePanel}>✕</button>
@@ -451,23 +355,31 @@ export default function DetailPanel() {
         {/* Status */}
         <div className="psec">
           <div className="psec-title">Status</div>
-          <select
-            className="status-sel"
-            value={l.status}
-            onChange={e => changeStatus(l.id, e.target.value)}
-            disabled={l.status === 'job_done' && l.paid && l.paidAmount > 0}
-            title={l.status === 'job_done' && l.paid && l.paidAmount > 0 ? 'Remove payment record to change status' : undefined}
-          >
-            <option value="new">🔵 New Lead</option>
-            <option value="in_progress">🟡 In Progress</option>
-            <option value="quote_sent">🟣 Quote Sent</option>
-            <option value="refused">🚫 Refused</option>
-            <option value="job_done">✅ Job Done</option>
-          </select>
-          {l.status === 'job_done' && l.paid && l.paidAmount > 0 && (
-            <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '5px' }}>
-              Remove payment to change status
+          {l.status === 'job_done' && l.paid && l.paidAmount > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: 1, padding: '8px 12px', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#15803d' }}>
+                ✅ Job Done
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', background: '#f9fafb', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '11px', color: 'var(--gray-400)', flexShrink: 0 }}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '11px', height: '11px' }}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                Locked
+              </div>
             </div>
+          ) : (
+            <select
+              className="status-sel"
+              value={l.status}
+              onChange={e => changeStatus(l.id, e.target.value)}
+            >
+              <option value="new">🔵 New Lead</option>
+              <option value="in_progress">🟡 In Progress</option>
+              <option value="quote_sent">🟣 Quote Sent</option>
+              <option value="booked">📅 Booked</option>
+              <option value="job_done">✅ Job Done</option>
+              <option value="refused">🚫 Refused</option>
+            </select>
           )}
         </div>
 
@@ -496,7 +408,10 @@ export default function DetailPanel() {
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>
             </svg>
-            <span className="prow-text">{l.phone || '—'}</span>
+            {l.phone
+              ? <a href={`tel:${l.phone}`} className="prow-text" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>{l.phone}</a>
+              : <span className="prow-text" style={{ color: 'var(--gray-400)' }}>—</span>
+            }
           </div>
           {/* Email — tap to edit */}
           <div className="prow" style={{ cursor: 'pointer' }} onClick={editingEmail ? undefined : startEditEmail}>
@@ -549,10 +464,9 @@ export default function DetailPanel() {
           <div className="jrow" style={{ alignItems: 'center' }}>
             <span className="jlbl">Job Type</span>
             <select
-              className="status-sel"
               value={l.jobType || ''}
               onChange={e => saveJobType(l.id, e.target.value)}
-              style={{ fontSize: '12px', padding: '4px 8px', height: 'auto', flex: 1 }}
+              style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--gray-200)', borderRadius: '6px', fontFamily: 'inherit', background: '#fff', color: 'var(--gray-700)', outline: 'none', flex: 1 }}
             >
               <option value="">— Select —</option>
               <option value="Window Cleaning">Window Cleaning</option>
@@ -588,7 +502,7 @@ export default function DetailPanel() {
           <div className="psec-title">Payment</div>
           {l.paid ? (
             <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: l.status !== 'job_done' ? '8px' : 0 }}>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>✓ Payment Recorded</div>
                   <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '3px' }}>
@@ -596,6 +510,7 @@ export default function DetailPanel() {
                     {l.paymentMethod ? ` · ${l.paymentMethod.toUpperCase()}` : ''}
                   </div>
                 </div>
+                {/* Edit always available — price may change after job (discount or increase) */}
                 <button
                   onClick={handleSubmitPayment}
                   style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d', background: '#fff', border: '1px solid #86efac', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
@@ -603,12 +518,18 @@ export default function DetailPanel() {
                   Edit
                 </button>
               </div>
-              <button
-                onClick={handleDeletePayment}
-                style={{ width: '100%', padding: '7px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Delete Payment &amp; Revenue Record
-              </button>
+              {/* Delete only available before job_done — no job should be recorded as free */}
+              {l.status !== 'job_done' && (
+                <button
+                  onClick={handleDeletePayment}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', width: '100%', padding: '6px', background: 'transparent', color: '#dc2626', border: 'none', borderTop: '1px solid #dcfce7', marginTop: '4px', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                  </svg>
+                  Delete Payment
+                </button>
+              )}
             </div>
           ) : (
             <button
@@ -663,33 +584,39 @@ export default function DetailPanel() {
           <div className="psec-title">Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* Row 1: Send Quote + Job Done */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
+            {l.status !== 'job_done' && (
+              <div style={{ display: 'grid', gridTemplateColumns: l.status === 'quote_sent' ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                {l.status !== 'quote_sent' && (
+                  <button className="action-btn btn-dark" onClick={handleSendQuote} style={{ minHeight: '44px' }}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Send Quote
+                  </button>
+                )}
+                <button className="action-btn btn-green" onClick={handleJobDone} style={{ minHeight: '44px' }}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  Job Done
+                </button>
+              </div>
+            )}
+            {/* Row 2: Book (full width) — hidden once booked or job done */}
+            {l.status !== 'booked' && l.status !== 'job_done' && (
+              <button
+                className="action-btn"
+                style={{ background: '#2563eb', borderColor: '#2563eb', color: '#fff', minHeight: '44px' }}
+                onClick={() => changeStatus(l.id, 'booked')}
+              >
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
-                Send Quote
+                Book
               </button>
-              <button className="action-btn btn-green" onClick={handleJobDone} style={{ minHeight: '44px' }}>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Job Done
-              </button>
-            </div>
-            {/* Row 2: Schedule Appointment (full width) */}
-            <button
-              className="action-btn"
-              style={{ background: '#7c3aed', borderColor: '#7c3aed', color: '#fff', minHeight: '44px' }}
-              onClick={() => setScheduleModalOpen(true)}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              Schedule Appointment
-            </button>
+            )}
             {/* Row 3: Archive (full width, subtle) */}
             <button className="action-btn btn-red" onClick={handleArchive} style={{ minHeight: '44px' }}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
@@ -711,13 +638,6 @@ export default function DetailPanel() {
           onSubmit={onPaymentSubmit}
           onClose={() => { if (!paymentSaving) setPayModalOpen(false); }}
           saving={paymentSaving}
-        />
-      )}
-      {scheduleModalOpen && (
-        <ScheduleModal
-          lead={l}
-          onSubmit={onScheduleSubmit}
-          onClose={() => setScheduleModalOpen(false)}
         />
       )}
       {quoteModalOpen && (

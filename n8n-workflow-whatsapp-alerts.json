@@ -1,0 +1,70 @@
+{
+  "name": "Pearl View — New Lead WhatsApp Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pearl-view-new-lead",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "New Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 300],
+      "webhookId": "a1b2c3d4-0001-0001-0001-000000000002"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract lead data from the incoming webhook payload\nconst body = $input.first().json.body || $input.first().json;\n\nconst name    = body.name        || 'Unknown';\nconst phone   = body.phone       || 'N/A';\nconst email   = body.email       || 'N/A';\nconst subject = body.subject     || 'N/A';\nconst source  = body.leadSource  || 'Unknown';\n\n// Format timestamp\nconst now = new Date();\nconst time = now.toLocaleString('en-US', {\n  timeZone: 'America/New_York',\n  month:  'short',\n  day:    'numeric',\n  hour:   'numeric',\n  minute: '2-digit',\n  hour12: true,\n});\n\n// Build WhatsApp message\nconst message =\n  `*New Lead - Pearl View*\\n\\n` +\n  `*Name:* ${name}\\n` +\n  `*Phone:* ${phone}\\n` +\n  `*Email:* ${email}\\n` +\n  `*Subject:* ${subject}\\n` +\n  `*Source:* ${source}\\n` +\n  `*Time:* ${time}\\n\\n` +\n  `Open the dashboard to manage this lead.`;\n\nreturn [{ json: { message } }];\n"
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendText",
+        "phoneNumberId": "YOUR_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "=+1XXXXXXXXXX",
+        "textBody": "={{ $json.message }}"
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Send WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [620, 300],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Lead Webhook": {
+      "main": [
+        [{ "node": "Format Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [{ "node": "Send WhatsApp", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

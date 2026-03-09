@@ -3,6 +3,8 @@ import { STATUS_MAP, AT_STATUS_MAP, PROG_MAP } from '../utils/constants';
 import { parseDate } from '../utils/dateUtils';
 import { createRecord, updateRecord, deleteRecord, fetchRecords, AT_TABLES } from '../utils/airtableSync';
 
+const VALID_JOB_TYPES = new Set(['Window Cleaning', 'Pressure Washing', 'Solar Panel', 'Other']);
+
 const IS_LOCAL = import.meta.env.DEV;
 const AT_TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN || '';
 const AT_BASE  = import.meta.env.VITE_AIRTABLE_BASE_ID || '';
@@ -12,11 +14,19 @@ function normaliseRecord(rec) {
   const f = rec.fields;
   const isCall = !!(f['Caller ID'] || f['Call Time']);
   const rawSrc = isCall ? (f['Call - Lead Source'] || '') : (f['Lead Source'] || '');
+  const rawSrcNorm = rawSrc.toLowerCase().replace(/[\s-]/g, '');
+
+  // LP only set for website leads; all other sources (Phone Call, Facebook, Google, Other) get null
+  let lp = null;
+  if (rawSrcNorm.includes('pearlview')) lp = 'LP2';
+  else if (rawSrcNorm.includes('crystalpro') || rawSrcNorm.includes('crystal')) lp = 'LP1';
+
+  // source encodes call vs form type (used for isCallLead detection)
   let source;
   if (isCall) {
-    source = rawSrc.includes('pearlview') ? 'call2' : 'call1';
+    source = lp === 'LP2' ? 'call2' : 'call1';
   } else {
-    source = rawSrc.includes('pearlview') ? 'form2' : 'form1';
+    source = lp === 'LP2' ? 'form2' : 'form1';
   }
   const rawStatus = f['Lead Status'] || 'New';
   const status = STATUS_MAP[rawStatus] || 'new';
@@ -25,14 +35,14 @@ function normaliseRecord(rec) {
   const rawDate = isCall ? f['Call Time'] : f['Inquiry Date'];
   return {
     id: rec.id, name, source,
-    lp: source.includes('2') ? 'LP2' : 'LP1',
+    lp,
     phone: f['Phone Number'] || f['Caller ID'] || '',
     email: f['Email'] || '',
     subject: fullSubject,
     date: rawDate || '',
     dateObj: parseDate(rawDate),
     address: f['Adress'] || f['Service Address'] || '',
-    jobType: f['Property Type'] || '',
+    jobType: VALID_JOB_TYPES.has(f['Property Type']) ? f['Property Type'] : '',
     windows: f['Estimated Window Count'] || 0,
     stories: f['Stories'] || 0,
     value: f['Quote Amount'] || 0,
@@ -49,6 +59,7 @@ function normaliseRecord(rec) {
     paymentMethod: f['Payment Method'] || '',
     city: f['City'] || '',
     leadChannel: f['Lead Channel'] || '',
+    leadSource: f['Lead Source'] || '',
     airtableId: rec.id,
   };
 }
@@ -56,19 +67,27 @@ function normaliseRecord(rec) {
 // ─── Normalise a raw Airtable Bookings record into the calBooking shape ───────
 function normaliseCalBooking(rec) {
   const f = rec.fields;
+  // Source encoded in Booking Name: "LEAD::Name - date" = from lead flow, else manual
+  const bookingName   = f['Booking Name'] || '';
+  const isLeadBooking = bookingName.startsWith('LEAD::');
   return {
-    id:            `cal-${rec.id}`,
-    airtableId:    rec.id,
-    clientName:    f['Client Name']    || '',
-    phone:         f['Phone']          || '',
-    email:         '',
-    city:          f['City']           || '',
-    service:       f['Job_Service']    || '',
-    paymentMethod: 'Cash',
-    date:          f['Date']           ? f['Date'].split('T')[0] : '',
-    bookingStatus: f['Booking Status'] || 'Scheduled',
-    amount:        f['Amount']         || 0,
-    linkedLeadId:  null,
+    id:             `cal-${rec.id}`,
+    airtableId:     rec.id,
+    clientName:     f['Client Name']     || '',
+    phone:          f['Phone']           || '',
+    email:          '',
+    city:           f['City']            || '',
+    service:        f['Job_Service']     || '',
+    paymentMethod:  'Cash',
+    date:           f['Date']            ? f['Date'].split('T')[0] : '',
+    bookingStatus:  f['Booking Status']  || 'Scheduled',
+    amount:         f['Amount']          || 0,
+    jobTime:        f['Job Time']        || '',
+    assignedWorker: f['Assigned Worker'] || '',
+    upsellAmount:   f['Upsell Amount']   || 0,
+    upsellNotes:    f['Upsell Notes']    || '',
+    linkedLeadId:   null,
+    bookingSource:  isLeadBooking ? 'Lead' : 'Manual',
   };
 }
 
@@ -97,13 +116,35 @@ function writeRevenue(lead, paidAmount, paymentMethod, status) {
   });
 }
 
+// ─── Normalise a raw Airtable Clients record ──────────────────────────────────
+function normaliseClient(rec) {
+  const f = rec.fields;
+  return {
+    id:         rec.id,
+    airtableId: rec.id,
+    name:       f['Client Name']   || f['Name'] || '',
+    phone:      f['Phone']         || f['Phone Number'] || '',
+    email:      f['Email']         || '',
+    address:    f['Address']       || f['Service Address'] || f['Adress'] || '',
+    city:       f['City']          || '',
+    notes:      f['Notes']         || '',
+    jobType:    f['Property Type'] || '',
+    leadSource: f['Lead Source']   || '',
+    status:     f['Status']        || '',
+  };
+}
+
 export function useLeads() {
   const [leads,        setLeads]        = useState([]);
   const [deletedLeads, setDeletedLeads] = useState([]);
   const [calBookings,  setCalBookings]  = useState([]);
+  const [clients,         setClients]         = useState([]);
+  const [archivedClients, setArchivedClients] = useState([]);
   const [isLoading,    setIsLoading]    = useState(true);
   // Track in-flight Airtable writes so silent polls don't overwrite optimistic UI
   const pendingWrites = useRef(0);
+  // IDs permanently deleted locally — filtered from fetchLeads until Airtable confirms deletion
+  const permanentlyDeletedIds = useRef(new Set());
   // Epoch increments on every write — lets fetchLeads detect if a write started mid-fetch
   const writeEpoch = useRef(0);
 
@@ -126,11 +167,15 @@ export function useLeads() {
         });
     return req
       .then(r => {
-        if (!r.ok) return r.json().then(e => { console.error('Airtable patch failed:', logFields, e); return null; });
+        if (!r.ok) return r.json().then(e => {
+          const msg = e?.error?.message || e?.message || e?.error || `HTTP ${r.status}`;
+          console.error('Airtable patch failed:', logFields, e);
+          return { __patchFailed: true, error: msg };
+        });
         console.log('Airtable synced:', logFields);
         return r.json();
       })
-      .catch(err => { console.error('Airtable sync error:', err); return null; })
+      .catch(err => { console.error('Airtable sync error:', err); return { __patchFailed: true, error: err.message }; })
       .finally(() => { pendingWrites.current--; });
   }, []);
 
@@ -162,11 +207,8 @@ export function useLeads() {
         if (!res.ok || data.error) throw new Error(data.error || `API error: ${res.status}`);
         allRecords = data.records;
       }
-      // ── Fetch revenue + refused in parallel ──────────────────────────────────
-      const [revenueRecs, refusedRecs] = await Promise.all([
-        fetchRecords(AT_TABLES.revenue),
-        fetchRecords(AT_TABLES.refused),
-      ]);
+      // ── Fetch revenue in parallel ─────────────────────────────────────────────
+      const revenueRecs = await fetchRecords(AT_TABLES.revenue);
       // Build phone → payment lookup (highest amount wins per phone)
       const paymentByPhone = {};
       revenueRecs.forEach(r => {
@@ -184,29 +226,17 @@ export function useLeads() {
           }
         }
       });
-      // Build phone → refused record ID lookup
-      const refusedByPhone = {};
-      refusedRecs.forEach(r => {
-        const phone = (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase();
-        if (phone) refusedByPhone[phone] = r.id;
-      });
 
       const all = allRecords.map(r => {
         const lead = normaliseRecord(r);
         const phoneKey = (lead.phone || '').replace(/\s/g, '').toLowerCase();
         const payment = phoneKey ? (paymentByPhone[phoneKey] || {}) : {};
-        // Cross-reference with Refused table — overrides Lead Status field
-        const refusedRecordId = phoneKey ? (refusedByPhone[phoneKey] || null) : null;
-        const merged = { ...lead, ...payment };
-        if (refusedRecordId && merged.status !== 'archived') {
-          merged.status = 'refused';
-          merged.progress = PROG_MAP['refused'] || 100;
-          merged.refusedRecordId = refusedRecordId;
-        }
-        return merged;
+        return { ...lead, ...payment };
       });
       const active  = all.filter(r => r.status !== 'archived').sort((a, b) => b.dateObj - a.dateObj);
-      const archived = all.filter(r => r.status === 'archived').sort((a, b) => b.dateObj - a.dateObj)
+      const archived = all
+        .filter(r => r.status === 'archived' && !permanentlyDeletedIds.current.has(r.airtableId))
+        .sort((a, b) => b.dateObj - a.dateObj)
         .map(r => ({ ...r, deletedAt: r.dateObj }));
       // Skip if a write started while we were fetching — our data is now stale
       if (silent && epochAtStart !== writeEpoch.current) {
@@ -220,6 +250,13 @@ export function useLeads() {
       fetchRecords(AT_TABLES.calendar).then(recs => {
         setCalBookings(recs.map(r => normaliseCalBooking(r)));
       });
+
+      // ── Fetch clients (in parallel, non-blocking) ─────────────────────────────
+      fetchRecords(AT_TABLES.clients).then(recs => {
+        const all = recs.map(r => normaliseClient(r));
+        setClients(all.filter(c => c.status !== 'Archived'));
+        setArchivedClients(all.filter(c => c.status === 'Archived'));
+      });
     } catch (err) {
       console.error('Failed to load from Airtable:', err);
       throw err;
@@ -228,34 +265,43 @@ export function useLeads() {
     }
   }, [patchAirtable]);
 
-  // ─── Awaits the PATCH so refreshing after a status change shows the new value ─
-  const changeStatus = useCallback(async (id, status) => {
-    let prevLead = null;
-    let updatedLead = null;
+  // ─── Awaits the PATCH — confirms status from Airtable response without overwriting
+  //     other fields that may have their own in-flight PATCHes (e.g. Quote Amount)
+  //
+  // NOTE: reads `leads` directly (not via setLeads extraction) because React 18
+  // automatic batching does not execute setLeads callbacks synchronously when called
+  // in async continuations (after await). Adding `leads` to deps ensures we always
+  // have the current snapshot.
+  const changeStatus = useCallback(async (id, status, extraFields = {}) => {
+    const currentLead = leads.find(l => l.id === id);
+    if (!currentLead?.airtableId) return 'Status updated';
+    const prevLead = currentLead;
+    // Optimistic update
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      prevLead = l;
-      const updated = { ...l, status, progress: PROG_MAP[status] || 10 };
-      if (status === 'completed' && !l.invoice && l.value > 0) updated.invoice = l.value;
-      updatedLead = updated;
-      return updated;
+      const extra = {};
+      if (extraFields['Quote Amount'] !== undefined) extra.value = extraFields['Quote Amount'];
+      return { ...l, status, progress: PROG_MAP[status] || 10, ...extra };
     }));
-    if (!updatedLead?.airtableId) return 'Status updated';
-    const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status };
-    if (status === 'completed' && updatedLead.invoice > 0) atFields['Final Invoice Amount'] = updatedLead.invoice;
-    const result = await patchAirtable(updatedLead.airtableId, atFields);
-    if (!result && status !== 'refused') {
-      // PATCH failed — revert optimistic update (but not for refused: Refused table is source of truth)
+    const atFields = { 'Lead Status': AT_STATUS_MAP[status] || status, ...extraFields };
+    const result = await patchAirtable(currentLead.airtableId, atFields);
+    const patchFailed = !result || result.__patchFailed;
+    if (patchFailed) {
       setLeads(prev => prev.map(l => l.id === id ? prevLead : l));
       return 'error';
     }
-    // Re-confirm status in case a background fetch ran mid-PATCH and overwrote it
-    setLeads(prev => prev.map(l => l.id !== id ? l : { ...l, status, progress: PROG_MAP[status] || 10 }));
-    // Scenario 3 → Scenario 1: lead already had payment but wasn't job_done yet — now it is
-    // Update the Revenue record Status to 'Job Done' so it counts as income in Reports
-    if (status === 'job_done' && updatedLead?.paid && updatedLead?.paidAmount > 0) {
+    // Confirm status/progress from Airtable response only — don't overwrite other fields
+    setLeads(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      const confirmed = normaliseRecord(result);
+      const confirmedStatus   = confirmed?.status   ?? status;
+      const confirmedProgress = confirmed?.progress ?? (PROG_MAP[status] || 10);
+      return { ...l, status: confirmedStatus, progress: confirmedProgress };
+    }));
+    // Scenario 3 → Scenario 1: lead had payment but wasn't job_done yet — update Revenue
+    if (status === 'job_done' && currentLead?.paid && currentLead?.paidAmount > 0) {
       fetchRecords(AT_TABLES.revenue).then(revRecs => {
-        const phone = (updatedLead.phone || '').replace(/\s/g, '').toLowerCase();
+        const phone = (currentLead.phone || '').replace(/\s/g, '').toLowerCase();
         const match = revRecs.find(r => {
           const rPhone = (r.fields?.['Phone'] || '').replace(/\s/g, '').toLowerCase();
           return rPhone === phone && parseFloat(r.fields?.['Amount'] || 0) > 0;
@@ -263,8 +309,24 @@ export function useLeads() {
         if (match) updateRecord(AT_TABLES.revenue, match.id, { 'Status': 'Job Done' });
       });
     }
+    // Mark linked calBooking as Completed when lead is set to Job Done
+    if (status === 'job_done') {
+      const phone = (currentLead.phone || '').replace(/\s/g, '').toLowerCase();
+      setCalBookings(prev => {
+        const linked = prev.find(b =>
+          b.id === currentLead.id ||
+          (b.linkedLeadId && b.linkedLeadId === id) ||
+          (phone && (b.phone || '').replace(/\s/g, '').toLowerCase() === phone)
+        );
+        if (!linked || linked.bookingStatus === 'Completed') return prev;
+        if (linked.airtableId) {
+          updateRecord(AT_TABLES.calendar, linked.airtableId, { 'Booking Status': 'Completed' });
+        }
+        return prev.map(b => b.id === linked.id ? { ...b, bookingStatus: 'Completed' } : b);
+      });
+    }
     return 'ok';
-  }, [patchAirtable]);
+  }, [patchAirtable, leads]);
 
   const toggleStar = useCallback((id) => {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, starred: !l.starred } : l));
@@ -287,11 +349,14 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const setRefuseReason = useCallback((id, reason) => {
+    let airtableId = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Refusal Reason': REFUSED_REASON_MAP[reason] || reason });
+      airtableId = l.airtableId;
       return { ...l, refuseReason: reason };
     }));
+    const mapped = REFUSED_REASON_MAP[reason] || reason;
+    return airtableId ? patchAirtable(airtableId, { 'Refusal Reason': mapped }) : Promise.resolve(null);
   }, [patchAirtable]);
 
   // ─── Save payment info ─────────────────────────────────────────────────────────
@@ -362,19 +427,23 @@ export function useLeads() {
   }, [patchAirtable]);
 
   const saveQuoteAmount = useCallback((id, amount) => {
+    let airtableId = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': amount });
+      airtableId = l.airtableId;
       return { ...l, value: amount };
     }));
+    return airtableId ? patchAirtable(airtableId, { 'Quote Amount': amount }) : Promise.resolve(null);
   }, [patchAirtable]);
 
   const clearQuoteAmount = useCallback((id) => {
+    let airtableId = null;
     setLeads(prev => prev.map(l => {
       if (l.id !== id) return l;
-      if (l.airtableId) patchAirtable(l.airtableId, { 'Quote Amount': 0 });
+      airtableId = l.airtableId;
       return { ...l, value: 0 };
     }));
+    return airtableId ? patchAirtable(airtableId, { 'Quote Amount': 0 }) : Promise.resolve(null);
   }, [patchAirtable]);
 
   // ─── Delete payment: remove Revenue record from Airtable + clear local state ──
@@ -416,7 +485,12 @@ export function useLeads() {
   const permanentDelete = useCallback((id) => {
     setDeletedLeads(prev => {
       const lead = prev.find(l => l.id === id);
-      if (lead?.airtableId) deleteRecord(AT_TABLE, lead.airtableId);
+      if (lead?.airtableId) {
+        // Register ID immediately so fetchLeads polls don't bring it back before delete completes
+        permanentlyDeletedIds.current.add(lead.airtableId);
+        // Use AT_TABLES.leads (has fallback name) instead of AT_TABLE which may be '' in production
+        deleteRecord(AT_TABLES.leads, lead.airtableId);
+      }
       return prev.filter(l => l.id !== id);
     });
   }, []);
@@ -440,23 +514,30 @@ export function useLeads() {
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const tempId = String(Date.now());
+    // Derive lp from leadSource (same logic as normaliseRecord) so badge is correct immediately
+    const srcNorm = (leadData.leadSource || '').toLowerCase().replace(/\s/g, '');
+    const derivedLp = srcNorm.includes('pearlview') ? 'LP2'
+      : (srcNorm.includes('crystalpro') || srcNorm.includes('crystal')) ? 'LP1'
+      : null;
     setLeads(prev => [{
       id: tempId, ...leadData,
-      lp: leadData.source === 'form2' || leadData.source === 'call2' ? 'LP2' : 'LP1',
+      lp: derivedLp,
       status: 'new', date: dateStr, dateObj: now,
-      address: '', jobType: 'Residential', windows: 0,
+      address: leadData.address || '', jobType: 'Residential', windows: 0,
       starred: false, notes: '', hasCall: leadData.source?.startsWith('call') || false,
       progress: 10, refuseReason: '', airtableId: null,
+      leadSource: leadData.leadSource || '',
     }, ...prev]);
     // Create record in Airtable — use dedicated endpoint (mirrors patchAirtable pattern)
     const fields = {
       'Client Name':             leadData.name,
-      'Phone Number':            leadData.phone   || '',
-      'Email':                   leadData.email   || '',
-      'Inquiry Subject/Reason':  leadData.subject || '',
+      'Phone Number':            leadData.phone      || '',
+      'Email':                   leadData.email      || '',
+      'Inquiry Subject/Reason':  leadData.subject    || '',
       'Lead Status':             'New Lead',
-      'Quote Amount':            leadData.value   || 0,
+      'Quote Amount':            leadData.value      || 0,
       'Inquiry Date':            now.toISOString(),
+      'Lead Source':             leadData.leadSource || '',
     };
     const req = IS_LOCAL
       ? fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_TABLE}`, {
@@ -479,6 +560,21 @@ export function useLeads() {
       const data = await r.json();
       if (data.id) {
         setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId: data.id } : l));
+        // Notify n8n → WhatsApp (fire-and-forget)
+        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+        if (webhookUrl) {
+          fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name:       leadData.name        || '',
+              phone:      leadData.phone       || '',
+              email:      leadData.email       || '',
+              subject:    leadData.subject     || '',
+              leadSource: leadData.leadSource  || '',
+            }),
+          }).catch(() => {});
+        }
         return data.id;
       }
       return null;
@@ -488,69 +584,189 @@ export function useLeads() {
     }
   }, []);
 
-  // ─── Write lead data to the Refused table (awaitable) ────────────────────────
-  const addRefusedRecord = useCallback(async (lead, reason) => {
-    if (!lead) return null;
-    return createRecord(AT_TABLES.refused, {
-      'Client Name':              lead.name || '',
-      'Phone Number':             lead.phone || '',
-      'Email':                    lead.email || '',
-      'Inquiry Subject/Reason':   lead.subject || '',
-      'Inquiry Date':             lead.date || '',
-      'Adress':                   lead.address || '',
-      'Notes':                    lead.notes || '',
-      'Lead Status':              'Refused',
-      'Refusal Reason':           REFUSED_REASON_MAP[reason] || '',
-    });
-  }, []);
-
-  // ─── Remove lead from Refused table — async so callers can await the delete ──
-  const deleteFromRefusedTable = useCallback(async (id) => {
-    let refusedRecordId = null;
-    let phone = null;
-    // Read lead info synchronously via functional setter
-    setLeads(prev => {
-      const lead = prev.find(l => l.id === id);
-      refusedRecordId = lead?.refusedRecordId || null;
-      phone = lead?.phone || null;
-      return prev.map(l => l.id === id ? { ...l, refusedRecordId: null } : l);
-    });
-    if (refusedRecordId) {
-      await deleteRecord(AT_TABLES.refused, refusedRecordId);
-    } else if (phone) {
-      const pn = phone.replace(/\s/g, '').toLowerCase();
-      const recs = await fetchRecords(AT_TABLES.refused);
-      const match = recs.find(r =>
-        (r.fields?.['Phone Number'] || '').replace(/\s/g, '').toLowerCase() === pn
-      );
-      if (match) await deleteRecord(AT_TABLES.refused, match.id);
+  // ─── Sync a lead's field update to the matching Clients table record ─────────
+  // phone: the lead's phone number (used for matching)
+  // atFields: Airtable field names + values to patch (e.g. { 'Client Name': 'John' })
+  // localFields: local client object keys to update (e.g. { name: 'John' })
+  const syncToClients = useCallback((phone, atFields, localFields = {}) => {
+    if (!phone) return;
+    const normalPhone = (phone || '').replace(/\s/g, '').toLowerCase();
+    const client = clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone);
+    if (client?.airtableId) {
+      updateRecord(AT_TABLES.clients, client.airtableId, atFields);
+      if (Object.keys(localFields).length) {
+        setClients(prev => prev.map(c => c.airtableId === client.airtableId ? { ...c, ...localFields } : c));
+      }
     }
+  }, [clients]);
+
+  // ─── Create a new client record in the Clients table ─────────────────────────
+  const upsertClient = useCallback(async (lead) => {
+    if (!lead?.name) return;
+    const normalPhone = (lead.phone || '').replace(/\s/g, '').toLowerCase();
+    // Deduplicate: by phone (if provided), otherwise by exact name match
+    const exists = normalPhone
+      ? clients.find(c => (c.phone || '').replace(/\s/g, '').toLowerCase() === normalPhone)
+      : clients.find(c => (c.name || '').toLowerCase().trim() === (lead.name || '').toLowerCase().trim());
+    if (exists) return; // already in Clients table
+    // Use exact Airtable Clients table field names: 'Phone Number' and 'Adress' (sic)
+    const src = lead.leadSource || (lead.lp === 'LP2' ? 'website-pearlview' : lead.lp === 'LP1' ? 'website-crystalpro' : '');
+    const newId = await createRecord(AT_TABLES.clients, {
+      'Client Name':   lead.name,
+      'Phone Number':  lead.phone   || '',
+      'Email':         lead.email   || '',
+      'Adress':        lead.address || '',
+      'City':          lead.city    || '',
+      'Notes':         lead.notes   || '',
+      'Property Type': lead.jobType || '',
+      'Lead Source':   src,
+    });
+    if (newId) {
+      setClients(prev => [...prev, {
+        id: newId, airtableId: newId,
+        name: lead.name, phone: lead.phone || '',
+        email: lead.email || '', address: lead.address || '',
+        city: lead.city || '', notes: lead.notes || '', jobType: lead.jobType || '',
+        leadSource: src, status: '',
+      }]);
+    }
+  }, [clients]);
+
+  // ─── Populate Clients table from leads ───────────────────────────────────────
+  // - Creates new Clients records for leads not already in the table
+  // - Updates Lead Source for existing clients that have it blank
+  // Returns count of records created or updated.
+  const syncClientsFromLeads = useCallback(async () => {
+    // Build a phone → client map for quick lookup
+    const phoneToClient = {};
+    const nameToClient  = {};
+    clients.forEach(c => {
+      const p = (c.phone || '').replace(/\s/g, '').toLowerCase();
+      if (p) phoneToClient[p] = c;
+      else   nameToClient[(c.name || '').toLowerCase().trim()] = c;
+    });
+
+    const toCreate = [];
+    const toUpdate = []; // existing clients missing Lead Source
+    const batchPhones = new Set();
+    const batchNames  = new Set();
+
+    leads.forEach(l => {
+      const rawName = (l.name || '').trim();
+      const displayName = (rawName && rawName !== 'Unknown' && rawName !== 'Unknown Caller')
+        ? rawName : (l.phone || null);
+      if (!displayName) return;
+
+      const phone = (l.phone || '').replace(/\s/g, '').toLowerCase();
+      const lname = displayName.toLowerCase();
+      // Use actual lead source (e.g. 'website-pearlview', 'Phone Call', 'Facebook')
+      // Fall back to LP-derived label only if leadSource is empty
+      const lpSrc = l.leadSource || (l.lp === 'LP2' ? 'website-pearlview' : 'website-crystalpro');
+
+      // Check if already exists
+      const existing = phone ? phoneToClient[phone] : nameToClient[lname];
+      if (existing) {
+        // Update Lead Source if blank
+        if (!existing.leadSource && existing.airtableId) {
+          toUpdate.push({ client: existing, lpSrc });
+        }
+        return;
+      }
+
+      // Not in Clients table — queue for creation (dedup within batch)
+      if (phone) {
+        if (batchPhones.has(phone)) return;
+        batchPhones.add(phone);
+      } else {
+        if (batchNames.has(lname)) return;
+        batchNames.add(lname);
+      }
+      toCreate.push({ ...l, name: displayName, lpSrc });
+    });
+
+    let count = 0;
+
+    // Update existing clients missing Lead Source
+    for (const { client, lpSrc } of toUpdate) {
+      updateRecord(AT_TABLES.clients, client.airtableId, { 'Lead Source': lpSrc });
+      setClients(prev => prev.map(c =>
+        c.airtableId === client.airtableId ? { ...c, leadSource: lpSrc } : c
+      ));
+      count++;
+      await new Promise(r => setTimeout(r, 220));
+    }
+
+    // Create new client records
+    const newClients = [];
+    for (const l of toCreate) {
+      const id = await createRecord(AT_TABLES.clients, {
+        'Client Name':   l.name,
+        'Phone Number':  l.phone   || '',
+        'Email':         l.email   || '',
+        'Adress':        l.address || '',
+        'City':          l.city    || '',
+        'Notes':         l.notes   || '',
+        'Property Type': l.jobType || '',
+        'Lead Source':   l.lpSrc,
+      });
+      if (id) {
+        newClients.push({
+          id, airtableId: id,
+          name: l.name, phone: l.phone || '',
+          email: l.email || '', address: l.address || '',
+          city: l.city || '', notes: l.notes || '', jobType: l.jobType || '',
+          leadSource: l.lpSrc, status: '',
+        });
+        count++;
+      }
+      await new Promise(r => setTimeout(r, 220));
+    }
+    if (newClients.length > 0) setClients(prev => [...prev, ...newClients]);
+    return count;
+  }, [clients, leads]);
+
+  // ─── Update a client record in Airtable + local state ────────────────────────
+  const updateClient = useCallback((airtableId, atFields, localFields) => {
+    updateRecord(AT_TABLES.clients, airtableId, atFields);
+    setClients(prev => prev.map(c =>
+      c.airtableId === airtableId ? { ...c, ...localFields } : c
+    ));
   }, []);
 
   // ─── Calendar booking operations ─────────────────────────────────────────────
 
   const addCalBooking = useCallback(async (data) => {
     const localId = `cal-${Date.now()}`;
+    const isFromLead = !!data.linkedLeadId;
     const record = {
       id: localId, airtableId: null,
       clientName: data.clientName || '', phone: data.phone || '',
       email: data.email || '', city: data.city || '',
       service: data.service || '', paymentMethod: data.paymentMethod || 'Cash',
-      date: data.date || '', bookingStatus: 'Scheduled', amount: data.amount || 0,
+      date: data.date || '', bookingStatus: data.bookingStatus || 'Scheduled', amount: data.amount || 0,
+      jobTime: data.jobTime || '', assignedWorker: data.assignedWorker || '',
+      upsellAmount: 0, upsellNotes: '',
       linkedLeadId: data.linkedLeadId || null,
+      bookingSource: isFromLead ? 'Lead' : 'Manual',
     };
     setCalBookings(prev => [record, ...prev]);
-    // Write to Airtable Bookings table
-    const airtableId = await createRecord(AT_TABLES.calendar, {
-      'Booking Name':   `${record.clientName} - ${record.date}`,
-      'Client Name':    record.clientName,
-      'Date':           record.date,
-      'Job_Service':    record.service,
-      'City':           record.city,
-      'Phone':          record.phone,
-      'Booking Status': 'Scheduled',
-      'Amount':         record.amount || 0,
-    });
+    // Encode source in Booking Name: "LEAD::" prefix for lead-sourced bookings
+    const bookingName = isFromLead
+      ? `LEAD::${record.clientName} - ${record.date}`
+      : `${record.clientName} - ${record.date}`;
+    const atFields = {
+      'Booking Name':    bookingName,
+      'Client Name':     record.clientName,
+      'Date':            record.date,
+      'Job_Service':     record.service,
+      'City':            record.city,
+      'Phone':           record.phone,
+      'Booking Status':  record.bookingStatus || 'Scheduled',
+      'Amount':          record.amount || 0,
+      'Job Time':        record.jobTime,
+      'Assigned Worker': record.assignedWorker,
+    };
+    const airtableId = await createRecord(AT_TABLES.calendar, atFields);
     if (airtableId) {
       setCalBookings(prev => prev.map(b => b.id === localId ? { ...b, airtableId } : b));
     }
@@ -560,7 +776,10 @@ export function useLeads() {
   const removeCalBooking = useCallback((id) => {
     setCalBookings(prev => {
       const booking = prev.find(b => b.id === id);
-      if (booking?.airtableId) deleteRecord(AT_TABLES.calendar, booking.airtableId);
+      if (booking?.airtableId) {
+        // Update status to Cancelled in Airtable (don't delete — keep for records)
+        updateRecord(AT_TABLES.calendar, booking.airtableId, { 'Booking Status': 'Cancelled' });
+      }
       return prev.filter(b => b.id !== id);
     });
   }, []);
@@ -570,12 +789,16 @@ export function useLeads() {
       const booking = prev.find(b => b.id === id);
       if (booking?.airtableId) {
         const patch = {};
-        if (data.clientName !== undefined) patch['Client Name']    = data.clientName;
-        if (data.phone      !== undefined) patch['Phone']          = data.phone;
-        if (data.city       !== undefined) patch['City']           = data.city;
-        if (data.service    !== undefined) patch['Job_Service']    = data.service;
+        if (data.clientName    !== undefined) patch['Client Name']    = data.clientName;
+        if (data.phone         !== undefined) patch['Phone']          = data.phone;
+        if (data.city          !== undefined) patch['City']           = data.city;
+        if (data.service       !== undefined) patch['Job_Service']    = data.service;
         if (data.bookingStatus !== undefined) patch['Booking Status'] = data.bookingStatus;
-        if (data.amount     !== undefined) patch['Amount']         = data.amount;
+        if (data.amount        !== undefined) patch['Amount']         = data.amount;
+        if (data.jobTime       !== undefined) patch['Job Time']       = data.jobTime;
+        if (data.assignedWorker !== undefined) patch['Assigned Worker'] = data.assignedWorker;
+        if (data.upsellAmount  !== undefined) patch['Upsell Amount']  = data.upsellAmount;
+        if (data.upsellNotes   !== undefined) patch['Upsell Notes']   = data.upsellNotes;
         if (Object.keys(patch).length) updateRecord(AT_TABLES.calendar, booking.airtableId, patch);
       }
       return prev.map(b => b.id === id ? { ...b, ...data } : b);
@@ -630,13 +853,47 @@ export function useLeads() {
     });
   }, [patchAirtable]);
 
+  // ─── Archive a client (Status = 'Archived' in Airtable, moves to archivedClients) ──
+  const archiveClient = useCallback((airtableId) => {
+    if (!airtableId) return;
+    updateRecord(AT_TABLES.clients, airtableId, { 'Status': 'Archived' });
+    setClients(prev => {
+      const client = prev.find(c => c.airtableId === airtableId);
+      if (client) setArchivedClients(d => [{ ...client, status: 'Archived' }, ...d]);
+      return prev.filter(c => c.airtableId !== airtableId);
+    });
+  }, []);
+
+  // ─── Restore an archived client back to active ────────────────────────────────
+  const restoreClient = useCallback((airtableId) => {
+    if (!airtableId) return;
+    updateRecord(AT_TABLES.clients, airtableId, { 'Status': '' });
+    setArchivedClients(prev => {
+      const client = prev.find(c => c.airtableId === airtableId);
+      if (client) setClients(d => [{ ...client, status: '' }, ...d]);
+      return prev.filter(c => c.airtableId !== airtableId);
+    });
+  }, []);
+
+  // ─── Permanently delete a client from Airtable ───────────────────────────────
+  const permanentDeleteClient = useCallback((airtableId, fromArchived = false) => {
+    if (!airtableId) return;
+    deleteRecord(AT_TABLES.clients, airtableId);
+    if (fromArchived) {
+      setArchivedClients(prev => prev.filter(c => c.airtableId !== airtableId));
+    } else {
+      setClients(prev => prev.filter(c => c.airtableId !== airtableId));
+    }
+  }, []);
+
   return {
-    leads, deletedLeads, calBookings, isLoading, fetchLeads,
+    leads, deletedLeads, calBookings, clients, isLoading, fetchLeads,
     changeStatus, toggleStar, saveNote, saveJobType,
     savePaidInfo, saveCity, saveJobDate, saveEmail, saveQuoteAmount, clearQuoteAmount,
     renameLead, setRefuseReason,
     archiveLead, permanentDelete, recoverLead, addLead,
     addCalBooking, removeCalBooking, updateCalBooking, recordBookingPayment,
-    addRefusedRecord, deleteFromRefusedTable, deletePayment,
+    deletePayment, syncToClients, upsertClient, syncClientsFromLeads, updateClient,
+    archivedClients, archiveClient, restoreClient, permanentDeleteClient,
   };
 }

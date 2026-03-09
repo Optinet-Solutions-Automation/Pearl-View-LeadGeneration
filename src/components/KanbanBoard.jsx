@@ -25,7 +25,7 @@ const STAT_LABELS = {
 };
 
 const STAT_DOT = {
-  new:        '#2563eb',
+  new:        '#0d9488',
   calls:      '#16a34a',
   quote_sent: '#7c3aed',
   refused:    '#dc2626',

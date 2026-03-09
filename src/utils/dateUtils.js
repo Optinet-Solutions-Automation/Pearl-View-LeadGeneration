@@ -8,11 +8,24 @@ export function parseDate(raw) {
 export function formatDate(raw) {
   const d = parseDate(raw);
   if (d.getTime() === 0) return raw || '—';
-  return (
-    d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ' ' +
-    d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })
-  );
+  const datePart = d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(/\s*(am|pm)$/i, m => ' ' + m.trim().toUpperCase());
+  return `${datePart} · ${timePart}`;
+}
+
+const SOURCE_LABELS = {
+  'website-pearlview':  'Pearl View',
+  'website-crystalpro': 'Crystal Pro',
+  'Phone Call':         'Phone Call',
+  'Facebook':           'Facebook',
+  'Google':             'Google',
+  'Other':              'Other',
+};
+
+export function formatLeadSource(raw) {
+  if (!raw) return null;
+  return SOURCE_LABELS[raw] || raw;
 }
 
 export function isToday(dateObj) {

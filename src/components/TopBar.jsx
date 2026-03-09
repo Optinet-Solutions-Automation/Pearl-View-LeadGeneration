@@ -42,6 +42,8 @@ export default function TopBar() {
   const [showNotifs,       setShowNotifs]       = useState(false);
   const [seenIds,          setSeenIds]          = useState(getSeenIds);
   const [dropdownSnapshot, setDropdownSnapshot] = useState([]);
+  const [bellAnim,         setBellAnim]         = useState(false);
+  const [refreshAnim,      setRefreshAnim]      = useState(false);
   const notifsRef = useRef(null);
 
   const title = PAGE_TITLES[currentPage] || 'Dashboard';
@@ -61,6 +63,7 @@ export default function TopBar() {
     const opening = !showNotifs;
     setShowNotifs(opening);
     if (opening) {
+      setBellAnim(true);
       setDropdownSnapshot([...unseenLeads]);
       if (unseenLeads.length > 0) {
         const next = new Set(seenIds);
@@ -69,6 +72,11 @@ export default function TopBar() {
         saveSeenIds(next);
       }
     }
+  }
+
+  function handleRefreshClick() {
+    setRefreshAnim(true);
+    refetch();
   }
 
   // Close when clicking outside
@@ -117,10 +125,14 @@ export default function TopBar() {
         <button
           className="notif-btn"
           title="Refresh from Airtable"
-          onClick={() => refetch()}
-          style={{ background: 'var(--blue-50)', border: '1.5px solid var(--blue-200)' }}
+          onClick={handleRefreshClick}
         >
-          <svg fill="none" viewBox="0 0 24 24" stroke="var(--primary)" strokeWidth="2" style={{ width: '15px', height: '15px' }}>
+          <svg
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+            style={{ width: '15px', height: '15px' }}
+            className={refreshAnim ? 'refresh-animate' : ''}
+            onAnimationEnd={() => setRefreshAnim(false)}
+          >
             <path d="M23 4v6h-6M1 20v-6h6"/>
             <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
           </svg>
@@ -141,11 +153,18 @@ export default function TopBar() {
               ? `${badgeCount} new lead${badgeCount !== 1 ? 's' : ''} today`
               : 'No new leads today'}
           >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+            <svg
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+              style={{ width: '16px', height: '16px' }}
+              className={bellAnim ? 'bell-animate' : ''}
+              onAnimationEnd={() => setBellAnim(false)}
+            >
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
             </svg>
             {badgeCount > 0 && (
-              <span className="notif-badge">{badgeCount > 9 ? '9+' : badgeCount}</span>
+              <span className="notif-badge" style={{ animation: 'pulse-dot 2s ease-in-out infinite' }}>
+                {badgeCount > 9 ? '9+' : badgeCount}
+              </span>
             )}
           </button>
 
@@ -181,11 +200,11 @@ export default function TopBar() {
                           </svg>
                         ) : (
                           /* Form icon for web form leads */
-                          <svg fill="none" viewBox="0 0 24 24" stroke="#2563eb" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
+                          <svg fill="none" viewBox="0 0 24 24" stroke="var(--primary)" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
                             <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                           </svg>
                         )}
-                        <span className="notif-item-dot" style={{ background: l.hasCall ? '#16a34a' : '#2563eb' }} />
+                        <span className="notif-item-dot" style={{ background: l.hasCall ? '#16a34a' : '#0d9488' }} />
                       </div>
                       <div className="notif-item-body">
                         <div className="notif-item-name">
@@ -193,8 +212,8 @@ export default function TopBar() {
                           <span style={{
                             marginLeft: '6px', fontSize: '9px', fontWeight: 700,
                             padding: '1px 5px', borderRadius: '20px', textTransform: 'uppercase',
-                            background: l.hasCall ? '#dcfce7' : '#dbeafe',
-                            color: l.hasCall ? '#15803d' : '#1d4ed8',
+                            background: l.hasCall ? '#dcfce7' : '#ccfbf1',
+                            color: l.hasCall ? '#15803d' : '#0f766e',
                           }}>
                             {l.hasCall ? 'Call' : 'Form'}
                           </span>

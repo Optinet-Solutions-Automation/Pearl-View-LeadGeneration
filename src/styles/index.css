@@ -1,46 +1,53 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar:       #0c2340;
-  --sidebar-hover: #162f4d;
-  --sidebar-active:#1d4ed8;
-  --primary:       #2563eb;
-  --primary-dk:    #1d4ed8;
-  --primary-lt:    #3b82f6;
-  --blue-50:       #eff6ff;
-  --blue-100:      #dbeafe;
-  --blue-200:      #bfdbfe;
+  /* Nature theme — Light Mode */
+  --bg:            #f8f5f0;
+  --surface:       #ffffff;
+  --sidebar:       #1b3a1f;
+  --sidebar-hover: #243e28;
+  --sidebar-active:#2d5030;
+  --primary:       #2e7d32;
+  --primary-dk:    #1b5e20;
+  --primary-lt:    #4caf50;
+  --blue-50:       #f1f8e9;
+  --blue-100:      #dcedc8;
+  --blue-200:      #aed581;
   --white:         #ffffff;
-  --gray-50:       #f8fafc;
-  --gray-100:      #f1f5f9;
-  --gray-200:      #e2e8f0;
-  --gray-300:      #cbd5e1;
-  --gray-400:      #94a3b8;
-  --gray-500:      #64748b;
-  --gray-600:      #475569;
-  --gray-700:      #334155;
-  --gray-800:      #1e293b;
-  --gray-900:      #0f172a;
-  --green:         #16a34a;
+  --gray-50:       #fafaf8;
+  --gray-100:      #f3f0eb;
+  --gray-200:      #e5e0d8;
+  --gray-300:      #ccc8be;
+  --gray-400:      #9e9a8e;
+  --gray-500:      #736e62;
+  --gray-600:      #5c5750;
+  --gray-700:      #3e3a34;
+  --gray-800:      #3e2723;
+  --gray-900:      #1a120e;
+  --green:         #2e7d32;
   --amber:         #d97706;
-  --red:           #dc2626;
-  --purple:        #7c3aed;
-  --teal:          #0d9488;
+  --red:           #c62828;
+  --purple:        #6a1b9a;
+  --teal:          #2e7d32;
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background: var(--blue-50);
+  font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+  background: var(--bg);
   color: var(--gray-800);
   display: flex;
-  height: 100vh;
+  /* 100dvh = dynamic viewport height — respects Android address bar & gesture nav */
+  height: 100dvh;
+  height: 100vh; /* fallback for older browsers */
   overflow: hidden;
   font-size: 13.5px;
+  overscroll-behavior: none; /* prevent Android/iOS bounce scrolling */
 }
 
 #root {
   display: flex;
   width: 100%;
+  height: 100dvh;
   height: 100vh;
   overflow: hidden;
 }
@@ -91,7 +98,7 @@ body {
 .nav-item.active::before {
   content: ''; position: absolute;
   left: 0; top: 0; bottom: 0; width: 3px;
-  background: #60a5fa; border-radius: 0 2px 2px 0;
+  background: #a5d6a7; border-radius: 0 2px 2px 0;
 }
 .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; opacity: .75; }
 .nav-item.active svg, .nav-item:hover svg { opacity: 1; }
@@ -234,8 +241,8 @@ body {
   border: 1.5px solid transparent;
   cursor: pointer; transition: border-color .15s, box-shadow .15s;
 }
-.card:hover { border-color: var(--blue-200); box-shadow: 0 2px 8px rgba(37,99,235,.09); }
-.card.active { border-color: var(--primary); box-shadow: 0 2px 12px rgba(37,99,235,.13); }
+.card:hover { border-color: var(--blue-200); box-shadow: 0 2px 8px rgba(13,148,136,.12); }
+.card.active { border-color: var(--primary); box-shadow: 0 2px 12px rgba(13,148,136,.18); }
 .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 5px; }
 .card-name { font-size: 12.5px; font-weight: 700; color: var(--gray-900); line-height: 1.3; }
 .star { font-size: 13px; cursor: pointer; color: var(--gray-300); flex-shrink: 0; line-height: 1; margin-left: 3px; background: none; border: none; padding: 0; }
@@ -245,7 +252,7 @@ body {
   font-size: 10px; font-weight: 700; padding: 2px 6px;
   border-radius: 20px; white-space: nowrap;
 }
-.tag-form1 { background: #dbeafe; color: #1d4ed8; }
+.tag-form1 { background: #ccfbf1; color: #0f766e; }
 .tag-form2 { background: #ede9fe; color: #6d28d9; }
 .tag-call  { background: #d1fae5; color: #065f46; }
 .tag-sent  { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
@@ -386,12 +393,14 @@ body {
 .overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,.45); z-index: 200;
-  align-items: center; justify-content: center;
+  align-items: flex-end; justify-content: center;
+  overflow-y: auto;
 }
 .overlay.open { display: flex; }
 .modal {
-  background: #fff; border-radius: 16px; padding: 26px;
-  width: 460px; max-height: 80vh; overflow-y: auto;
+  background: #fff; border-radius: 16px 16px 0 0; padding: 26px;
+  padding-bottom: max(26px, env(safe-area-inset-bottom, 26px));
+  width: min(480px, 100vw); max-height: 90dvh; overflow-y: auto;
 }
 .modal-title { font-size: 17px; font-weight: 700; color: var(--gray-900); margin-bottom: 18px; }
 .fgroup { margin-bottom: 13px; }
@@ -404,6 +413,16 @@ body {
 }
 .ftextarea { min-height: 70px; resize: vertical; }
 .finput:focus, .fselect:focus, .ftextarea:focus { border-color: var(--primary); }
+/* Uniform height for native date/time/number inputs */
+.finput[type="date"],
+.finput[type="time"],
+.finput[type="number"] {
+  height: 38px;
+  line-height: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
 .modal-footer { display: flex; gap: 9px; justify-content: flex-end; margin-top: 18px; }
 .btn-cancel {
   padding: 8px 16px; border: 1.5px solid var(--gray-200);
@@ -428,6 +447,23 @@ body {
   animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0deg); }
+  10%       { transform: rotate(14deg); }
+  20%       { transform: rotate(-12deg); }
+  30%       { transform: rotate(10deg); }
+  40%       { transform: rotate(-8deg); }
+  50%       { transform: rotate(6deg); }
+  60%       { transform: rotate(-4deg); }
+  70%       { transform: rotate(2deg); }
+  80%       { transform: rotate(-1deg); }
+}
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.35); opacity: .7; }
+}
+.bell-animate    { animation: bell-ring 0.9s ease forwards; transform-origin: 50% 2px; }
+.refresh-animate { animation: spin 0.65s linear; }
 
 /* ── TOAST ───────────────────────────────── */
 .toast {
@@ -760,7 +796,7 @@ body {
 }
 .stat-clickable:hover {
   border-color: var(--blue-200);
-  box-shadow: 0 2px 10px rgba(37,99,235,.10);
+  box-shadow: 0 2px 10px rgba(13,148,136,.12);
   transform: translateY(-1px);
 }
 .stat-active {
@@ -817,9 +853,82 @@ body {
 .refresh-btn:hover { background: var(--gray-200); color: var(--gray-800); }
 .refresh-btn svg { width: 15px; height: 15px; }
 
+/* ── Hide bottom nav + FAB when mobile keyboard is open ─ */
+body.keyboard-open .mobile-bottom-nav { display: none !important; }
+body.keyboard-open .fab              { display: none !important; }
+
+/* ── FAB (Floating Action Button) ───────── */
+.fab {
+  display: none;
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 52px; height: 52px;
+  background: var(--primary);
+  color: #fff;
+  border: none; border-radius: 50%;
+  box-shadow: 0 4px 18px rgba(13,148,136,.45);
+  cursor: pointer;
+  align-items: center; justify-content: center;
+  z-index: 115;
+  transition: transform .15s ease, box-shadow .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fab:active { transform: scale(.92); box-shadow: 0 2px 8px rgba(13,148,136,.3); }
+
+/* ── Pull-to-refresh ─────────────────────── */
+.ptr-indicator {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  height: 44px;
+  font-size: 12px; font-weight: 600; color: var(--primary);
+  pointer-events: none;
+}
+.ptr-indicator svg { color: var(--primary); }
+
+/* ── MOBILE BOTTOM NAV ───────────────────── */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #fff; border-top: 1px solid var(--gray-200);
+  z-index: 120;
+  /* 58px nav height + safe area for phones with gesture nav / notches */
+  height: calc(58px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  align-items: flex-start; justify-content: space-around;
+  padding-left: 4px; padding-right: 4px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+}
+.mobile-nav-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; height: 58px; gap: 2px;
+  background: none; border: none; cursor: pointer; padding: 6px 4px 8px;
+  color: var(--gray-400); transition: color .15s; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-nav-tab.active { color: var(--primary); }
+.mobile-nav-icon { position: relative; }
+.mobile-nav-badge {
+  position: absolute; top: -5px; right: -8px;
+  background: var(--red); color: #fff;
+  font-size: 8.5px; font-weight: 800;
+  border-radius: 20px; border: 1.5px solid #fff;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+.mobile-nav-label { font-size: 9.5px; font-weight: 600; line-height: 1; }
+
 /* ── MOBILE ──────────────────────────────── */
 @media (max-width: 768px) {
-  .burger-btn { display: flex; }
+  /* Burger hidden — navigation handled by bottom nav "More" tab */
+  .burger-btn { display: none; }
+  .mobile-bottom-nav { display: flex; }
+  .fab { display: flex; }
+
+  /* Prevent iOS Safari from auto-zooming when inputs are focused.
+     iOS zooms in when font-size < 16px — override to 16px on mobile. */
+  input, select, textarea { font-size: 16px !important; }
 
   .sidebar {
     position: fixed; top: 0; left: -220px; height: 100vh;
@@ -830,6 +939,8 @@ body {
   .stats { grid-template-columns: repeat(2, 1fr); }
 
   .panel.open { width: 100%; position: fixed; inset: 0; z-index: 150; }
+  /* 24px minimum ensures action buttons clear the system nav bar on Android */
+  .panel.open .panel-body { padding-bottom: max(env(safe-area-inset-bottom, 24px), 24px); }
 
   /* Kanban: horizontal scroll so all columns remain visible */
   .board {
@@ -859,6 +970,13 @@ body {
   .col-modal-footer { flex-wrap: wrap; gap: 8px; }
   .pg-info { width: 100%; text-align: center; }
   .pg-controls { width: 100%; justify-content: center; }
+
+  /* Padding so content isn't hidden behind bottom nav + Android gesture bar.
+     20px fallback covers Android devices that report env()=0 but still have a gesture nav bar. */
+  .page { padding-bottom: max(calc(36px + 58px + env(safe-area-inset-bottom, 20px)), 120px); }
+
+  /* Toast above bottom nav */
+  .toast { bottom: calc(16px + 58px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 520px) {
@@ -880,8 +998,8 @@ body {
   .stat-val  { font-size: 20px; }
   .stat-lbl  { font-size: 10px; }
 
-  /* Tighter page padding to maximise content width */
-  .page { padding: 12px 14px; gap: 12px; }
+  /* Tighter page padding to maximise content width (preserve bottom padding for nav bar + safe area) */
+  .page { padding: 12px 14px max(calc(36px + 58px + env(safe-area-inset-bottom, 20px)), 120px); gap: 12px; }
 
   /* Board header */
   .board-title { font-size: 13.5px; }
@@ -941,7 +1059,35 @@ body {
 
   /* Notification dropdown: wider on small screens */
   .notif-dropdown { width: calc(100vw - 24px); right: -50px; }
+
+  /* ── Calendar booking table → card layout ── */
+  /* Remove the overflowX scroll container so vertical scroll isn't blocked */
+  .cal-book-wrap { overflow-x: unset !important; }
+  .cal-book-table { display: block; }
+  .cal-book-table thead { display: none; }
+  .cal-book-table tbody { display: block; }
+  .cal-book-tr {
+    display: flex !important;
+    align-items: center;
+    gap: 0;
+    padding: 11px 14px !important;
+    min-height: 52px;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  /* All td: strip table padding (overrides inline styles) */
+  .cal-book-tr td { padding: 0 !important; border: none; vertical-align: middle; }
+  .cal-td-date   { flex-shrink: 0; margin-right: 12px; }
+  .cal-td-client { flex: 1; min-width: 0; font-size: 13px !important; }
+  .cal-td-phone  { display: none !important; }  /* tapping the row opens the full detail */
+  .cal-td-service { display: none !important; } /* shown inside the modal instead */
+  .cal-td-time   { display: none !important; }
+  .cal-td-status { flex-shrink: 0; margin-left: 8px; }
+  .cal-td-amount { flex-shrink: 0; margin-left: 8px; text-align: right !important; font-size: 12.5px; }
 }
+
+/* ── CALENDAR BOOKING TABLE (base) ──────── */
+/* Allow horizontal scroll on desktop/tablet, but don't block parent scroll on mobile */
+.cal-book-wrap { overflow-x: auto; touch-action: pan-y; }
 
 /* ── OVERVIEW LP CARDS ───────────────────── */
 .lp-grid {
@@ -1223,3 +1369,167 @@ body {
     grid-column: auto;
   }
 }
+
+/* ── Design polish ──────────────────────────────────────────────────────── */
+
+/* Better card shadows (light mode) */
+.card {
+  box-shadow: 0 1px 3px rgba(62,39,35,.04), 0 2px 8px rgba(62,39,35,.04);
+  transition: border-color .15s, box-shadow .2s, transform .15s;
+}
+.card:hover {
+  border-color: var(--blue-200);
+  box-shadow: 0 4px 20px rgba(46,125,50,.12);
+  transform: translateY(-1px);
+}
+.card.active {
+  border-color: var(--primary);
+  box-shadow: 0 4px 20px rgba(46,125,50,.2);
+}
+
+/* Stat cards — left accent bar */
+.stat-card {
+  box-shadow: 0 1px 3px rgba(62,39,35,.05), 0 2px 8px rgba(62,39,35,.04);
+  transition: box-shadow .2s, transform .15s;
+}
+.stat-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(46,125,50,.14) !important;
+}
+
+/* Topbar shadow (no border line) */
+.topbar {
+  box-shadow: 0 1px 0 var(--gray-200), 0 2px 12px rgba(62,39,35,.06);
+}
+
+/* Bottom nav glass effect */
+.mobile-bottom-nav {
+  box-shadow: 0 -2px 20px rgba(62,39,35,.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255,255,255,.92) !important;
+}
+
+/* FAB shadow with green glow */
+.fab {
+  box-shadow: 0 4px 18px rgba(46,125,50,.45), 0 0 0 0 rgba(46,125,50,0);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.fab:hover {
+  box-shadow: 0 6px 24px rgba(46,125,50,.55);
+  transform: scale(1.06);
+}
+.fab:active {
+  transform: scale(.92);
+  box-shadow: 0 2px 8px rgba(46,125,50,.3);
+}
+
+/* Sidebar subtle gradient overlay */
+.sidebar {
+  background: linear-gradient(180deg, #1b3a1f 0%, #162e1a 100%);
+}
+
+/* Notif dropdown shadow */
+.notif-dropdown {
+  box-shadow: 0 8px 40px rgba(62,39,35,.18), 0 2px 8px rgba(62,39,35,.1);
+}
+
+/* Modal shadow */
+.modal {
+  box-shadow: 0 20px 60px rgba(62,39,35,.2), 0 4px 16px rgba(62,39,35,.1);
+}
+
+/* Action button micro interaction */
+.action-btn {
+  transition: opacity .15s, transform .1s;
+}
+.action-btn:hover { opacity: .9; transform: translateY(-1px); }
+.action-btn:active { transform: scale(.97); }
+
+/* Panel header subtle bg */
+.panel-hdr {
+  background: var(--gray-50);
+}
+
+/* ── MOBILE BOTTOM NAV — Active tab indicator ───────────────────────────────
+   Adds a green capsule at the top of the active tab (native-app style)
+   ─────────────────────────────────────────────────────────────────────────── */
+.mobile-nav-tab { position: relative; }
+.mobile-nav-tab.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 6px 6px;
+}
+.mobile-nav-tab.active .mobile-nav-label {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ── SEARCH — Pill-shaped input ─────────────────────────────────────────── */
+.search-wrap input {
+  border-radius: 24px;
+  padding-left: 36px;
+}
+
+/* ── BTN-NEW — Pill shape + shadow ─────────────────────────────────────── */
+.btn-new {
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(46,125,50,.28);
+  letter-spacing: 0.01em;
+}
+
+/* ── VIEW BTN — Solid primary CTA ──────────────────────────────────────── */
+.view-btn {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  border-radius: 8px !important;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.view-btn:hover {
+  background: var(--primary-dk) !important;
+  border-color: var(--primary-dk) !important;
+}
+
+/* ── TAGS — Slightly more padding + letter spacing ──────────────────────── */
+.tag {
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
+
+/* ── LEAD CARD — Refined border radius + hover shadow ───────────────────── */
+.card {
+  border-radius: 12px;
+}
+
+/* ── STAT CARD — Accent left border + rounded corners ──────────────────── */
+.stat-card {
+  border-radius: 14px;
+  border-left: 3px solid var(--primary);
+}
+
+/* ── NOTIF BTN — Rounder, smooth hover ─────────────────────────────────── */
+.notif-btn {
+  border-radius: 10px;
+  transition: background .15s, color .15s, transform .1s;
+}
+.notif-btn:hover { background: var(--gray-200); color: var(--gray-700); transform: scale(1.05); }
+
+/* ── CTRL BTN — Rounder ─────────────────────────────────────────────────── */
+.ctrl-btn { border-radius: 10px; }
+
+/* ── COL HEADER — Tighter accent dot ───────────────────────────────────── */
+.col-dot { width: 9px; height: 9px; }
+
+/* ── AVATAR — Subtle ring ───────────────────────────────────────────────── */
+.avatar {
+  box-shadow: 0 0 0 2px rgba(46,125,50,.2);
+}
+
