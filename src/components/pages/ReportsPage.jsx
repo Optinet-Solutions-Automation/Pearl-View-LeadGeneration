@@ -173,6 +173,8 @@ export default function ReportsPage() {
   const maxCat     = Math.max(...Object.values(byCategory), 1);
 
   const outstandingLeads = leads.filter(l => l.status === 'job_done' && !l.paid && inRange(l.date));
+  const jobDoneLeads     = leads.filter(l => l.status === 'job_done' && inRange(l.date))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
   const rangeLabel = RANGES.find(r => r.id === range)?.label || '';
 
   if (isLoading) {
@@ -454,6 +456,44 @@ export default function ReportsPage() {
       {/* ── Transactions tab ── */}
       {activeTab === 'transactions' && (
         <>
+          {/* Job Done Leads from Kanban */}
+          {jobDoneLeads.length > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <div style={cardHdr2}>Job Done Leads</div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>All completed jobs from the pipeline</div>
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#15803d', borderRadius: '20px', padding: '3px 10px', border: '1px solid #bbf7d0' }}>
+                  {jobDoneLeads.length} job{jobDoneLeads.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {jobDoneLeads.map((l, i) => {
+                const src = l.leadSource || (l.hasCall ? 'Phone Call' : 'Other');
+                const sm  = getSourceMeta(src);
+                return (
+                  <div key={l.id} style={{ padding: '11px 0', borderBottom: i < jobDoneLeads.length - 1 ? '1px solid var(--gray-100)' : 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)' }}>{l.name}</span>
+                        <span style={{ fontSize: '9px', fontWeight: 700, background: sm.bg, color: sm.color, padding: '1px 5px', borderRadius: '6px' }}>{sm.label.toUpperCase()}</span>
+                        {l.paid && <span style={{ fontSize: '9px', fontWeight: 700, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '1px 5px', borderRadius: '6px' }}>PAID</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '3px' }}>
+                        {new Date(l.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {l.jobType ? ` · ${l.jobType}` : ''}
+                        {l.phone ? ` · ${l.phone}` : ''}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 800, color: l.value > 0 ? '#15803d' : 'var(--gray-400)', fontSize: '15px', flexShrink: 0 }}>
+                      {l.value > 0 ? `$${l.value.toLocaleString('en-AU', { minimumFractionDigits: 2 })}` : '—'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {filteredRevenue.length > 0 ? (
             <div style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -494,9 +534,9 @@ export default function ReportsPage() {
                 );
               })}
             </div>
-          ) : (
-            <EmptyState />
-          )}
+          ) : null}
+
+          {jobDoneLeads.length === 0 && filteredRevenue.length === 0 && <EmptyState />}
         </>
       )}
     </div>
