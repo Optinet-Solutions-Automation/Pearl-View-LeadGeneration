@@ -40,6 +40,8 @@ export default function KanbanBoard() {
   const [visibleCols,    setVisibleCols]    = useState(() => new Set(ALL_COLS.map(c => c.key)));
   const [showColPicker,  setShowColPicker]  = useState(false);
   const pickerRef = useRef(null);
+  const boardRef  = useRef(null);
+  const dragState = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false });
 
   // When a stat filter is activated, close any open column table
   useEffect(() => {
@@ -272,7 +274,31 @@ export default function KanbanBoard() {
         </div>
       ) : (
         /* ── Kanban board — shown when no filter/column is selected ── */
-        <div className="board">
+        <div
+          className="board"
+          ref={boardRef}
+          onMouseDown={e => {
+            if (window.innerWidth > 1338) return;
+            dragState.current = { active: true, startX: e.pageX - boardRef.current.offsetLeft, scrollLeft: boardRef.current.scrollLeft, moved: false };
+            boardRef.current.style.cursor = 'grabbing';
+            boardRef.current.style.userSelect = 'none';
+          }}
+          onMouseMove={e => {
+            if (!dragState.current.active) return;
+            const x    = e.pageX - boardRef.current.offsetLeft;
+            const walk = x - dragState.current.startX;
+            if (Math.abs(walk) > 4) dragState.current.moved = true;
+            boardRef.current.scrollLeft = dragState.current.scrollLeft - walk;
+          }}
+          onMouseUp={() => {
+            dragState.current.active = false;
+            if (boardRef.current) { boardRef.current.style.cursor = ''; boardRef.current.style.userSelect = ''; }
+          }}
+          onMouseLeave={() => {
+            dragState.current.active = false;
+            if (boardRef.current) { boardRef.current.style.cursor = ''; boardRef.current.style.userSelect = ''; }
+          }}
+        >
           {COLS.map(col => (
             <KanbanColumn
               key={col.id}

@@ -203,7 +203,9 @@ body {
     grid-template-columns: repeat(7, 210px);
     overflow-x: auto;
     padding-bottom: 8px;
+    cursor: grab;
   }
+  .board:active { cursor: grabbing; }
 }
 .col {
   background: var(--gray-100); border-radius: 12px;
