@@ -103,11 +103,21 @@ const SOURCE_META_OV = {
   'Other':              { label: 'Other',        color: '#6b7280', bg: '#f9fafb' },
 };
 
+function ageBadge(dateObj) {
+  if (!dateObj) return { label: '—', color: 'var(--gray-400)', bg: 'var(--gray-100)' };
+  const days = (Date.now() - dateObj.getTime()) / 86400000;
+  if (days < 2)  return { label: ageLabel(dateObj), color: '#15803d', bg: '#f0fdf4' };
+  if (days < 5)  return { label: ageLabel(dateObj), color: '#92400e', bg: '#fffbeb' };
+  return           { label: ageLabel(dateObj), color: '#991b1b', bg: '#fef2f2' };
+}
+
 export default function OverviewPage() {
   const { leads, calBookings, openPanel, setCurrentPage } = useLeadsContext();
 
   // Status buckets
-  const newLeads  = leads.filter(l => l.status === 'new');
+  const newLeads   = leads.filter(l => l.status === 'new');
+  const inProgress = leads.filter(l => l.status === 'in_progress')
+    .sort((a, b) => (a.dateObj || 0) - (b.dateObj || 0)); // oldest first
   const quoteSent = leads.filter(l => l.status === 'quote_sent');
   const jobDone = leads.filter(l => l.status === 'job_done');
 
@@ -182,6 +192,44 @@ export default function OverviewPage() {
           <div style={{ fontSize: '10px', color: pendingRevenue > 0 ? '#d97706' : 'var(--gray-400)', marginTop: '4px' }}>{quoteSent.length} quotes open</div>
         </div>
       </div>
+
+      {/* ── In Progress ── */}
+      {inProgress.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #bfdbfe', padding: '16px 18px' }}>
+          <SectionHeader title="In Progress" count={inProgress.length} countColor="#2563eb" />
+          {inProgress.slice(0, 6).map(l => {
+            const badge = ageBadge(l.dateObj);
+            return (
+              <div
+                key={l.id}
+                onClick={() => goToLead(l.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer' }}
+              >
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#2563eb', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gray-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '1px' }}>{l.phone || l.subject || '—'}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, background: badge.bg, color: badge.color, borderRadius: '20px', padding: '2px 7px', whiteSpace: 'nowrap' }}>
+                    {badge.label}
+                  </span>
+                  {l.phone && (
+                    <a href={`tel:${l.phone}`} onClick={e => e.stopPropagation()} style={{ fontSize: '11px', color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+                      Call
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {inProgress.length > 6 && (
+            <div style={{ fontSize: '11px', color: 'var(--primary)', cursor: 'pointer', marginTop: '8px', fontWeight: 600 }} onClick={() => setCurrentPage('leads')}>
+              +{inProgress.length - 6} more →
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Needs Attention ── */}
       {totalActions > 0 && (
