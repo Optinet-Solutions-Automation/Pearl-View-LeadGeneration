@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { fetchRecords, AT_TABLES } from '../../utils/airtableSync';
 
@@ -29,6 +29,402 @@ function startOf(type) {
   if (type === 'month') { d.setDate(1); d.setHours(0,0,0,0); return d; }
   if (type === 'year')  { d.setMonth(0,1); d.setHours(0,0,0,0); return d; }
   return null;
+}
+
+// ── Finance chart helpers ─────────────────────────────────────────────────────
+function smoothPath(pts) {
+  if (!pts || pts.length < 2) return '';
+  if (pts.length === 2) return `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)} L${pts[1][0].toFixed(1)},${pts[1][1].toFixed(1)}`;
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const cp1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1);
+    const cp1y = (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1);
+    const cp2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1);
+    const cp2y = (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1);
+    d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${(+p2[0]).toFixed(1)},${(+p2[1]).toFixed(1)}`;
+  }
+  return d;
+}
+
+function buildPeriods(range, from, to, revenues, expenses) {
+  if (!from || !to) return [];
+  const rev = revenues || [], exp = expenses || [];
+  if (range === 'year') {
+    return Array.from({ length: 12 }, (_, m) => {
+      const s = new Date(from.getFullYear(), m, 1);
+      const e = new Date(from.getFullYear(), m + 1, 0, 23, 59, 59);
+      const label = s.toLocaleDateString('en-AU', { month: 'short' });
+      const income = rev.filter(r => { const d = new Date(r.date); return d >= s && d <= e; }).reduce((a, r) => a + r.amount, 0);
+      const expAmt = exp.filter(r => { const d = new Date(r.date); return d >= s && d <= e; }).reduce((a, e) => a + e.amount, 0);
+      return { label, income, exp: expAmt };
+    });
+  }
+  const result = [];
+  const cur = new Date(from); cur.setHours(0, 0, 0, 0);
+  const end = new Date(to);   end.setHours(23, 59, 59, 999);
+  while (cur <= end) {
+    const ds = cur.toDateString();
+    const income = rev.filter(r => new Date(r.date).toDateString() === ds).reduce((a, r) => a + r.amount, 0);
+    const expAmt = exp.filter(r => new Date(r.date).toDateString() === ds).reduce((a, e) => a + e.amount, 0);
+    const label = range === 'week'
+      ? cur.toLocaleDateString('en-AU', { weekday: 'short' })
+      : (result.length === 0 || cur.getDate() === 1
+          ? cur.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+          : String(cur.getDate()));
+    result.push({ label, income, exp: expAmt });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return result;
+}
+
+// ── Expense category line chart helpers ──────────────────────────────────────
+const CAT_COLORS = ['#2563eb', '#0d9488', '#dc2626', '#d97706', '#7c3aed', '#ea580c', '#0891b2', '#16a34a', '#f43f5e'];
+
+function buildExpensePeriods(range, from, to, expenses) {
+  if (!from || !to || !expenses.length) return { labels: [], series: [] };
+  const cats = [...new Set(expenses.map(e => e.category))].filter(Boolean);
+  if (range === 'year') {
+    const labels = Array.from({ length: 12 }, (_, m) =>
+      new Date(from.getFullYear(), m, 1).toLocaleDateString('en-AU', { month: 'short' })
+    );
+    return {
+      labels,
+      series: cats.map(cat => ({
+        label: cat,
+        data: Array.from({ length: 12 }, (_, m) => {
+          const s = new Date(from.getFullYear(), m, 1);
+          const e = new Date(from.getFullYear(), m + 1, 0, 23, 59, 59);
+          return expenses.filter(ex => ex.category === cat && new Date(ex.date) >= s && new Date(ex.date) <= e).reduce((a, ex) => a + ex.amount, 0);
+        }),
+      })),
+    };
+  }
+  const labels = [];
+  const seriesData = Object.fromEntries(cats.map(c => [c, []]));
+  const cur = new Date(from); cur.setHours(0, 0, 0, 0);
+  const end = new Date(to);   end.setHours(23, 59, 59, 999);
+  while (cur <= end) {
+    const ds = cur.toDateString();
+    const label = range === 'week'
+      ? cur.toLocaleDateString('en-AU', { weekday: 'short' })
+      : (labels.length === 0 || cur.getDate() === 1
+          ? cur.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+          : String(cur.getDate()));
+    labels.push(label);
+    cats.forEach(cat => {
+      seriesData[cat].push(expenses.filter(e => e.category === cat && new Date(e.date).toDateString() === ds).reduce((a, e) => a + e.amount, 0));
+    });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return { labels, series: cats.map(c => ({ label: c, data: seriesData[c] })) };
+}
+
+function ExpensesLineChart({ expenses, range, from, to }) {
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const W = 320, H = 160, PL = 4, PR = 4, PT = 26, PB = 26;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const floorY = PT + cH;
+
+  const { labels, series } = useMemo(
+    () => buildExpensePeriods(range, from, to, expenses),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, from?.getTime(), to?.getTime(), expenses]
+  );
+
+  const activeSeries = series.filter(s => s.data.some(v => v > 0));
+  const hasData = activeSeries.length > 0;
+
+  const n       = (hasData ? labels : ['']).length || 1;
+  const rawMax  = hasData ? Math.max(...activeSeries.flatMap(s => s.data), 1) : 1;
+  const niceStep = (() => {
+    const rough = rawMax / 4;
+    const exp   = Math.pow(10, Math.floor(Math.log10(rough)));
+    return [1, 2, 2.5, 5, 10].map(s => s * exp).find(s => s >= rough) || exp * 10;
+  })();
+  const maxVal = Math.ceil(rawMax / niceStep) * niceStep;
+  const xOf = i => PL + (n <= 1 ? cW / 2 : (i / (n - 1)) * cW);
+  const yOf = v => PT + cH - (v / maxVal) * cH;
+  const yTicks = Array.from({ length: 5 }, (_, i) => {
+    const v = niceStep * i;
+    return { y: yOf(v), label: v >= 1000 ? `$${(v/1000).toFixed(v%1000===0?0:1)}k` : `$${Math.round(v)}` };
+  });
+  const labelEvery = n <= 31 ? 1 : n <= 60 ? 2 : Math.ceil(n / 12);
+  const hX = hoverIdx !== null ? xOf(hoverIdx) : null;
+  const tipPct = hoverIdx !== null ? (xOf(hoverIdx) / W * 100) : 50;
+
+  function onMove(e) {
+    const r     = e.currentTarget.getBoundingClientRect();
+    const svgX  = ((e.clientX - r.left) / r.width) * W;
+    const plotX = Math.max(0, Math.min(cW, svgX - PL));
+    setHoverIdx(Math.max(0, Math.min(n - 1, Math.round((plotX / cW) * (n - 1)))));
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--gray-200)', padding: '16px 16px 10px', marginBottom: '14px' }}>
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '6px' }}>Total Expenses</div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {activeSeries.map((s, idx) => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ width: '14px', height: '2.5px', background: CAT_COLORS[idx % CAT_COLORS.length], borderRadius: '2px' }} />
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--gray-500)' }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        {hoverIdx !== null && (
+          <div style={{
+            position: 'absolute', top: '2px', zIndex: 20, pointerEvents: 'none',
+            left: `clamp(60px, ${tipPct}%, calc(100% - 60px))`,
+            transform: 'translateX(-50%)',
+            background: '#1e293b', color: '#fff',
+            fontSize: '9.5px', fontWeight: 600,
+            padding: '8px 12px', borderRadius: '10px',
+            lineHeight: 1.9, whiteSpace: 'nowrap',
+            boxShadow: '0 4px 20px rgba(0,0,0,.35)',
+            border: '1px solid rgba(255,255,255,.08)',
+          }}>
+            <div style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 500, marginBottom: '3px' }}>{labels[hoverIdx]}</div>
+            {activeSeries.map((s, idx) => (
+              <div key={s.label} style={{ color: CAT_COLORS[idx % CAT_COLORS.length] }}>
+                ● {s.label}: ${(s.data[hoverIdx] || 0).toLocaleString('en-AU')}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="180"
+          preserveAspectRatio="none"
+          style={{ display: 'block', cursor: 'crosshair', overflow: 'hidden' }}
+          onMouseMove={onMove} onMouseLeave={() => setHoverIdx(null)}
+        >
+          {yTicks.map((t, i) => (
+            <g key={i}>
+              <line x1={PL} y1={t.y} x2={W - PR} y2={t.y} stroke={i === 0 ? '#e2e8f0' : '#f1f5f9'} strokeWidth="0.8" />
+              <text x={PL + 4} y={t.y - 3} textAnchor="start" fontSize="8" fontWeight="500" fill="#94a3b8">{t.label}</text>
+            </g>
+          ))}
+
+          {activeSeries.map((s, idx) => (
+            <path
+              key={s.label}
+              d={smoothPath(s.data.map((v, i) => [xOf(i), yOf(v)]))}
+              fill="none"
+              stroke={CAT_COLORS[idx % CAT_COLORS.length]}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+
+          {labels.map((lbl, i) => i % labelEvery === 0 ? (
+            <text key={i} x={xOf(i).toFixed(1)} y={H - 5}
+              textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
+              fontSize="7.5" fill="#94a3b8"
+            >{lbl}</text>
+          ) : null)}
+
+          {hX !== null && (
+            <>
+              <line x1={hX} y1={PT} x2={hX} y2={floorY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3,3" />
+              {activeSeries.map((s, idx) => (
+                <circle key={s.label} cx={hX} cy={yOf(s.data[hoverIdx] || 0)} r="3" fill="#fff" stroke={CAT_COLORS[idx % CAT_COLORS.length]} strokeWidth="1.5" />
+              ))}
+            </>
+          )}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ── Finance area chart ────────────────────────────────────────────────────────
+const FC = {
+  inc:  { stroke: '#2563eb', label: 'Income',   dot: '#93c5fd' },
+  exp:  { stroke: '#f43f5e', label: 'Expenses', dot: '#fda4af' },
+  prof: { stroke: '#15803d', label: 'Profit',   dot: '#4ade80' },
+};
+
+function FinanceChart({ periods }) {
+  const incRef     = useRef(null);
+  const expRef     = useRef(null);
+  const profRef    = useRef(null);
+  const areaGrpRef = useRef(null);
+  const [hoverIdx, setHoverIdx] = useState(null);
+
+  const W = 320, H = 160, PL = 4, PR = 4, PT = 26, PB = 26;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const floorY = PT + cH;
+
+  const allVals = periods.flatMap(p => [p.income, p.exp, Math.max(0, p.income - p.exp)]);
+  const rawMax  = Math.max(...allVals, 1);
+  // Compute nice round max & step
+  const niceStep = (() => {
+    const rough = rawMax / 4;
+    const exp   = Math.pow(10, Math.floor(Math.log10(rough)));
+    return [1, 2, 2.5, 5, 10].map(s => s * exp).find(s => s >= rough) || exp * 10;
+  })();
+  const maxVal  = Math.ceil(rawMax / niceStep) * niceStep;
+  const hasData = allVals.some(v => v > 0);
+  const depsKey = periods.map(p => `${p.income},${p.exp}`).join('|');
+
+  useEffect(() => {
+    [incRef, expRef, profRef].forEach(ref => {
+      const el = ref.current;
+      if (!el) return;
+      const len = el.getTotalLength();
+      el.style.strokeDasharray  = len;
+      el.style.strokeDashoffset = len;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (el) { el.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1)'; el.style.strokeDashoffset = 0; }
+      }));
+    });
+    const grp = areaGrpRef.current;
+    if (grp) {
+      grp.style.transition      = 'none';
+      grp.style.transformOrigin = `${PL}px ${floorY}px`;
+      grp.style.transform       = 'scaleY(0)';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (grp) { grp.style.transition = 'transform 1.5s cubic-bezier(.4,0,.2,1)'; grp.style.transform = 'scaleY(1)'; }
+      }));
+    }
+  }, [depsKey]);
+
+  const n    = periods.length || 1;
+  const xOf  = i => PL + (n <= 1 ? cW / 2 : (i / (n - 1)) * cW);
+  const yOf  = v => PT + cH - (v / maxVal) * cH;
+
+  const incPts  = periods.map((p, i) => [xOf(i), yOf(p.income)]);
+  const expPts  = periods.map((p, i) => [xOf(i), yOf(p.exp)]);
+  const profPts = periods.map((p, i) => [xOf(i), yOf(Math.max(0, p.income - p.exp))]);
+
+  const incLine  = smoothPath(incPts);
+  const expLine  = smoothPath(expPts);
+  const profLine = smoothPath(profPts);
+  const mkArea   = line => line ? `${line} L${xOf(n-1).toFixed(1)},${floorY} L${xOf(0).toFixed(1)},${floorY} Z` : '';
+
+  const yTicks = Array.from({ length: 5 }, (_, i) => {
+    const v = niceStep * i;
+    return { y: yOf(v), label: v >= 1000 ? `$${(v/1000).toFixed(v%1000===0?0:1)}k` : `$${Math.round(v)}` };
+  });
+
+  const labelEvery = n <= 31 ? 1 : n <= 60 ? 2 : Math.ceil(n / 12);
+  const hX     = hoverIdx !== null ? xOf(hoverIdx) : null;
+  const hP     = hoverIdx !== null ? periods[hoverIdx] : null;
+  const tipPct = hoverIdx !== null ? ((PL + (hoverIdx / Math.max(n-1,1)) * cW) / W * 100) : 50;
+
+  function onMove(e) {
+    const r    = e.currentTarget.getBoundingClientRect();
+    const svgX = ((e.clientX - r.left) / r.width) * W;
+    const plotX = Math.max(0, Math.min(cW, svgX - PL));
+    setHoverIdx(Math.max(0, Math.min(n - 1, Math.round((plotX / cW) * (n - 1)))));
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '16px', padding: '16px 16px 10px', marginBottom: '14px', border: '1px solid var(--gray-200)' }}>
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-800)', marginBottom: '6px' }}>Financial Overview</div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {Object.values(FC).map(s => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '16px', height: '3px', background: s.stroke, borderRadius: '2px' }} />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--gray-500)' }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+        {!hasData && <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '4px' }}>No data — add revenue or expenses</div>}
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        {hoverIdx !== null && hP && (
+          <div style={{
+            position: 'absolute', top: '2px', zIndex: 20, pointerEvents: 'none',
+            left: `clamp(82px, ${tipPct}%, calc(100% - 82px))`,
+            transform: 'translateX(-50%)',
+            background: '#1e293b', color: '#fff',
+            fontSize: '9.5px', fontWeight: 600,
+            padding: '8px 12px', borderRadius: '10px',
+            lineHeight: 1.9, whiteSpace: 'nowrap',
+            boxShadow: '0 4px 20px rgba(0,0,0,.35)',
+            border: '1px solid rgba(255,255,255,.08)',
+          }}>
+            <div style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 500, marginBottom: '3px' }}>{hP.label}</div>
+            <div style={{ color: FC.inc.dot  }}>● Income: ${hP.income.toLocaleString('en-AU')}</div>
+            <div style={{ color: FC.exp.dot  }}>● Expenses: ${hP.exp.toLocaleString('en-AU')}</div>
+            <div style={{ color: FC.prof.dot }}>● Profit: ${Math.max(0, hP.income - hP.exp).toLocaleString('en-AU')}</div>
+          </div>
+        )}
+
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="200"
+          preserveAspectRatio="none"
+          style={{ display: 'block', cursor: 'crosshair', overflow: 'hidden' }}
+          onMouseMove={onMove} onMouseLeave={() => setHoverIdx(null)}
+        >
+          <defs>
+            <linearGradient id="fc-inc-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="#2563eb" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02" />
+            </linearGradient>
+            <linearGradient id="fc-exp-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="#f43f5e" stopOpacity="0.40" />
+              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.02" />
+            </linearGradient>
+            <linearGradient id="fc-prof-g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="#15803d" stopOpacity="0.38" />
+              <stop offset="100%" stopColor="#15803d" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines + floating Y-axis labels inside chart */}
+          {yTicks.map((t, i) => (
+            <g key={i}>
+              <line x1={PL} y1={t.y} x2={W - PR} y2={t.y} stroke={i === 0 ? '#e2e8f0' : '#f1f5f9'} strokeWidth="0.8" />
+              <text
+                x={PL + 4} y={i === 0 ? t.y - 3 : t.y - 3}
+                textAnchor="start" fontSize="8" fontWeight="500" fill="#94a3b8"
+              >{t.label}</text>
+            </g>
+          ))}
+
+          <g ref={areaGrpRef}>
+            <path d={mkArea(incLine)}  fill="url(#fc-inc-g)" />
+            <path d={mkArea(expLine)}  fill="url(#fc-exp-g)" />
+            <path d={mkArea(profLine)} fill="url(#fc-prof-g)" />
+          </g>
+
+          <path ref={incRef}  d={incLine}  fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path ref={expRef}  d={expLine}  fill="none" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path ref={profRef} d={profLine} fill="none" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+          {periods.map((p, i) => i % labelEvery === 0 ? (
+            <text
+              key={i}
+              x={xOf(i).toFixed(1)}
+              y={H - 5}
+              textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
+              fontSize="7.5"
+              fill="#94a3b8"
+            >{p.label}</text>
+          ) : null)}
+
+          {hX !== null && incPts[hoverIdx] && (
+            <>
+              <line x1={hX} y1={PT} x2={hX} y2={floorY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3,3" />
+              <circle cx={hX} cy={incPts[hoverIdx][1]}  r="3.5" fill="#fff" stroke="#2563eb" strokeWidth="2" />
+              <circle cx={hX} cy={expPts[hoverIdx][1]}  r="3.5" fill="#fff" stroke="#f43f5e" strokeWidth="2" />
+              <circle cx={hX} cy={profPts[hoverIdx][1]} r="3.5" fill="#fff" stroke="#15803d" strokeWidth="2" />
+            </>
+          )}
+        </svg>
+      </div>
+    </div>
+  );
 }
 
 function Bar({ label, value, max, color, bg, count }) {
@@ -127,6 +523,11 @@ export default function ReportsPage() {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const filteredExpenses = expenses.filter(e => inRange(e.date));
+  const chartPeriods = useMemo(
+    () => buildPeriods(range, from, to, filteredRevenue, filteredExpenses),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [range, from?.getTime(), to?.getTime(), revenueRecords, expenses]
+  );
 
   // Separate upsell records from regular job revenue
   const isUpsellRecord = r => (r.name || '').toLowerCase().includes('upsell') || r.jobType === 'Upsell';
@@ -192,6 +593,9 @@ export default function ReportsPage() {
         <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>Income, expenses & lead sources</div>
       </div>
 
+      {/* ── Area chart ── */}
+      <FinanceChart periods={chartPeriods} />
+
       {/* ── Summary cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
         <SummaryCard
@@ -216,6 +620,7 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '4px', marginBottom: '10px' }}>
         {[
           { id: 'overview',      label: 'Overview' },
+          { id: 'expenses',      label: 'Expenses' },
           { id: 'source',        label: 'By Source' },
           { id: 'transactions',  label: 'Transactions' },
         ].map(t => (
@@ -324,14 +729,6 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {Object.keys(byCategory).length > 0 && (
-            <div style={card}>
-              <div style={cardHdr}>Expenses by Category</div>
-              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
-                <Bar key={k} label={k} value={v} max={maxCat} color="#dc2626" bg="#fef2f2" />
-              ))}
-            </div>
-          )}
 
           {outstandingLeads.length > 0 && (
             <div style={card}>
@@ -358,6 +755,24 @@ export default function ReportsPage() {
 
           {filteredRevenue.length === 0 && filteredExpenses.length === 0 && (
             <EmptyState />
+          )}
+        </>
+      )}
+
+      {/* ── Expenses tab ── */}
+      {activeTab === 'expenses' && (
+        <>
+          <ExpensesLineChart expenses={filteredExpenses} range={range} from={from} to={to} />
+
+          {Object.keys(byCategory).length > 0 ? (
+            <div style={card}>
+              <div style={cardHdr}>Expenses by Category</div>
+              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                <Bar key={k} label={k} value={v} max={maxCat} color="#dc2626" bg="#fef2f2" />
+              ))}
+            </div>
+          ) : (
+            <EmptyState msg="No expenses recorded for this period." />
           )}
         </>
       )}

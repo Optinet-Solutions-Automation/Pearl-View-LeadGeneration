@@ -535,8 +535,9 @@ export default function CalendarPage() {
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
             const bookingsOnDay = byDay[day] || [];
-            const hasBooked  = bookingsOnDay.length > 0;
-            const count      = bookingsOnDay.length;
+            const hasBooked    = bookingsOnDay.length > 0;
+            const activeCount  = bookingsOnDay.filter(b => b.bookingStatus !== 'Completed').length;
+            const count        = activeCount || bookingsOnDay.length;
             const isSelected = selectedDay === day;
             const todayMark  = isToday(day);
 

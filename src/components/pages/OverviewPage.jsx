@@ -17,7 +17,7 @@ function fmt$(n) {
 }
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
-function Sparkline({ id, data, color, fmt }) {
+function Sparkline({ id, data, color, fmt, labels }) {
   const pathRef = useRef(null);
   const [hoverIdx, setHoverIdx] = useState(null);
   const W = 100, H = 32;
@@ -67,21 +67,25 @@ function Sparkline({ id, data, color, fmt }) {
         <div style={{
           position: 'absolute',
           bottom: '100%',
-          left: `clamp(18px, ${hPct}%, calc(100% - 18px))`,
+          left: `clamp(22px, ${hPct}%, calc(100% - 22px))`,
           transform: 'translateX(-50%)',
-          background: color,
+          background: '#1e293b',
           color: '#fff',
           fontSize: '9px',
           fontWeight: 700,
-          padding: '2px 6px',
-          borderRadius: '4px',
+          padding: '4px 7px',
+          borderRadius: '6px',
           whiteSpace: 'nowrap',
           pointerEvents: 'none',
-          marginBottom: '3px',
+          marginBottom: '4px',
           zIndex: 10,
-          boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+          boxShadow: '0 2px 8px rgba(0,0,0,.25)',
+          lineHeight: 1.6,
         }}>
-          {fmt ? fmt(hVal) : hVal}
+          {labels && labels[hoverIdx] && (
+            <div style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 500 }}>{labels[hoverIdx]}</div>
+          )}
+          <div style={{ color }}>{fmt ? fmt(hVal) : hVal}</div>
         </div>
       )}
       <svg
@@ -231,11 +235,19 @@ export default function OverviewPage() {
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toDateString();
   });
-  const newByDay      = last7.map(ds => leads.filter(l => l.dateObj && l.dateObj.toDateString() === ds).length);
-  const followByDay   = last7.map(ds => leads.filter(l => l.followUp && new Date(l.followUp).toDateString() === ds).length);
-  const bookedByDay   = last7.map(ds => (calBookings || []).filter(b => b.date && new Date(b.date).toDateString() === ds).length);
+  const last7Labels = last7.map(ds => {
+    const d = new Date(ds);
+    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  });
+  const newByDay      = last7.map(ds => leads.filter(l => l.status === 'new' && l.dateObj && l.dateObj.toDateString() === ds).length);
+  const followByDay   = last7.map(ds => leads.filter(l => l.followUp && new Date(l.followUp) < new Date() && new Date(l.followUp).toDateString() === ds).length);
+  const bookedByDay   = last7.map(ds => (calBookings || []).filter(b => b.date && new Date(b.date).toDateString() === ds && b.bookingStatus !== 'Completed').length);
   const revenueByDay  = last7.map(ds => leads.filter(l => l.paid && l.dateObj && l.dateObj.toDateString() === ds).reduce((s, l) => s + (l.paidAmount || 0), 0));
-  const pipelineByDay = last7.map(ds => leads.filter(l => l.status === 'quote_sent' && l.dateObj && l.dateObj.toDateString() === ds).length);
+  // Cumulative: how many quote_sent leads existed as of each day (so last point = current total)
+  const pipelineByDay = last7.map(ds => {
+    const cutoff = new Date(ds); cutoff.setHours(23, 59, 59, 999);
+    return leads.filter(l => l.status === 'quote_sent' && l.dateObj && l.dateObj <= cutoff).length;
+  });
 
   // Action items
   const agingNew    = newLeads.filter(l => l.dateObj && (Date.now() - l.dateObj.getTime()) > 24 * 3600000);
@@ -265,8 +277,8 @@ export default function OverviewPage() {
         <div style={{ background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '12px', padding: '12px 10px' }}>
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#0f766e', marginBottom: '5px' }}>New Today</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: '#134e4a', lineHeight: 1 }}>{newToday}</div>
-          <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '4px' }}>received</div>
-          <Sparkline id="new" data={newByDay} color="#0d9488" />
+          <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '4px' }}>{newToday === 1 ? '1 received today' : `${newToday} received today`}</div>
+          <Sparkline id="new" data={newByDay} color="#0d9488" labels={last7Labels} />
         </div>
         <div
           style={{ background: followUpsDue.length > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue.length > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: followUpsDue.length > 0 ? 'pointer' : 'default' }}
@@ -274,8 +286,8 @@ export default function OverviewPage() {
         >
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-500)', marginBottom: '5px' }}>Follow-ups</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-400)', lineHeight: 1 }}>{followUpsDue.length}</div>
-          <div style={{ fontSize: '10px', color: followUpsDue.length > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>overdue</div>
-          <Sparkline id="followup" data={followByDay} color={followUpsDue.length > 0 ? '#ef4444' : '#9ca3af'} />
+          <div style={{ fontSize: '10px', color: followUpsDue.length > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>{followUpsDue.length === 1 ? '1 overdue' : `${followUpsDue.length} overdue`}</div>
+          <Sparkline id="followup" data={followByDay} color={followUpsDue.length > 0 ? '#ef4444' : '#9ca3af'} labels={last7Labels} />
         </div>
         <div
           style={{ background: bookedToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${bookedToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: bookedToday > 0 ? 'pointer' : 'default' }}
@@ -283,8 +295,8 @@ export default function OverviewPage() {
         >
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: bookedToday > 0 ? '#d97706' : 'var(--gray-500)', marginBottom: '5px' }}>Booked Today</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: bookedToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{bookedToday}</div>
-          <div style={{ fontSize: '10px', color: bookedToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>on calendar</div>
-          <Sparkline id="booked" data={bookedByDay} color={bookedToday > 0 ? '#f59e0b' : '#9ca3af'} />
+          <div style={{ fontSize: '10px', color: bookedToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>{bookedToday === 1 ? '1 on calendar' : `${bookedToday} on calendar`}</div>
+          <Sparkline id="booked" data={bookedByDay} color={bookedToday > 0 ? '#f59e0b' : '#9ca3af'} labels={last7Labels} />
         </div>
       </div>
 
@@ -294,8 +306,8 @@ export default function OverviewPage() {
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px 14px' }}>
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#15803d', marginBottom: '5px' }}>Revenue Collected</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#14532d', lineHeight: 1 }}>{totalRevenue > 0 ? fmt$(totalRevenue) : '—'}</div>
-          <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '4px' }}>{leads.filter(l => l.paid).length} paid jobs</div>
-          <Sparkline id="revenue" data={revenueByDay} color="#16a34a" fmt={v => v > 0 ? fmt$(v) : '$0'} />
+          <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '4px' }}>{leads.filter(l => l.paid).length} paid job{leads.filter(l => l.paid).length !== 1 ? 's' : ''}</div>
+          <Sparkline id="revenue" data={revenueByDay} color="#16a34a" fmt={v => v > 0 ? fmt$(v) : '$0'} labels={last7Labels} />
         </div>
         <div
           style={{ background: pendingRevenue > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${pendingRevenue > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 14px', cursor: 'pointer' }}
@@ -303,8 +315,8 @@ export default function OverviewPage() {
         >
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: pendingRevenue > 0 ? '#92400e' : 'var(--gray-500)', marginBottom: '5px' }}>Quoted Pipeline</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: pendingRevenue > 0 ? '#b45309' : 'var(--gray-400)', lineHeight: 1 }}>{pendingRevenue > 0 ? fmt$(pendingRevenue) : '—'}</div>
-          <div style={{ fontSize: '10px', color: pendingRevenue > 0 ? '#d97706' : 'var(--gray-400)', marginTop: '4px' }}>{quoteSent.length} quotes open</div>
-          <Sparkline id="pipeline" data={pipelineByDay} color={pendingRevenue > 0 ? '#d97706' : '#9ca3af'} />
+          <div style={{ fontSize: '10px', color: pendingRevenue > 0 ? '#d97706' : 'var(--gray-400)', marginTop: '4px' }}>{quoteSent.length} quote{quoteSent.length !== 1 ? 's' : ''} open</div>
+          <Sparkline id="pipeline" data={pipelineByDay} color={pendingRevenue > 0 ? '#d97706' : '#9ca3af'} labels={last7Labels} />
         </div>
       </div>
 
