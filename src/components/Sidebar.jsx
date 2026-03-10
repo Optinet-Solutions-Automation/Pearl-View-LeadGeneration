@@ -15,7 +15,8 @@ export function MobileBottomNav() {
   const { leads, currentPage, setCurrentPage, setSearchTerm, closePanel, sidebarOpen, toggleSidebar } = useLeadsContext();
 
   function navigate(page) {
-    setCurrentPage(page);
+    const dest = currentPage === 'leads' && page === 'leads' ? 'overview' : page;
+    setCurrentPage(dest);
     setSearchTerm('');
     closePanel();
   }
@@ -82,7 +83,8 @@ export default function Sidebar() {
   const { leads, deletedLeads, currentPage, setCurrentPage, setSearchTerm, closePanel, sidebarOpen, closeSidebar } = useLeadsContext();
 
   function navigate(page) {
-    setCurrentPage(page);
+    const dest = currentPage === 'leads' && page === 'leads' ? 'overview' : page;
+    setCurrentPage(dest);
     setSearchTerm('');
     closePanel();
     closeSidebar();

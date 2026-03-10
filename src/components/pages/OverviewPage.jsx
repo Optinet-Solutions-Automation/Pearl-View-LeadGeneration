@@ -1,3 +1,4 @@
+import { useRef, useEffect, useState } from 'react';
 import { useLeadsContext } from '../../context/LeadsContext';
 import { formatDate, isToday } from '../../utils/dateUtils';
 
@@ -13,6 +14,102 @@ function ageLabel(dateObj) {
 function fmt$(n) {
   if (n >= 1000) return `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
   return `$${n.toLocaleString()}`;
+}
+
+// ── Sparkline ─────────────────────────────────────────────────────────────────
+function Sparkline({ id, data, color, fmt }) {
+  const pathRef = useRef(null);
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const W = 100, H = 32;
+
+  useEffect(() => {
+    const el = pathRef.current;
+    if (!el) return;
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = len;
+    el.style.strokeDashoffset = len;
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (el) {
+          el.style.transition = 'stroke-dashoffset 1s ease';
+          el.style.strokeDashoffset = 0;
+        }
+      })
+    );
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  if (!data || data.length < 2) return null;
+
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => [
+    +((i / (data.length - 1)) * W).toFixed(1),
+    +(H - 4 - ((v - min) / range) * (H - 8)).toFixed(1),
+  ]);
+  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+  const area = `${line} L${W},${H} L0,${H} Z`;
+  const gid = `sp-${id}`;
+  const hPt  = hoverIdx !== null ? pts[hoverIdx] : null;
+  const hVal = hoverIdx !== null ? data[hoverIdx] : null;
+  const hPct = hoverIdx !== null ? (hoverIdx / (data.length - 1)) * 100 : 50;
+
+  function onMove(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - r.left) / r.width;
+    setHoverIdx(Math.max(0, Math.min(data.length - 1, Math.round(ratio * (data.length - 1)))));
+  }
+
+  return (
+    <div style={{ position: 'relative', marginTop: '8px' }}>
+      {hoverIdx !== null && hVal !== null && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: `clamp(18px, ${hPct}%, calc(100% - 18px))`,
+          transform: 'translateX(-50%)',
+          background: color,
+          color: '#fff',
+          fontSize: '9px',
+          fontWeight: 700,
+          padding: '2px 6px',
+          borderRadius: '4px',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          marginBottom: '3px',
+          zIndex: 10,
+          boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+        }}>
+          {fmt ? fmt(hVal) : hVal}
+        </div>
+      )}
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width="100%"
+        height="32"
+        preserveAspectRatio="none"
+        style={{ display: 'block', cursor: 'crosshair' }}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#${gid})`} />
+        <path ref={pathRef} d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {hPt && (
+          <>
+            <line x1={hPt[0]} y1="0" x2={hPt[0]} y2={H} stroke={color} strokeWidth="0.8" opacity="0.45" />
+            <circle cx={hPt[0]} cy={hPt[1]} r="2.5" fill="#fff" stroke={color} strokeWidth="1.5" />
+          </>
+        )}
+      </svg>
+    </div>
+  );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -130,6 +227,16 @@ export default function OverviewPage() {
   const totalRevenue   = leads.filter(l => l.paid).reduce((sum, l) => sum + (l.paidAmount || 0), 0);
   const pendingRevenue = quoteSent.reduce((sum, l) => sum + (l.value || 0), 0);
 
+  // Sparkline data — last 7 days
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toDateString();
+  });
+  const newByDay      = last7.map(ds => leads.filter(l => l.dateObj && l.dateObj.toDateString() === ds).length);
+  const followByDay   = last7.map(ds => leads.filter(l => l.followUp && new Date(l.followUp).toDateString() === ds).length);
+  const bookedByDay   = last7.map(ds => (calBookings || []).filter(b => b.date && new Date(b.date).toDateString() === ds).length);
+  const revenueByDay  = last7.map(ds => leads.filter(l => l.paid && l.dateObj && l.dateObj.toDateString() === ds).reduce((s, l) => s + (l.paidAmount || 0), 0));
+  const pipelineByDay = last7.map(ds => leads.filter(l => l.status === 'quote_sent' && l.dateObj && l.dateObj.toDateString() === ds).length);
+
   // Action items
   const agingNew    = newLeads.filter(l => l.dateObj && (Date.now() - l.dateObj.getTime()) > 24 * 3600000);
   const uncollected = jobDone.filter(l => !l.paid);
@@ -159,6 +266,7 @@ export default function OverviewPage() {
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#0f766e', marginBottom: '5px' }}>New Today</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: '#134e4a', lineHeight: 1 }}>{newToday}</div>
           <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '4px' }}>received</div>
+          <Sparkline id="new" data={newByDay} color="#0d9488" />
         </div>
         <div
           style={{ background: followUpsDue.length > 0 ? '#fef2f2' : '#f9fafb', border: `1px solid ${followUpsDue.length > 0 ? '#fecaca' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: followUpsDue.length > 0 ? 'pointer' : 'default' }}
@@ -167,6 +275,7 @@ export default function OverviewPage() {
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-500)', marginBottom: '5px' }}>Follow-ups</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: followUpsDue.length > 0 ? '#dc2626' : 'var(--gray-400)', lineHeight: 1 }}>{followUpsDue.length}</div>
           <div style={{ fontSize: '10px', color: followUpsDue.length > 0 ? '#ef4444' : 'var(--gray-400)', marginTop: '4px' }}>overdue</div>
+          <Sparkline id="followup" data={followByDay} color={followUpsDue.length > 0 ? '#ef4444' : '#9ca3af'} />
         </div>
         <div
           style={{ background: bookedToday > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${bookedToday > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '12px 10px', cursor: bookedToday > 0 ? 'pointer' : 'default' }}
@@ -175,6 +284,7 @@ export default function OverviewPage() {
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: bookedToday > 0 ? '#d97706' : 'var(--gray-500)', marginBottom: '5px' }}>Booked Today</div>
           <div style={{ fontSize: '28px', fontWeight: 800, color: bookedToday > 0 ? '#d97706' : 'var(--gray-400)', lineHeight: 1 }}>{bookedToday}</div>
           <div style={{ fontSize: '10px', color: bookedToday > 0 ? '#f59e0b' : 'var(--gray-400)', marginTop: '4px' }}>on calendar</div>
+          <Sparkline id="booked" data={bookedByDay} color={bookedToday > 0 ? '#f59e0b' : '#9ca3af'} />
         </div>
       </div>
 
@@ -185,11 +295,16 @@ export default function OverviewPage() {
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#15803d', marginBottom: '5px' }}>Revenue Collected</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#14532d', lineHeight: 1 }}>{totalRevenue > 0 ? fmt$(totalRevenue) : '—'}</div>
           <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '4px' }}>{leads.filter(l => l.paid).length} paid jobs</div>
+          <Sparkline id="revenue" data={revenueByDay} color="#16a34a" fmt={v => v > 0 ? fmt$(v) : '$0'} />
         </div>
-        <div style={{ background: pendingRevenue > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${pendingRevenue > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 14px' }}>
+        <div
+          style={{ background: pendingRevenue > 0 ? '#fffbeb' : '#f9fafb', border: `1px solid ${pendingRevenue > 0 ? '#fde68a' : 'var(--gray-200)'}`, borderRadius: '12px', padding: '14px 14px', cursor: 'pointer' }}
+          onClick={() => setCurrentPage('leads')}
+        >
           <div style={{ fontSize: '9.5px', fontWeight: 700, color: pendingRevenue > 0 ? '#92400e' : 'var(--gray-500)', marginBottom: '5px' }}>Quoted Pipeline</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: pendingRevenue > 0 ? '#b45309' : 'var(--gray-400)', lineHeight: 1 }}>{pendingRevenue > 0 ? fmt$(pendingRevenue) : '—'}</div>
           <div style={{ fontSize: '10px', color: pendingRevenue > 0 ? '#d97706' : 'var(--gray-400)', marginTop: '4px' }}>{quoteSent.length} quotes open</div>
+          <Sparkline id="pipeline" data={pipelineByDay} color={pendingRevenue > 0 ? '#d97706' : '#9ca3af'} />
         </div>
       </div>
 

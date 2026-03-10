@@ -1,18 +1,66 @@
+import { useRef, useEffect } from 'react';
 import { useLeadsContext } from '../context/LeadsContext';
 
-function StatCard({ id, label, value, sub, icon, iconBg, iconStroke, onClick, isActive }) {
+// ── Animated donut ring ────────────────────────────────────────────────────────
+function DonutRing({ pct, color, size = 46 }) {
+  const circleRef = useRef(null);
+  const r    = (size - 7) / 2;
+  const circ = 2 * Math.PI * r;
+  const target = circ * (1 - Math.min(Math.max(pct, 0), 100) / 100);
+
+  useEffect(() => {
+    const el = circleRef.current;
+    if (!el) return;
+    el.style.strokeDasharray  = circ;
+    el.style.strokeDashoffset = circ;          // start hidden
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (el) {
+          el.style.transition       = 'stroke-dashoffset 1s ease';
+          el.style.strokeDashoffset = target;  // animate to target
+        }
+      })
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [pct]);
+
+  return (
+    <svg width={size} height={size} style={{ flexShrink: 0 }}>
+      {/* Track */}
+      <circle
+        cx={size / 2} cy={size / 2} r={r}
+        fill="none" stroke={color} strokeOpacity="0.15" strokeWidth="4.5"
+      />
+      {/* Progress arc */}
+      <circle
+        ref={circleRef}
+        cx={size / 2} cy={size / 2} r={r}
+        fill="none" stroke={color} strokeWidth="4.5" strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ strokeDasharray: circ, strokeDashoffset: circ }}
+      />
+      {/* Centre label */}
+      <text
+        x={size / 2} y={size / 2}
+        textAnchor="middle" dominantBaseline="central"
+        fontSize="9.5" fontWeight="800" fill={color}
+      >
+        {Math.round(pct)}%
+      </text>
+    </svg>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, color, pct, onClick, isActive }) {
   return (
     <div
       className={`stat-card stat-clickable${isActive ? ' stat-active' : ''}`}
       onClick={onClick}
     >
       <div className="stat-top">
-        <span className="stat-lbl">{label}</span>
-        <div className="stat-ico" style={{ background: iconBg }}>
-          <svg fill="none" viewBox="0 0 24 24" stroke={iconStroke} strokeWidth="2">
-            {icon}
-          </svg>
-        </div>
+        <span className="stat-lbl" style={{ color }}>{label}</span>
+        <DonutRing pct={pct} color={color} />
       </div>
       <div className="stat-val">{value}</div>
       <div className="stat-sub">{sub}</div>
@@ -20,14 +68,16 @@ function StatCard({ id, label, value, sub, icon, iconBg, iconStroke, onClick, is
   );
 }
 
+// ── StatsRow ──────────────────────────────────────────────────────────────────
 export default function StatsRow() {
   const { leads, statFilter, toggleStatFilter } = useLeadsContext();
 
-  const newCount       = leads.filter(l => l.status === 'new').length;
-  const callCount      = leads.filter(l => l.hasCall).length;
-  const formCount      = leads.filter(l => !l.hasCall).length;
-  const quotedCount    = leads.filter(l => l.status === 'quote_sent').length;
-  const refusedLeads   = leads.filter(l => l.status === 'refused');
+  const total        = leads.length || 1; // avoid /0
+  const newCount     = leads.filter(l => l.status === 'new').length;
+  const callCount    = leads.filter(l => l.hasCall).length;
+  const formCount    = leads.filter(l => !l.hasCall).length;
+  const quotedCount  = leads.filter(l => l.status === 'quote_sent').length;
+  const refusedLeads = leads.filter(l => l.status === 'refused');
 
   // Refuse reason breakdown subtitle
   const rc = { too_expensive: 0, competition: 0, no_answer: 0, other: 0 };
@@ -45,37 +95,37 @@ export default function StatsRow() {
         label="New Leads"
         value={newCount}
         sub={`${leads.length} total leads`}
-        iconBg="#eff6ff" iconStroke="#2563eb"
+        color="#2563eb"
+        pct={(newCount / total) * 100}
         isActive={statFilter === 'new'}
         onClick={() => toggleStatFilter('new')}
-        icon={<><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></>}
       />
       <StatCard
         label="Calls Received"
         value={callCount}
         sub={`${formCount} form submissions`}
-        iconBg="#f0fdf4" iconStroke="#16a34a"
+        color="#16a34a"
+        pct={(callCount / total) * 100}
         isActive={statFilter === 'calls'}
         onClick={() => toggleStatFilter('calls')}
-        icon={<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14.92z" transform="translate(1,1)"/>}
       />
       <StatCard
         label="Pending Quotes"
         value={quotedCount}
         sub="Awaiting client response"
-        iconBg="#fffbeb" iconStroke="#d97706"
+        color="#d97706"
+        pct={(quotedCount / total) * 100}
         isActive={statFilter === 'quote_sent'}
         onClick={() => toggleStatFilter('quote_sent')}
-        icon={<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>}
       />
       <StatCard
         label="Refused"
         value={refusedLeads.length}
         sub={refusedSub}
-        iconBg="#fee2e2" iconStroke="#dc2626"
+        color="#dc2626"
+        pct={(refusedLeads.length / total) * 100}
         isActive={statFilter === 'refused'}
         onClick={() => toggleStatFilter('refused')}
-        icon={<><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>}
       />
     </div>
   );
