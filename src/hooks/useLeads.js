@@ -560,8 +560,8 @@ export function useLeads() {
       const data = await r.json();
       if (data.id) {
         setLeads(prev => prev.map(l => l.id === tempId ? { ...l, airtableId: data.id } : l));
-        // Notify n8n → WhatsApp (fire-and-forget)
-        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+        // Notify WhatsApp service (fire-and-forget)
+        const webhookUrl = import.meta.env.VITE_WEBHOOK_URL;
         if (webhookUrl) {
           fetch(webhookUrl, {
             method: 'POST',
